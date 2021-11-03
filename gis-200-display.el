@@ -81,6 +81,15 @@
             (gis-200--resolve-moved-point row col (1+ line) 0)
           (list line line-col))))))
 
+(defun gis-200--row-register-display (row col direction)
+  ""
+  "????"
+  ;; (let ((val (gis-200--get-direction-row-registers row col direction)))
+  ;;   (cond
+  ;;    ((not val) "    ")
+  ;;    ((numberp val) (format "%4d" val))))
+  )
+
 (defun gis-200-display-game-board ()
   (let* ((arrow-up "↑")
          (arrow-down "↓")
@@ -98,6 +107,7 @@
          (box-inside (make-string gis-200-box-width ?\s)))
     (let ((insert-row-top
            (lambda (row)
+             "Draw the  ┌───┐┌───┐┌───┐┌───┐ part of the board."
              (insert space-start)
              (insert space-between)
              (dotimes (col gis-200-column-ct)
@@ -108,6 +118,7 @@
              (insert "\n")))
           (insert-row-bottom
            (lambda (row)
+             "Draw the  └───┘└───┘└───┘└───┘ part of the board. "
              (insert space-start)
              (insert space-between)
              (dotimes (col gis-200-column-ct)
@@ -118,6 +129,7 @@
              (insert "\n")))
           (insert-row-middle
            (lambda (row box-row)
+             "Draw the ⇋|   |⇋|   |⇋|   |⇋|   |⇋ part of the board."
              (insert space-start)
              (cond
               ((= 5 box-row)
@@ -140,33 +152,34 @@
                 (t
                  (insert space-between))))
              (insert "\n")))
-          (insert-row-space
-           (lambda (row)
-             (insert (make-string (+ (length space-start)       
-                                     (* gis-200-column-ct
-                                        (+ 1 (length box-line-top-bottom) 1 (length space-between))))
-                                  ?\s))
-             (insert "\n")))
           (insert-middle-row-space
            (lambda (row)
-             (let* ((padding-space-left (make-string (1+ (- (/ (length box-line-top-bottom) 2) 1)) ?\s))
-                    (padding-space-right (make-string (1+ (- (length box-line-top-bottom) 2 (length padding-space-left))) ?\s)))
+             "Draw the  ↑↓    ↑↓    ↑↓    ↑↓ part of the board."
+             (let* ((left-of-arrows-len (1+ (- (/ (length box-line-top-bottom) 2) 1)))
+                    (right-of-arrows-len (1+ (- (length box-line-top-bottom) 2 left-of-arrows-len)))
+                    (padding-space-left (make-string (- left-of-arrows-len 5) ?\s))
+                    (padding-space-right (make-string (- right-of-arrows-len 5) ?\s)))
                (insert space-start)
                (insert space-between)
                (dotimes (col gis-200-column-ct)
                  (insert padding-space-left)
-                 (insert arrow-up) (insert ?\s) (insert arrow-down)
+                 (let ((up-arrow-display (gis-200--row-register-display row col 'UP))
+                       (down-arrow-display (gis-200--row-register-display row col 'DOWN)))
+                   (insert up-arrow-display)
+                   (insert " ") (insert arrow-up) (insert ?\s) (insert arrow-down) (insert " ")
+                   (insert down-arrow-display))
                  (insert padding-space-right)
                  (insert space-between))
+               (insert (format "%d" row))
                (insert "\n")))))
-      (funcall insert-middle-row-space -1)
+      (funcall insert-middle-row-space 0)
       (dotimes (row 3)
         (funcall insert-row-top row)
         (dotimes (box-row gis-200-box-height)
           (funcall insert-row-middle row box-row))
         (funcall insert-row-bottom row)
         (when (not (= 2 row))
-          (funcall insert-middle-row-space row)))
+          (funcall insert-middle-row-space (1+ row))))
       (funcall insert-middle-row-space 3))))
 
 (defun gis-200-redraw-game-board ()

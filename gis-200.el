@@ -281,6 +281,8 @@
          (_ (and (>= pc (length instrs)) (error "End of program error"))))
     (car (nthcdr pc instrs))))
 
+
+;; TODO - consolidate this function with gis-200--cell-at-moved-row-col
 (defun gis-200--cell-at-row-col (row col)
   "Return the cell at index ROW COL from the gameboard."
   (aref gis-200--gameboard
@@ -528,6 +530,32 @@
         (let ((cell (aref gis-200--gameboard idx)))
           (gis-200--cell-runtime-step cell))))))
 
+
+;;; Gameboard Display Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Functions that map the domain of the gameboard to that of the
+;; display.
+
+(defun gis-200--get-direction-row-registers (row col direction)
+  "Return the register value for the DIRECTION registers at ROW, COL.
+ROW and COL here do not refer to the coordinates of a
+cell-runtime but rather the in-between row/col."
+  (assert (or (eql 'UP direction) (eql 'DOWN direction)))
+  (assert (<= 0 row gis-200--gameboard-row-ct))
+  (assert (<= 0 col (1- gis-200--gameboard-col-ct)))
+  (let ((cell-row (if (eql 'DOWN direction) (1- row) row)))
+    (cond
+     ((or (and (= row 0) (eql direction 'UP))
+          (and (= row gis-200--gameboard-row-ct) (eql direction 'DOWN)))
+      nil)
+     ((or (= row 0)
+          (= row gis-200--gameboard-row-ct))
+      (let* ((source (gis-200--gameboard-source-at-pos cell-row col))
+             (data (gis-200--cell-source-data source)))
+        (car data)))
+     (t
+      (let* ((cell-runtime (gis-200--cell-at-row-col cell-row col)))
+        (gis-200--get-value-from-direction cell-runtime direction))))))
 
 ;;; Problem Infrastructure ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
