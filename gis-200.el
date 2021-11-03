@@ -33,201 +33,6 @@
 (require 'cl-lib)
 (require 'seq)
 
-
-;;; structure definitions and helpers
-
-(cl-defstruct (gis-200-code-cell
-               (:constructor gis-200--cell-create)
-               (:copier nil))
-  coord code pc acc bak up right down left)
-
-(defun gis-200-code-cell-get-port (cell port)
-  "Return the item in PORT of CELL."
-  (unless (gis-200-port-p port)
-    (error "Invalid port %s" port))
-  (pcase port
-    ('up (gis-200-code-cell-up cell))
-    ('right (gis-200-code-cell-right cell))
-    ('down (gis-200-code-cell-down cell))
-    ('left (gis-200-code-cell-left cell))))
-
-(defun gis-200--code-cell-init (code x y)
-  "Return an instantiated code-cell with CODE, at coords X, Y."
-  (gis-200--cell-create
-   :coord (list x y)
-   :code (gis-200--parse-code code)
-   :pc 0 :acc 0 :bak 0 :up nil :right nil :down nil :left nil))
-
-(defun gis-200--code-cell-update (cell location val)
-  "Return a new code cell from CELL with LOCATION updated with VAL."
-  (let ((coord (gis-200-code-cell-coord cell))
-        (code (gis-200-code-cell-code cell))
-        (pc (gis-200-code-cell-pc cell))
-        (acc (gis-200-code-cell-acc cell))
-        (bak (gis-200-code-cell-bak cell))
-        (up (gis-200-code-cell-up cell))
-        (right (gis-200-code-cell-right cell))
-        (down (gis-200-code-cell-down cell))
-        (left (gis-200-code-cell-left cell)))
-    (pcase location
-      ('pc (setq pc val))
-      ('acc (setq acc val))
-      ('up (setq up val))
-      ('right (setq right val))
-      ('down (setq down val))
-      ('left (setq left val)))
-    (gis-200--cell-create
-     :coord coord
-     :code code
-     :pc pc :acc acc :bak bak :up up :right right :down down :left left)))
-
-(defun gis-200--code-cell-pc-inc (cell)
-  (let* ((program (gis-200-code-cell-code cell))
-         (old-pc (gis-200-code-cell-pc cell))
-         (line-ct (length program))
-         (new-pc (mod (1+ old-pc) line-ct)))
-    (gis-200--code-cell-update cell 'pc new-pc)))
-
-;;; code parsing
-
-(defun gis-200--parse-code (code)
-  "Return parsed structure of CODE."
-  (read (concat "(" code ")")))
-
-;;; port/coordinates logic
-
-(defun gis-200--port-inverse (port)
-  "Return the opposite direction of PORT."
-  (unless (gis-200-port-p port)
-    (error "Invalid port %s" port))
-  (pcase port
-    ('up 'down)
-    ('down 'up)
-    ('right 'left)
-    ('left 'right)))
-
-(defun gis-200-port-p (sym)
-  "Return non-nil of SYM is up, right, down, or left."
-  (pcase sym
-    ('up t)
-    ('right t)
-    ('down t)
-    ('left t)
-    (_ nil)))
-
-(defun gis-200--coord-move (at dir)
-  "Return the coordinate by going in direction DIR from AT."
-  (let ((x (car at))
-        (y (cadr at)))
-    (pcase dir
-      ('up (list x (1- y)))
-      ('down (list x (1+ y)))
-      ('right (list (1+ x) y))
-      ('left (list (1- x) y))
-      (_ (error "Invalid direction %s" dir)))))
-
-;;; Game board
-
-(defvar gis-200--gameboard nil
-  "The current state of the current played level.
-
-The board should be a two dimentional grid of `gis-200--code-cell' items.")
-
-(defun gis-200--fetch-cell (coord)
-  "Return board-cell of COORD."
-  ;; TODO: write me
-  (let ((x (car coord))
-        (y (cadr coord)))
-    (nth x (nth y gis-200--gameboard))))
-
-(defun gis-200--init-board ()
-  "Helper function to initialize the board to a test state."
-  (setq gis-200--gameboard (gis-200--parse-game-board)))
-
-(defun gis-200--cell-free-p (cell)
-  "Return non-nil if CELL is blocked on a send."
-  (not (or (gis-200-code-cell-up cell)
-           (gis-200-code-cell-down cell)
-           (gis-200-code-cell-left cell)
-           (gis-200-code-cell-right cell))))
-
-(defun gis-200--unblocked-board-positions ()
-  "Return a sequence of all board position."
-  (seq-map #'gis-200-code-cell-coord
-           (seq-filter #'gis-200--cell-free-p (seq-reduce #'append gis-200--gameboard '()))))
-
-(defun gis-200--update-new-cells (cells)
-  "Replace the gameboard cells with CELLS."
-  (let ((new-cells cells))
-    (while new-cells
-      (let* ((new-cell    (car new-cells))
-             (cell-coords (gis-200-code-cell-coord new-cell)))
-        (setq gis-200--gameboard
-         (seq-map
-          (lambda (row)
-            (seq-map (lambda (cell)
-                       (if (equal (gis-200-code-cell-coord cell) cell-coords)
-                           new-cell
-                         cell))
-                     row))
-          gis-200--gameboard)))
-      (setq new-cells (cdr new-cells)))))
-
-;;; Execution Logic
-
-(defun gis-200--recv (cell from-port)
-  "Attempt to receive the item on the FROM-PORT from CELL.
-
-If result is non-nil, the item will have been removed from the
-port."
-  (let* ((at-coord (gis-200-code-cell-coord cell))
-         (recv-coord (gis-200--coord-move at-coord from-port))
-         (recv-cell (gis-200--fetch-cell recv-coord))
-         (from-port-inv (gis-200--port-inverse from-port))
-         (port-val (gis-200-code-cell-get-port recv-cell from-port-inv)))
-    (if (not port-val)
-        ;; If port-val is nil do nothing
-        nil
-      ;; else consume the value
-      (gis-200--update-new-cells (list (gis-200--code-cell-update recv-cell from-port-inv nil)))
-      ;; TODO: maybe find a better way to do this
-      port-val)))
-
-(defun gis-200--move (cell cmd)
-  "Perform the move CMD on CELL."
-  (let* ((from (nth 1 cmd))
-         (to (nth 2 cmd))
-         (from-res (cond
-                    ((numberp from) from)
-                    ((eql 'acc from) (gis-200-code-cell-acc cell))
-                    ((eql 'nil from) 0)
-                    ((eql 'any from) (error "Any not implemented"))
-                    ((gis-200-port-p from) (gis-200--recv cell from)))))
-    (if (not from-res)
-        nil ;; no value for from, block
-      (gis-200--code-cell-update cell to from-res))))
-
-(defun gis-200--cell-step (cell)
-  "Run one step of the program in CELL, returning a new cell."
-  (let* ((at-cmd (nth (gis-200-code-cell-pc cell) (gis-200-code-cell-code cell)))
-         (res (pcase (car at-cmd) ('mov (gis-200--move cell at-cmd)))))
-    (when res
-      (setq res (gis-200--code-cell-pc-inc res)))
-    res))
-
-(defun gis-200--board-step ()
-  "Run one step of the program for each cell on the current board."
-  (let ((unblocked-cells-coords (gis-200--unblocked-board-positions))
-        new-cells)
-    (while unblocked-cells-coords
-      (let* ((next-coord (car unblocked-cells-coords))
-             (next-cell (gis-200--fetch-cell next-coord))
-             (next-cell-step (gis-200--cell-step next-cell)))
-        (when next-cell-step
-          (setq new-cells (cons next-cell-step new-cells))))
-      (setq unblocked-cells-coords (cdr unblocked-cells-coords)))
-    (gis-200--update-new-cells new-cells)))
-
 ;;;                  parse start location
 ;;; ASM Parse       / parse end location
 ;;                 / /
@@ -326,7 +131,7 @@ port."
 (defconst gis-200-base-operations
   '(GET SET TEE CONST NULL IS_NULL DROP
         NOP ADD SUB MUL DIV REM AND OR EQZ
-        EQ NE LT GT GE LE SEND PUSH))
+        EQ NE LT GT GE LE SEND PUSH POP))
 
 (defvar gis-200--parse-depth nil)
 (defvar gis-200--branch-labels nil)
@@ -334,15 +139,14 @@ port."
 (defun gis-200--make-label ()
   (intern (concat "L_" (number-to-string (random 100000)) "_" (number-to-string gis-200--parse-depth))))
 
-;; TODO: flatten result of this
-(defun gis-200--parse-tree-to-asm (parse)
-  "Convert PARSE into a list of ASM instructions."
+(defun gis-200--parse-tree-to-asm* (parse)
+  "Convert PARSE into a list of ASM instructions recursively."
   (let ((gis-200--parse-depth (if gis-200--parse-depth
                                   (1+ gis-200--parse-depth)
                                 0)))
     (cond
      ((listp parse)
-      (let ((asm-stmts (mapcar #'gis-200--parse-tree-to-asm parse)))
+      (let ((asm-stmts (mapcar #'gis-200--parse-tree-to-asm* parse)))
         (apply #'append asm-stmts)))
      ((gis-200-code-node-p parse)
       (let* ((children (gis-200-code-node-children parse))
@@ -356,7 +160,7 @@ port."
          ((eql first-child 'BLOCK)
           (let* ((label-symbol (gis-200--make-label))
                  (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
-                 (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm rest-children)))
+                 (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
             (append rest-asm-stmts
                     (list (gis-200--code-node-create
                            :children (list 'LABEL label-symbol)
@@ -366,7 +170,7 @@ port."
          ((eql first-child 'LOOP)
           (let* ((label-symbol (gis-200--make-label))
                  (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
-                 (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm rest-children)))
+                 (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
             (append (list (gis-200--code-node-create
                            :children (list 'LABEL label-symbol)
                            :start-pos nil
@@ -402,7 +206,7 @@ port."
                :start-pos nil
                :end-pos nil)
               ,@(if then-case
-                    (seq-map #'gis-200--parse-tree-to-asm (cdr (gis-200-code-node-children then-case)))
+                    (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children then-case)))
                   nil)
               ,(gis-200--code-node-create
                :children (list 'JMP end-label)
@@ -413,12 +217,39 @@ port."
                :start-pos nil
                :end-pos nil)
               ,@(if else-case
-                    (seq-map #'gis-200--parse-tree-to-asm (cdr (gis-200-code-node-children else-case)))
+                    (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children else-case)))
                   nil)
               ,(gis-200--code-node-create
                :children (list 'LABEL end-label)
                :start-pos nil
                :end-pos nil))))))))))
+
+(defun gis-200--resolve-labels (asm)
+  "Change each label reference in ASM to index in program."
+  (let ((idxs '())
+        (idx 0))
+    (dolist (code-node asm)
+      (let* ((code-data (gis-200-code-node-children code-node))
+             (cmd (car code-data)))
+        (when (eql cmd 'LABEL)
+          (let ((label-name (cadr code-data)))
+            (setq idxs (cons (cons label-name idx) idxs)))))
+      (setq idx (1+ idx)))
+    (dolist (code-node asm)
+      (let* ((code-data (gis-200-code-node-children code-node))
+             (cmd (car code-data)))
+        (when (or (eql cmd 'JMP)
+                  (eql cmd 'JMP_IF)
+                  (eql cmd 'JMP_IF_NOT))
+          (let* ((label-name (cadr code-data))
+                 (jmp-to-idx (cdr (assoc label-name idxs))))
+            (setcdr code-data (list jmp-to-idx))))))))
+
+(defun gis-200--parse-tree-to-asm (parse)
+  "Generate game bytecode from tree of PARSE, resolving labels."
+  (let ((asm (flatten-list (gis-200--parse-tree-to-asm* parse))))
+    (gis-200--resolve-labels asm)
+    asm))
 
 (defun gis-200--pprint-asm (instructions)
   (message "%s" "======INSTRUCTIONS=======")
@@ -430,15 +261,28 @@ port."
   (message "%s" "======INSTRUCTIONS_END=======")
   nil)
 
+;;; RUNTIME ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;;
+(cl-defstruct (gis-200--cell-runtime
+               (:constructor gis-200--cell-runtime-create)
+               (:copier nil))
+  instructions pc stack row col up down left right)
 
 (defconst gis-200--gameboard-col-ct 4)
 (defconst gis-200--gameboard-row-ct 3)
 
 (defvar gis-200--gameboard nil)
+(defvar gis-200--extra-gameboard-cells nil)
+
+(defun gis-200--cell-runtime-current-instruction (cell-runtime)
+  "Return the current instruction of CELL-RUNTIME based in pc."
+  (let* ((pc (gis-200--cell-runtime-pc cell-runtime))
+         (instrs (gis-200--cell-runtime-instructions cell-runtime))
+         (_ (and (>= pc (length instrs)) (error "End of program error"))))
+    (car (nthcdr pc instrs))))
 
 (defun gis-200--cell-at-row-col (row col)
+  "Return the cell at index ROW COL from the gameboard."
   (aref gis-200--gameboard
         (+ (* row gis-200--gameboard-row-ct)
            col)))
@@ -463,11 +307,6 @@ port."
     ('LEFT 'RIGHT)
     ('RIGHT 'LEFT)))
 
-(cl-defstruct (gis-200--cell-runtime
-               (:constructor gis-200--cell-runtime-create)
-               (:copier nil))
-  instructions pc stack row col up down left right)
-
 (defun gis-200--get-value-from-direction (cell-runtime direction)
   "Dynamically look up and return value at DIRECTION on CELL-RUNTIME."
   (pcase direction
@@ -475,6 +314,64 @@ port."
     ('RIGHT (gis-200--cell-runtime-right cell-runtime))
     ('DOWN (gis-200--cell-runtime-down cell-runtime))
     ('LEFT (gis-200--cell-runtime-left cell-runtime))))
+
+(defun gis-200--gameboard-source-at-pos (row col &optional dir)
+  "Return non-nil if a source exists at ROW, COL (at offset DIR)."
+  (let* ((d-row (cond ((eql dir 'UP) -1)
+                      ((eql dir 'DOWN) 1)
+                      (t 0)))
+         (d-col (cond ((eql dir 'LEFT) -1)
+                      ((eql dir 'RIGHT) 1)
+                      (t 0)))
+         (row* (+ row d-row))
+         (col* (+ col d-col))
+         (sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells)))
+    (seq-find (lambda (source)
+                (and (= (gis-200--cell-source-row source) row*)
+                     (= (gis-200--cell-source-col source) col*)))
+              sources)))
+
+(defun gis-200--valid-position (row col &optional dir)
+  "Return non-nil if cell exists at ROW, COL (plus optional DIR)."
+  (let* ((d-row (cond ((eql dir 'UP) -1)
+                      ((eql dir 'DOWN) 1)
+                      (t 0)))
+         (d-col (cond ((eql dir 'LEFT) -1)
+                      ((eql dir 'RIGHT) 1)
+                      (t 0)))
+         (row* (+ row d-row))
+         (col* (+ col d-col)))
+    (and (<= 0 row* (1- gis-200--gameboard-row-ct))
+         (<= 0 col* (1- gis-200--gameboard-col-ct)))))
+
+(defun gis-200--cell-is-blocked-on-get (cell-runtime)
+  "Return non-nil if CELL-RUNTIME's current instruction is a GET when no value exists."
+  (let* ((current-instruction (gis-200--cell-runtime-current-instruction cell-runtime))
+         (code-data (gis-200-code-node-children current-instruction))
+         (cmd (car code-data)))
+    (if (not (eql cmd 'GET))
+        nil
+      (let* ((direction (cadr code-data))
+             (opposite-direction (gis-200--mirror-direction direction))
+             (row (gis-200--cell-runtime-row cell-runtime))
+             (col (gis-200--cell-runtime-col cell-runtime)))
+        (cond
+         ((gis-200--gameboard-source-at-pos row col direction) nil)
+         ((not (gis-200--valid-position row col direction)) t)
+         (t (let* ((from-cell (gis-200--cell-at-moved-row-col row col direction))
+                   (recieving-val (gis-200--get-value-from-direction from-cell opposite-direction)))
+              (if recieving-val
+                  nil
+                t))))))))
+
+(defun gis-200--gameboard-get-all-blocked-cells ()
+  "Return a list of gameboard indexes of blocked cells."
+  (let ((res))
+    (dotimes (idx (length gis-200--gameboard))
+      (let ((cell (aref gis-200--gameboard idx)))
+        (when (gis-200--cell-is-blocked-on-get cell)
+          (setq res (cons idx res)))))
+    res))
 
 (defun gis-200--remove-value-from-direction (cell-runtime direction)
   "Dynamically look up and return value at DIRECTION on CELL-RUNTIME."
@@ -487,6 +384,14 @@ port."
 (defun gis-200--cell-runtime-instructions-length (cell-runtime)
   "Return the length of CELL-RUNTIME."
   (length (gis-200--cell-runtime-instructions cell-runtime)))
+
+(defun gis-200--cell-runtime-pc-inc (cell-runtime)
+  "Return the length of CELL-RUNTIME."
+  (let ((instr-ct (gis-200--cell-runtime-instructions-length cell-runtime))
+        (pc (gis-200--cell-runtime-pc cell-runtime)))
+    (if (= (1+ pc) instr-ct)
+        (setf (gis-200--cell-runtime-pc cell-runtime) 0)
+      (setf (gis-200--cell-runtime-pc cell-runtime) (1+ pc)))))
 
 (defun gis-200--cell-runtime-push (cell-runtime value)
   "Add VALUE to the stack of CELL-RUNTIME."
@@ -516,9 +421,9 @@ port."
     (gis-200--cell-runtime-push cell-runtime res)))
 
 (defun gis-200--cell-runtime-send (cell-runtime direction)
+  "Put the top value of CELL-RUNTIME's stack on the DIRECTION register."
   (let ((v (gis-200--cell-runtime-pop cell-runtime))
-        (current-val)
-        (set-fn))
+        (current-val))
     (pcase direction
       ('UP (setq current-val (gis-200--cell-runtime-up cell-runtime)))
       ('DOWN (setq current-val (gis-200--cell-runtime-down cell-runtime)))
@@ -529,22 +434,34 @@ port."
         'blocked
       (pcase direction
         ('UP (setf (gis-200--cell-runtime-up cell-runtime) v))
-        ('DOWN (setf (gis-200--cell-runtime-up cell-runtime) v))
-        ('LEFT (setf (gis-200--cell-runtime-up cell-runtime) v))
-        ('RIGHT (setf (gis-200--cell-runtime-up cell-runtime) v))))))
+        ('DOWN (setf (gis-200--cell-runtime-down cell-runtime) v))
+        ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) v))
+        ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) v))))))
+
+(defun gis-200--cell-runtime-get-extra (cell-runtime direction)
+  "Perform the GET command on CELL-RUNTIME outside the gameboard at DIRECTION."
+  (let* ((at-row (gis-200--cell-runtime-row cell-runtime))
+         (at-col (gis-200--cell-runtime-col cell-runtime))
+         (source (gis-200--gameboard-source-at-pos at-row at-col direction)))
+    (if (not source)
+        'blocked
+      (let ((v (gis-200--cell-source-pop source)))
+        (gis-200--cell-runtime-push cell-runtime v)))))
 
 (defun gis-200--cell-runtime-get (cell-runtime direction)
   "Perform the GET command running from CELL-RUNTIME, recieving from DIRECTION."
   (let* ((at-row (gis-200--cell-runtime-row cell-runtime))
-         (at-col (gis-200--cell-runtime-col cell-runtime))
-         (opposite-direction (gis-200--mirror-direction direction))
-         (from-cell (gis-200--cell-at-moved-row-col at-row at-col direction))
-         (recieve-val (gis-200--get-value-from-direction from-cell opposite-direction)))
-    (if recieve-val
-        (progn
-          (gis-200--cell-runtime-push cell-runtime recieve-val)
-          (gis-200--remove-value-from-direction from-cell opposite-direction))
-      'blocked)))
+         (at-col (gis-200--cell-runtime-col cell-runtime)))
+    (if (not (gis-200--valid-position at-row at-col direction))
+        (gis-200--cell-runtime-get-extra cell-runtime direction)
+      (let* ((opposite-direction (gis-200--mirror-direction direction))
+             (from-cell (gis-200--cell-at-moved-row-col at-row at-col direction))
+             (recieve-val (gis-200--get-value-from-direction from-cell opposite-direction)))
+        (if recieve-val
+            (progn
+              (gis-200--cell-runtime-push cell-runtime recieve-val)
+              (gis-200--remove-value-from-direction from-cell opposite-direction))
+          'blocked)))))
 
 (defun gis-200--true-p (v)
   "Return non-nil if V is truthy."
@@ -552,10 +469,7 @@ port."
 
 (defun gis-200--cell-runtime-step (cell-runtime)
   "Perform one step of CELL-RUNTIME."
-  (let* ((pc (gis-200--cell-runtime-pc cell-runtime))
-         (instrs (gis-200--cell-runtime-instructions cell-runtime))
-         (_ (and (>= pc (length instrs)) (error "End of program error"))) ;; TODO: move pc to beg?
-         (current-instr (car (nthcdr pc instrs)))
+  (let* ((current-instr (gis-200--cell-runtime-current-instruction cell-runtime))
          (code-data (gis-200-code-node-children current-instr))
          (cmd (car code-data))
          (status
@@ -582,6 +496,7 @@ port."
             ('GET (gis-200--cell-runtime-get cell-runtime (cadr code-data)))
             ('JMP (let ((position (cadr code-data)))
                     (setf (gis-200--cell-runtime-pc cell-runtime) position)))
+            ('LABEL 'label)
             ('JMP_IF (let ((position (cadr code-data))
                            (top-value (gis-200--cell-runtime-pop cell-runtime)))
                        (when (gis-200--true-p top-value)
@@ -594,13 +509,100 @@ port."
     (pcase status
       ('blocked nil)
       ('jump nil)
-      (_ (setf (gis-200--cell-runtime-pc cell-runtime) (1+ pc))))))
+      ('label (progn
+                (gis-200--cell-runtime-pc-inc cell-runtime)
+                (gis-200--cell-runtime-step cell-runtime)))
+      (_ (gis-200--cell-runtime-pc-inc cell-runtime)))))
+
+(defun gis-200--extra-gameboard-step ()
+  "Perform step on all things not on the gameboard."
+  (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells)))
+    (dolist (sink sinks)
+      (gis-200--cell-sink-get sink))))
+
+(defun gis-200--gameboard-step ()
+  "Perform step on all cells on the gameboard."
+  (let ((blocked-idxs (gis-200--gameboard-get-all-blocked-cells)))
+    (dotimes (idx (length gis-200--gameboard))
+      (when (not (memq idx blocked-idxs))
+        (let ((cell (aref gis-200--gameboard idx)))
+          (gis-200--cell-runtime-step cell))))))
+
+
+;;; Problem Infrastructure ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A problem generator is a function that when called, returns a
+;; problem-spec, ie a list of source nodes and a list of sink nodes.
+;; The source nodes indicate at which positions input should be feed
+;; to the board while the sink node indicates at which position should
+;; output be consumed.  The sink node should also have a list of the
+;; expected output.
+
+(cl-defstruct (gis-200--cell-source
+               (:constructor gis-200--cell-source-create)
+               (:copier nil))
+  row col data)
+
+(cl-defstruct (gis-200--cell-sink
+               (:constructor gis-200--cell-sink-create)
+               (:copier nil))
+  row col expected-data)
+
+(cl-defstruct (gis-200--problem-spec
+               (:constructor gis-200--problem-spec-create)
+               (:copier nil))
+  sources sinks)
+
+(defun gis-200--cell-sink-get (sink)
+  "Grab a value and put it into SINK from the gameboard."
+  (let* ((row (gis-200--cell-sink-row sink))
+         (col (gis-200--cell-sink-col sink))
+         (direction (cond
+                     ((>= col gis-200--gameboard-col-ct) 'LEFT)
+                     ((> 0 col) 'RIGHT)
+                     ((> 0 row) 'DOWN)
+                     ((> row gis-200--gameboard-row-ct) 'UP)))
+         (opposite-direction (gis-200--mirror-direction direction))
+         (cell-runtime (gis-200--cell-at-moved-row-col row col direction))
+         (v (gis-200--get-value-from-direction cell-runtime opposite-direction)))
+    (if v
+        (let* ((old-stack (gis-200--cell-sink-expected-data sink))
+               (expected-value (car old-stack)))
+          (when (not (equal expected-value v))
+            ;; TODO - do something here
+            (message "Unexpected value"))
+          (setf (gis-200--cell-sink-expected-data sink) (cdr old-stack))
+          (gis-200--remove-value-from-direction cell-runtime opposite-direction))
+        'blocked)))
+
+(defun gis-200--cell-source-pop (source)
+  "Pop a value from the data of SOURCE."
+  (unless (gis-200--cell-source-p source)
+    (error "Cell-source-pop type error"))
+  (let* ((data (gis-200--cell-source-data source))
+         (top (car data))
+         (rest (cdr data)))
+    (setf (gis-200--cell-source-data source) rest)
+    top))
+
+(defun gis-200--problem--add ()
+  "Generate a simple addition problem."
+  (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (expected (seq-mapn #'+ input-1 input-2)))
+    (gis-200--problem-spec-create
+     :sources (list (gis-200--cell-source-create :row -1 :col 0 :data input-1)
+                   (gis-200--cell-source-create :row -1 :col 1 :data input-2))
+     :sinks  (list (gis-200--cell-sink-create :row 4 :col 1 :expected-data expected)))))
+
 
 (defmacro comment (&rest x) nil)
 
 (comment
- (let* ((parsed (gis-200--parse-assembly "(GET RIGHT)"))
+ (let* ((parsed (gis-200--parse-assembly "(CONST 1) (SEND LEFT) (CONST 2) (SEND LEFT)"))
+        (parsed2 (gis-200--parse-assembly "(GET LEFT) (POP)"))
         (asm (gis-200--parse-tree-to-asm parsed))
+        (asm2 (gis-200--parse-tree-to-asm parsed2))
         (runtime (gis-200--cell-runtime-create
                   :instructions asm
                   :pc 0
@@ -612,20 +614,26 @@ port."
                   :left nil
                   :right nil))
         (runtime-2 (gis-200--cell-runtime-create
-                    :instructions '()
+                    :instructions asm2
                     :pc 0
                     :stack nil
                     :row 0
-                    :col 0
+                    :col 1
                     :up nil
                     :down nil
-                    :left 77
+                    :left 73
                     :right nil))
-        (gis-200--gameboard (vector runtime runtime-2)))
-   (gis-200--cell-runtime-step runtime)
-   runtime-2
-   )
- )
+        (gis-200--gameboard (vector runtime runtime-2))
+        (gis-200--extra-gameboard-cells
+         (gis-200--problem-spec-create :sources (list (gis-200--cell-source-create :row -1 :col 0 :data '(44 55 66)))
+                                       :sinks (list (gis-200--cell-sink-create :row 0 :col -1 :expected-data '(1 2)))))
+        (gis-200--gameboard-col-ct 2))
+   (gis-200--gameboard-step)
+   (gis-200--gameboard-step)
+   (gis-200--gameboard-step)
+   (gis-200--extra-gameboard-step)
+   (gis-200--cell-runtime-stack runtime)
+   (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))))
 
 ;;; 
 
@@ -637,8 +645,7 @@ port."
   (setq mode-name "gis-200"
         buffer-read-only t
         truncate-lines t)
-  (buffer-disable-undo)
-  (gis-200--display))
+  (buffer-disable-undo))
 
 (defun gis-200 ()
   "Open the game buffer."
