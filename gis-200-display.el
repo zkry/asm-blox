@@ -90,8 +90,31 @@
   ;;    ((numberp val) (format "%4d" val))))
   )
 
+(defun gis-200--source-sink-idx-to-name (type idx)
+  (let ((start-char (if (eql type 'source) ?A ?W)))
+    (format "%c" (+ start-char idx))))
+
+(defun gis-200--row-arrow-label-display (position type col)
+  (let* ((row (if (eql position 'top) -1 3))
+         (idx (if (eql type 'source)
+                   (gis-200--get-source-idx-at-position row col)
+                (gis-200--get-sink-idx-at-position row col))))
+    (if idx
+        (gis-200--source-sink-idx-to-name type idx)
+      " ")))
+
+(defun gis-200--col-arrow-label-display (position type row)
+  (let* ((col (if (eql position 'left) -1 4))
+         (idx (if (eql type 'source)
+                  (gis-200--get-source-idx-at-position row col)
+                (gis-200--get-sink-idx-at-position row col))))
+    (if idx
+        (gis-200--source-sink-idx-to-name type idx)
+      " ")))
+
 (defun gis-200-display-game-board ()
-  (let* ((arrow-up "↑")
+  (let* ((display-mode 'edit) ;; TODO - finalize where this comes from. can be 'edit or 'execute
+         (arrow-up "↑")
          (arrow-down "↓")
          (arrow-right "→")
          (arrow-left "←")
@@ -127,15 +150,38 @@
                (insert box-bottom-right)
                (insert space-between))
              (insert "\n")))
+          (insert-v-border
+           (lambda (position)
+             "Draw the very top and very bottom lines."
+             (let* ((left-of-arrows-len (1+ (- (/ (length box-line-top-bottom) 2) 1)))
+                    (right-of-arrows-len (1+ (- (length box-line-top-bottom) 2 left-of-arrows-len))))
+               (insert space-start)
+               (insert space-between)
+               (dotimes (col gis-200-column-ct)
+                 (insert (make-string left-of-arrows-len ?\s))
+                 (let ((sink-char (gis-200--row-arrow-label-display position 'sink col))
+                       (source-char (gis-200--row-arrow-label-display position 'source col)))
+                   (if (eql position 'top)
+                       (insert (format "%s %s" sink-char source-char))
+                     (insert (format "%s %s" source-char sink-char))))
+                 (insert (make-string right-of-arrows-len ?\s))
+                 (insert space-between)))
+             (insert "\n")))
           (insert-row-middle
            (lambda (row box-row)
              "Draw the ⇋|   |⇋|   |⇋|   |⇋|   |⇋ part of the board."
              (insert space-start)
              (cond
               ((= 5 box-row)
-               (progn (insert ?\s) (insert arrow-right) (insert ?\s)))
+               (let ((label (gis-200--col-arrow-label-display 'left 'source row)))
+                 (if (equal label " ")
+                     (insert space-between)
+                   (progn (insert label) (insert arrow-right) (insert ?\s)))))
               ((= 7 box-row)
-               (progn (insert ?\s) (insert arrow-left) (insert ?\s)))
+               (let ((label (gis-200--col-arrow-label-display 'left 'sink row)))
+                 (if (equal label " ")
+                     (insert space-between)
+                   (progn (insert label) (insert arrow-left) (insert ?\s)))))
               (t (insert space-between)))
              (dotimes (col gis-200-column-ct)
                (insert box-vertical)
@@ -144,13 +190,27 @@
                  (insert (propertize text 'gis-200-box-id (list row col box-row)))
                  (insert (propertize spacing 'gis-200-box-id (list row col box-row))))
                (insert box-vertical)
-               (cond
-                ((= 5 box-row)
-                 (progn (insert ?\s) (insert arrow-right) (insert ?\s)))
-                ((= 7 box-row)
-                 (progn (insert ?\s) (insert arrow-left) (insert ?\s)))
-                (t
-                 (insert space-between))))
+               (when (< col (1- gis-200-column-ct))
+                 (cond
+                  ((= 5 box-row)
+                   (progn (insert ?\s) (insert arrow-right) (insert ?\s)))
+                  ((= 7 box-row)
+                   (progn (insert ?\s) (insert arrow-left) (insert ?\s)))
+                  (t
+                   (insert space-between)))))
+             (cond
+              ((= 5 box-row)
+               (let ((label (gis-200--col-arrow-label-display 'right 'sink row)))
+                 (if (equal label " ")
+                     (insert space-between)
+                   (progn (insert ?\s) (insert arrow-right) (insert label)))))
+              ((= 7 box-row)
+               (let ((label (gis-200--col-arrow-label-display 'right 'source row)))
+                 (if (equal label " ")
+                     (insert space-between)
+                   (progn (insert ?\s) (insert arrow-left) (insert label)))))
+              (t
+               (insert space-between)))
              (insert "\n")))
           (insert-middle-row-space
            (lambda (row)
@@ -163,15 +223,37 @@
                (insert space-between)
                (dotimes (col gis-200-column-ct)
                  (insert padding-space-left)
-                 (let ((up-arrow-display (gis-200--row-register-display row col 'UP))
-                       (down-arrow-display (gis-200--row-register-display row col 'DOWN)))
+                 (let* ((up-arrow-display (gis-200--row-register-display row col 'UP))
+                        (down-arrow-display (gis-200--row-register-display row col 'DOWN))
+                        (label-position (cond ((= 0 row) 'top) ((= 3 row) 'bottom) (t nil)))
+                        (source-label
+                         (and label-position
+                              (gis-200--row-arrow-label-display label-position
+                                                                (if (eql label-position 'top)
+                                                                    'source 'sink)
+                                                                col)))
+                        (sink-label
+                         (and label-position
+                              (gis-200--row-arrow-label-display label-position
+                                                                (if (eql label-position 'top)
+                                                                    'sink 'source)
+                                                                col))))
                    (insert up-arrow-display)
-                   (insert " ") (insert arrow-up) (insert ?\s) (insert arrow-down) (insert " ")
+                   (insert " ")
+                   (if (or (not sink-label) (equal sink-label " "))
+                       (insert " ")
+                     (insert arrow-up))
+                   (insert ?\s)
+                   (if (or (not source-label) (equal source-label " "))
+                       (insert " ")
+                     (insert arrow-down))
+                   (insert " ")
                    (insert down-arrow-display))
                  (insert padding-space-right)
                  (insert space-between))
                (insert (format "%d" row))
                (insert "\n")))))
+      (funcall insert-v-border 'top)
       (funcall insert-middle-row-space 0)
       (dotimes (row 3)
         (funcall insert-row-top row)
@@ -180,7 +262,8 @@
         (funcall insert-row-bottom row)
         (when (not (= 2 row))
           (funcall insert-middle-row-space (1+ row))))
-      (funcall insert-middle-row-space 3))))
+      (funcall insert-middle-row-space 3)
+      (funcall insert-v-border 'bottom))))
 
 (defun gis-200-redraw-game-board ()
   (erase-buffer)
@@ -459,6 +542,12 @@
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
   (set-syntax-table gis-200-mode-syntax-table))
+
+(setq gis-200--extra-gameboard-cells
+      (gis-200--problem-spec-create :sources (list (gis-200--cell-source-create :row 3 :col 2 :data '(44 55 66)))
+                                    :sinks (list (gis-200--cell-sink-create :row 0 :col 4 :expected-data '(1 2)))))
+
+
 
 (provide 'gis-200-display)
 

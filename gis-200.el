@@ -557,6 +557,35 @@ cell-runtime but rather the in-between row/col."
       (let* ((cell-runtime (gis-200--cell-at-row-col cell-row col)))
         (gis-200--get-value-from-direction cell-runtime direction))))))
 
+(defun gis-200--get-source-idx-at-position (row col)
+  "Return name of source at position ROW, COL if exists."
+  (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
+        (idx 0)
+        (found))
+    (while sources
+      (let ((source (car sources)))
+        (if (and (= (gis-200--cell-source-row source) row)
+                 (= (gis-200--cell-source-col source) col))
+            (progn (setq sources nil)
+                   (setq found idx))
+          (setq sources (cdr sources))
+          (setq idx (1+ idx)))))
+    found))
+(defun gis-200--get-sink-idx-at-position (row col)
+  "Return name of source at position ROW, COL if exists."
+  (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+        (idx 0)
+        (found))
+    (while sinks
+      (let ((source (car sinks)))
+        (if (and (= (gis-200--cell-sink-row source) row)
+                 (= (gis-200--cell-sink-col source) col))
+            (progn (setq sinks nil)
+                   (setq found idx))
+          (setq sinks (cdr sinks))
+          (setq idx (1+ idx)))))
+    found))
+
 ;;; Problem Infrastructure ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A problem generator is a function that when called, returns a
