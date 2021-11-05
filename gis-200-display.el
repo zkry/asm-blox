@@ -27,9 +27,22 @@
 
 ;;; Code:
 
+(defface gis-200-error-face
+  '((((class color) (background light)) (:foreground "DarkGoldenrod4"))
+    (((class color) (background dark))  (:foreground "DarkGoldenrod1")))
+  "?"
+  :group 'gis-200)
+
+
 (defconst gis-200-column-ct 4)
 (defconst gis-200-box-width 20)
 (defconst gis-200-box-height 12)
+
+(defvar gis-200-parse-errors nil)
+
+(defun gis-200--get-parse-error-at-cell (row col)
+  (let ((err (assoc (list row col) gis-200-parse-errors)))
+    (cdr err)))
 
 (defvar gis-200-box-contents nil)
 
@@ -83,7 +96,8 @@
 
 (defun gis-200--row-register-display (row col direction)
   ""
-  "????"
+  "    "
+  ;; "????"
   ;; (let ((val (gis-200--get-direction-row-registers row col direction)))
   ;;   (cond
   ;;    ((not val) "    ")
@@ -125,7 +139,7 @@
          (box-bottom-right ?┘)
          (box-bottom-left ?└)
          (space-start (make-string 6 ?\s))
-         (space-between (make-string 3 ?\s))
+         (space-between (make-string 5 ?\s))
          (box-line-top-bottom (make-string gis-200-box-width box-horizontal))
          (box-inside (make-string gis-200-box-width ?\s)))
     (let ((insert-row-top
@@ -134,10 +148,16 @@
              (insert space-start)
              (insert space-between)
              (dotimes (col gis-200-column-ct)
-               (insert box-top-left)
-               (insert box-line-top-bottom)
-               (insert box-top-right)
-               (insert space-between))
+               (let ((err (gis-200--get-parse-error-at-cell row col)))
+                 (if err
+                     (progn
+                       (insert (propertize (char-to-string box-top-left) 'font-lock-face '(:foreground "red")))
+                       (insert (propertize box-line-top-bottom 'font-lock-face '(:foreground "red")))
+                       (insert (propertize (char-to-string box-top-right) 'font-lock-face '(:foreground "red")) ))
+                   (insert box-top-left)
+                   (insert box-line-top-bottom)
+                   (insert box-top-right))
+                 (insert space-between)))
              (insert "\n")))
           (insert-row-bottom
            (lambda (row)
@@ -145,10 +165,15 @@
              (insert space-start)
              (insert space-between)
              (dotimes (col gis-200-column-ct)
-               (insert box-bottom-left)
-               (insert box-line-top-bottom)
-               (insert box-bottom-right)
-               (insert space-between))
+               (let ((err (gis-200--get-parse-error-at-cell row col)))
+                 (if err
+                     (progn (insert (propertize (char-to-string box-bottom-left) 'font-lock-face '(:foreground "red")))
+                            (insert (propertize box-line-top-bottom 'font-lock-face '(:foreground "red")))
+                            (insert (propertize (char-to-string box-bottom-right) 'font-lock-face '(:foreground "red"))))
+                   (insert box-bottom-left)
+                   (insert box-line-top-bottom)
+                   (insert box-bottom-right))
+                 (insert space-between)))
              (insert "\n")))
           (insert-v-border
            (lambda (position)
@@ -184,18 +209,30 @@
                    (progn (insert label) (insert arrow-left) (insert ?\s)))))
               (t (insert space-between)))
              (dotimes (col gis-200-column-ct)
-               (insert box-vertical)
-               (let* ((text (gis-200--get-box-line-content row col box-row))
-                      (spacing (make-string (- (length box-inside) (length text)) ?\s)))
-                 (insert (propertize text 'gis-200-box-id (list row col box-row)))
-                 (insert (propertize spacing 'gis-200-box-id (list row col box-row))))
-               (insert box-vertical)
+               (let ((err (gis-200--get-parse-error-at-cell row col)))
+                 (if err
+                     (insert (propertize (char-to-string box-vertical) 'font-lock-face '(:foreground "red")))
+                   (insert box-vertical))
+                 ;; Draw the inner contents of the box
+                 (let* ((text (gis-200--get-box-line-content row col box-row))
+                        (spacing (make-string (- (length box-inside) (length text)) ?\s)))
+                   (if (and (= 11 box-row) err)
+                       (let ((err-text (caddr (gis-200--get-parse-error-at-cell row col)))) 
+                         (insert err-text)
+                         (insert (make-string (- (length box-inside) (length err-text)) ?\s)))
+                     (insert (propertize text 'gis-200-box-id (list row col box-row)))
+                     (insert (propertize spacing
+                                         'gis-200-box-id (list row col box-row)
+                                         'gis-200-text-type 'spacing))))
+                 (if err
+                     (insert (propertize (char-to-string box-vertical) 'font-lock-face '(:foreground "red")))
+                   (insert box-vertical)))
                (when (< col (1- gis-200-column-ct))
                  (cond
                   ((= 5 box-row)
-                   (progn (insert ?\s) (insert arrow-right) (insert ?\s)))
+                   (progn (insert "  ") (insert arrow-right) (insert "  ")))
                   ((= 7 box-row)
-                   (progn (insert ?\s) (insert arrow-left) (insert ?\s)))
+                   (progn (insert "  ") (insert arrow-left) (insert "  ")))
                   (t
                    (insert space-between)))))
              (cond
@@ -240,11 +277,11 @@
                                                                 col))))
                    (insert up-arrow-display)
                    (insert " ")
-                   (if (or (not sink-label) (equal sink-label " "))
+                   (if (and label-position (or (not sink-label) (equal sink-label " ")))
                        (insert " ")
                      (insert arrow-up))
                    (insert ?\s)
-                   (if (or (not source-label) (equal source-label " "))
+                   (if (and label-position (or (not source-label) (equal source-label " ")))
                        (insert " ")
                      (insert arrow-down))
                    (insert " ")
@@ -263,7 +300,35 @@
         (when (not (= 2 row))
           (funcall insert-middle-row-space (1+ row))))
       (funcall insert-middle-row-space 3)
-      (funcall insert-v-border 'bottom))))
+      (funcall insert-v-border 'bottom)
+
+      ;;; DEBUG INFORMATION
+      (insert "\n\n")
+      (insert (format "%s" gis-200-parse-errors)))))
+
+(defun gis-200--propertize-errors ()
+  "Add text properties to errors."
+  (let ((errs gis-200-parse-errors))
+    (dolist (err errs)
+      (let ((row (caar err))
+            (col (cadar err))
+            (pt (1- (caddr err))))
+        (gis-200--move-to-box row col)
+        ;; move to the point where the error occured.
+        ;; TODO: create box-point-forward to save this logic
+        (while (> pt 0)
+          (cond
+           ((eql (get-text-property (point) 'gis-200-text-type) 'spacing)
+            (forward-char))
+           ((not (gis-200-in-box-p))
+            (let ((col (- (current-column) gis-200-box-width)))
+              (forward-line 1)
+              (move-to-column col)
+              (setq pt (1- pt))))
+           (t (forward-char)
+              (setq pt (1- pt)))))
+        (let ((inhibit-read-only t))
+          (put-text-property (point) (1+ (point)) 'font-lock-face '(:underline (:color "red" :style wave))))))))
 
 (defun gis-200-redraw-game-board ()
   (erase-buffer)
@@ -304,6 +369,19 @@
   (while (gis-200-in-box-p)
     (forward-char -1))
   (forward-char 1))
+
+(defun gis-200--move-to-box (row col)
+  (goto-char (point-min))
+  (while (let* ((prop (get-text-property (point) 'gis-200-box-id))
+                (at-row (car prop))
+                (at-col (cadr prop)))
+           (and (not (eobp))
+            (or (not prop)
+                (not (and (= row at-row)
+                          (= col at-col))))))
+    (forward-char))
+  (when (eobp)
+    (error "box %d, %d not found" row col)))
 
 (defun gis-200--move-to-box-point (row col)
   (unless (gis-200-in-box-p)
@@ -532,12 +610,29 @@
   '(("\\<setq\\>" . 'font-lock-function-name-face)
     ("[0-9]+" . (1 'font-lock-constant-face))))
 
+(defun gis-200-start-execution ()
+  "Parse gameboard, displaying any errors, and display code execution buffer."
+  (interactive)
+  (setq gis-200-parse-errors nil)
+  (let ((parse-errors))
+    (maphash
+     (lambda (coords code-text)
+       (let ((parse-result (gis-200--parse-assembly code-text)))
+         (if (gis-200--parse-error-p parse-result)
+             (setq parse-errors (cons (cons coords parse-result) parse-errors)))))
+     gis-200-box-contents)
+    (when parse-errors
+      (setq gis-200-parse-errors parse-errors))
+    (let ((inhibit-read-only t))
+      (gis-200-redraw-game-board))))
+
 (defun gis-200-mode ()
   (interactive)
   (kill-all-local-variables)
   (use-local-map gis-200-mode-map)
   (setq mode-name "gis-200"
         buffer-read-only t)
+  (setq gis-200-parse-errors nil)
   (setq-local truncate-lines 0)
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)

@@ -62,71 +62,79 @@
                (:copier nil))
   children start-pos end-pos)
 
+(defun gis-200--parse-error-p (err)
+  "Return non-nil if ERR is a parse error."
+  (eql 'error (car err)))
+
 (defun gis-200--parse-assembly (code)
   "Parse ASM CODE returning a list of instructions."
   (with-temp-buffer
     (insert code)
     (goto-char (point-min))
     (let* ((top-body '()))
-      (cl-labels ((whitespace-p (c)
-                                (or (eql c ?\s)
-                                    (eql c ?\t)
-                                    (eql c ?\n)))
-                  (end-of-buffer-p ()
-                                   (eql (point) (point-max)))
-                  (current-char ()
-                                (char-after (point)))
-                  (consume-space ()
-                                 (while (and (whitespace-p (current-char))
-                                             (not (end-of-buffer-p)))
-                                   (forward-char)))
-                  (symbol-char-p (c)
-                                 (or (<= ?a c ?z)
-                                     (<= ?A c ?Z)))
-                  (digit-char-p (c) (<= ?0 c ?9))
-                  (parse-element ()
-                                 (let ((elements '()))
-                                   (catch 'end
-                                     (while t
-                                       (consume-space)
-                                       (if (end-of-buffer-p)
-                                           (throw 'end nil)
-                                         (let ((at-char (current-char)))
-                                           (cond
-                                            ;; Start of children list
-                                            ((eql at-char ?\()
-                                             (let ((start (point)))
-                                               (forward-char 1)
-                                               (let* ((children (parse-element))
-                                                      (node (gis-200--code-node-create :children children
-                                                                                       :start-pos start
-                                                                                       :end-pos (point))))
-                                                 (push node elements))))
-                                            ;; End of children list
-                                            ((eql at-char ?\))
-                                             (forward-char 1)
-                                             (throw 'end nil))
-                                            ;; Symbol
-                                            ((symbol-char-p at-char)
-                                             (let ((start (point)))
-                                               (forward-char 1)
-                                               (while (and (symbol-char-p (current-char))
-                                                           (not (end-of-buffer-p)))
-                                                 (forward-char 1))
-                                               (let ((symbol (intern (buffer-substring-no-properties start (point)))))
-                                                 (push symbol elements))))
+      (cl-labels
+          ((whitespace-p (c)
+                         (or (eql c ?\s)
+                             (eql c ?\t)
+                             (eql c ?\n)))
+           (current-char ()
+                         (char-after (point)))
+           (consume-space ()
+                          (while (and (whitespace-p (current-char))
+                                      (not (eobp)))
+                            (forward-char)))
+           (symbol-char-p (c)
+                          (or (<= ?a c ?z)
+                              (<= ?A c ?Z)))
+           (digit-char-p (c) (<= ?0 c ?9))
+           (parse-element (&optional top-level)
+                          (let ((elements '()))
+                            (catch 'end
+                              (while t
+                                (consume-space)
+                                (if (eobp)
+                                    (throw 'end nil)
+                                  (let ((at-char (current-char)))
+                                    (cond
+                                     ;; Start of children list
+                                     ((eql at-char ?\()
+                                      (let ((start (point)))
+                                        (forward-char 1)
+                                        (let* ((children (parse-element))
+                                               (node (gis-200--code-node-create :children children
+                                                                                :start-pos start
+                                                                                :end-pos (point))))
+                                          (push node elements))))
+                                     ;; End of children list
+                                     ((eql at-char ?\))
+                                      (if top-level
+                                          (throw 'error `(error ,(point) "SYNTAX ERROR"))
+                                          (forward-char 1)
+                                        (throw 'end nil)))
+                                     ;; Symbol
+                                     ((symbol-char-p at-char)
+                                      (let ((start (point)))
+                                        (forward-char 1)
+                                        (while (and (not (eobp))
+                                                    (symbol-char-p (current-char)))
+                                          (forward-char 1))
+                                        (let ((symbol (intern (buffer-substring-no-properties start (point)))))
+                                          (push symbol elements))))
 
-                                            ;; digit
-                                            ((digit-char-p at-char)
-                                             (let ((start (point)))
-                                               (forward-char 1)
-                                               (while (and (digit-char-p (current-char))
-                                                           (not (end-of-buffer-p)))
-                                                 (forward-char 1))
-                                               (let ((number (string-to-number (buffer-substring-no-properties start (point)))))
-                                                 (push number elements)))))))))
-                                   (reverse elements))))
-        (parse-element)))))
+                                     ;; digit
+                                     ((digit-char-p at-char)
+                                      (let ((start (point)))
+                                        (forward-char 1)
+                                        (while (and (not (eobp))
+                                                    (digit-char-p (current-char)))
+                                          (forward-char 1))
+                                        (let ((number (string-to-number (buffer-substring-no-properties start (point)))))
+                                          (push number elements))))
+
+                                     ;; Unknown character
+                                     (t (throw 'error `(error ,(point) "unexpected character"))))))))
+                            (reverse elements))))
+        (catch 'error (parse-element t))))))
 
 (defconst gis-200-base-operations
   '(GET SET TEE CONST NULL IS_NULL DROP
@@ -650,12 +658,14 @@ cell-runtime but rather the in-between row/col."
     (gis-200--problem-spec-create
      :sources (list (gis-200--cell-source-create :row -1 :col 0 :data input-1)
                    (gis-200--cell-source-create :row -1 :col 1 :data input-2))
-     :sinks  (list (gis-200--cell-sink-create :row 4 :col 1 :expected-data expected)))))
+     :sinks
+     (list (gis-200--cell-sink-create :row 4 :col 1 :expected-data expected)))))
 
 
 (defmacro comment (&rest x) nil)
 
 (comment
+ (gis-200--parse-assembly ")")
  (let* ((parsed (gis-200--parse-assembly "(CONST 1) (SEND LEFT) (CONST 2) (SEND LEFT)"))
         (parsed2 (gis-200--parse-assembly "(GET LEFT) (POP)"))
         (asm (gis-200--parse-tree-to-asm parsed))
