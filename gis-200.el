@@ -307,8 +307,8 @@
                   :stack nil
                   :row row
                   :col col
-                  :up nil
-                  :down nil
+                  :up 1
+                  :down 2
                   :left nil
                   :right nil)))
     (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-row-ct) col)) runtime)))
@@ -575,8 +575,10 @@ cell-runtime but rather the in-between row/col."
      ((or (= row 0)
           (= row gis-200--gameboard-row-ct))
       (let* ((source (gis-200--gameboard-source-at-pos cell-row col))
-             (data (gis-200--cell-source-data source)))
-        (car data)))
+             (data ))
+        (if (not source)
+            nil
+          (car (gis-200--cell-source-data source)))))
      (t
       (let* ((cell-runtime (gis-200--cell-at-row-col cell-row col)))
         (gis-200--get-value-from-direction cell-runtime direction))))))
@@ -717,26 +719,6 @@ cell-runtime but rather the in-between row/col."
    (gis-200--extra-gameboard-step)
    (gis-200--cell-runtime-stack runtime)
    (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))))
-
-;;; 
-
-(defun gis-200-mode ()
-  "Major mode for playing gis-200 game."
-  (interactive)
-  (kill-all-local-variables)
-  ;;(use-local-map )
-  (setq mode-name "gis-200"
-        buffer-read-only t
-        truncate-lines t)
-  (buffer-disable-undo))
-
-(defun gis-200 ()
-  "Open the game buffer."
-  (interactive)
-  (switch-to-buffer "*gis-200*")
-  (if (equal mode-name "gis-200")
-      nil ;; TODO: refresh the buffer
-    (gis-200-mode)))
 
 (provide 'gis-200)
 

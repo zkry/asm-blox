@@ -98,13 +98,17 @@
 
 (defun gis-200--row-register-display (row col direction)
   ""
-  "    "
-  ;; "????"
-  ;; (let ((val (gis-200--get-direction-row-registers row col direction)))
-  ;;   (cond
-  ;;    ((not val) "    ")
-  ;;    ((numberp val) (format "%4d" val))))
-  )
+  (if (eql 'execute gis-200--display-mode)
+      (let ((val (gis-200--get-direction-row-registers row col direction)))
+        (cond
+         ((not val) "    ")
+         ((numberp val)
+          (propertize
+           (if (eql 'UP direction)
+               (format "%4d" val)
+             (format "%-4d" val))
+            'font-lock-face '(:weight bold)))))
+    "    "))
 
 (defun gis-200--source-sink-idx-to-name (type idx)
   (let ((start-char (if (eql type 'source) ?A ?W)))
@@ -262,6 +266,7 @@
                (insert space-between)
                (dotimes (col gis-200-column-ct)
                  (insert padding-space-left)
+                 ;; logic to display arrow and contnents
                  (let* ((up-arrow-display (gis-200--row-register-display row col 'UP))
                         (down-arrow-display (gis-200--row-register-display row col 'DOWN))
                         (label-position (cond ((= 0 row) 'top) ((= 3 row) 'bottom) (t nil)))
@@ -290,7 +295,6 @@
                    (insert down-arrow-display))
                  (insert padding-space-right)
                  (insert space-between))
-               (insert (format "%d" row))
                (insert "\n")))))
       (funcall insert-v-border 'top)
       (funcall insert-middle-row-space 0)
@@ -306,6 +310,8 @@
 
       ;;; DEBUG INFORMATION
       (insert "\n\n")
+      (when (eql 'execute gis-200--display-mode)
+        (insert "EXECUTE"))
       (insert (format "%s" gis-200-parse-errors)))))
 
 (defun gis-200--propertize-errors ()
@@ -612,7 +618,8 @@
   (let ((map (make-keymap)))
     (prog1 map
       ;;(suppress-keymap map)
-      (define-key map "n" #'gis-200--execution-next-command))))
+      (define-key map "n" #'gis-200--execution-next-command)
+      (define-key map "q" #'quit-window))))
 
 (defconst gis-200-mode-syntax-table
   (let ((st (make-syntax-table)))
@@ -628,7 +635,9 @@
   "Create a new uneditable gamebuffer for displaing execution of puzzles."
   (let ((buffer (get-buffer-create "*gis-200-execution*")))
     (with-current-buffer buffer
-      (gis-200-redraw-game-board))))
+      (gis-200-execution-mode)
+      (let ((inhibit-read-only t))
+        (gis-200-redraw-game-board)))))
 
 (defun gis-200-start-execution ()
   "Parse gameboard, displaying any errors, and display code execution buffer."
@@ -664,6 +673,7 @@
               gis-200--display-mode 'execute)
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
+  (setq header-line-format "GIS-200 EXECUTION")
   (set-syntax-table gis-200-mode-syntax-table))
 
 (defun gis-200-mode ()
@@ -678,12 +688,9 @@
   (setq font-lock-defaults gis-200-mode-highlights)
   (set-syntax-table gis-200-mode-syntax-table))
 
-
 (setq gis-200--extra-gameboard-cells
       (gis-200--problem-spec-create :sources (list (gis-200--cell-source-create :row 3 :col 2 :data '(44 55 66)))
                                     :sinks (list (gis-200--cell-sink-create :row 0 :col 4 :expected-data '(1 2)))))
-
-
 
 (provide 'gis-200-display)
 
