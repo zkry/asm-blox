@@ -40,6 +40,8 @@
 
 (defvar gis-200-parse-errors nil)
 
+(defvar-local gis-200--display-mode 'edit)
+
 (defun gis-200--get-parse-error-at-cell (row col)
   (let ((err (assoc (list row col) gis-200-parse-errors)))
     (cdr err)))
@@ -600,31 +602,69 @@
       (define-key map (kbd "M-<") #'gis-200--beginning-of-buffer)
       (define-key map (kbd "M->") #'gis-200--end-of-buffer))))
 
+
+(defun gis-200--execution-next-command ()
+  ""
+  (interactive)
+  (error "not implemented"))
+
+(defconst gis-200-execution-mode-map
+  (let ((map (make-keymap)))
+    (prog1 map
+      ;;(suppress-keymap map)
+      (define-key map "n" #'gis-200--execution-next-command))))
+
 (defconst gis-200-mode-syntax-table
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?| "-" st)
     st)
-  "Syntax table for Go mode.")
+  "Syntax table for gis-200 mode.")
 
 (defconst gis-200-mode-highlights
   '(("\\<setq\\>" . 'font-lock-function-name-face)
     ("[0-9]+" . (1 'font-lock-constant-face))))
 
+(defun gis-200--create-execution-buffer ()
+  "Create a new uneditable gamebuffer for displaing execution of puzzles."
+  (let ((buffer (get-buffer-create "*gis-200-execution*")))
+    (with-current-buffer buffer
+      (gis-200-redraw-game-board))))
+
 (defun gis-200-start-execution ()
   "Parse gameboard, displaying any errors, and display code execution buffer."
   (interactive)
   (setq gis-200-parse-errors nil)
-  (let ((parse-errors))
+  (let ((parse-errors)
+        (parses))
     (maphash
      (lambda (coords code-text)
        (let ((parse-result (gis-200--parse-assembly code-text)))
          (if (gis-200--parse-error-p parse-result)
-             (setq parse-errors (cons (cons coords parse-result) parse-errors)))))
+             (setq parse-errors (cons (cons coords parse-result) parse-errors))
+           (let ((asm (gis-200--parse-tree-to-asm parse-result)))
+             (setq parses (cons (cons coords asm) parses))))))
      gis-200-box-contents)
-    (when parse-errors
-      (setq gis-200-parse-errors parse-errors))
-    (let ((inhibit-read-only t))
-      (gis-200-redraw-game-board))))
+    (if parse-errors
+        (setq gis-200-parse-errors parse-errors)
+      (dolist (parse parses)
+        (let* ((coords (car parse))
+               (row (car coords))
+               (col (cadr coords))
+               (asm (cadr parse)))
+          (assert (numberp col))
+          (gis-200--set-cell-at-row-col row col asm)))
+      (gis-200--create-execution-buffer))))
+
+(defun gis-200-execution-mode ()
+  (kill-all-local-variables)
+  (use-local-map gis-200-execution-mode-map)
+  (setq mode-name "gis-200-execution"
+        buffer-read-only t)
+  (setq-local truncate-lines 0
+              gis-200--display-mode 'execute)
+  (buffer-disable-undo)
+  (setq font-lock-defaults gis-200-mode-highlights)
+  (set-syntax-table gis-200-mode-syntax-table))
 
 (defun gis-200-mode ()
   (interactive)
@@ -637,6 +677,7 @@
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
   (set-syntax-table gis-200-mode-syntax-table))
+
 
 (setq gis-200--extra-gameboard-cells
       (gis-200--problem-spec-create :sources (list (gis-200--cell-source-create :row 3 :col 2 :data '(44 55 66)))

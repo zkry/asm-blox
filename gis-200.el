@@ -297,6 +297,22 @@
         (+ (* row gis-200--gameboard-row-ct)
            col)))
 
+(defun gis-200--set-cell-at-row-col (row col asm)
+  "Create a runtime from ASM at set board cell at ROW, COL to it."
+  (when (not gis-200--gameboard)
+    (setq gis-200--gameboard (make-vector (* gis-200--gameboard-col-ct gis-200--gameboard-row-ct) nil)))
+  (let ((runtime (gis-200--cell-runtime-create
+                  :instructions asm
+                  :pc 0
+                  :stack nil
+                  :row row
+                  :col col
+                  :up nil
+                  :down nil
+                  :left nil
+                  :right nil)))
+    (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-row-ct) col)) runtime)))
+
 (defun gis-200--cell-at-moved-row-col (row col dir)
   "Return the item at the cell in the gameboard at position DIR from ROW,COL."
   (let* ((d-row (cond ((eql dir 'UP) -1)
