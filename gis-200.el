@@ -69,6 +69,7 @@
 (defun gis-200--parse-assembly (code)
   "Parse ASM CODE returning a list of instructions."
   (with-temp-buffer
+    (erase-buffer)
     (insert code)
     (goto-char (point-min))
     (let* ((top-body '()))
@@ -286,6 +287,7 @@
   "Return the current instruction of CELL-RUNTIME based in pc."
   (let* ((pc (gis-200--cell-runtime-pc cell-runtime))
          (instrs (gis-200--cell-runtime-instructions cell-runtime))
+         (instrs (if (not (listp instrs)) (list instrs) instrs))
          (_ (and (>= pc (length instrs)) (error "End of program error"))))
     (car (nthcdr pc instrs))))
 
@@ -294,7 +296,7 @@
 (defun gis-200--cell-at-row-col (row col)
   "Return the cell at index ROW COL from the gameboard."
   (aref gis-200--gameboard
-        (+ (* row gis-200--gameboard-row-ct)
+        (+ (* row gis-200--gameboard-col-ct)
            col)))
 
 (defun gis-200--set-cell-at-row-col (row col asm)
@@ -309,9 +311,9 @@
                   :col col
                   :up 1
                   :down 2
-                  :left nil
-                  :right nil)))
-    (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-row-ct) col)) runtime)))
+                  :left 3
+                  :right 4)))
+    (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-col-ct) col)) runtime)))
 
 (defun gis-200--cell-at-moved-row-col (row col dir)
   "Return the item at the cell in the gameboard at position DIR from ROW,COL."
@@ -560,6 +562,29 @@
 ;; Functions that map the domain of the gameboard to that of the
 ;; display.
 
+(defun gis-200--get-direction-col-registers (row col direction)
+  "Return the register value for the DIRECTION registers at ROW, COL.
+ROW and COL here do not refer to the coordinates of a
+cell-runtime but rather the in-between row/col."
+  (assert (or (eql 'LEFT direction) (eql 'RIGHT direction)))
+  (assert (<= 0 row (1- gis-200--gameboard-row-ct)))
+  (assert (<= 0 col gis-200--gameboard-col-ct))
+  (let ((cell-col (if (eql 'RIGHT direction) (1- col) col)))
+    (cond
+     ;; outputs are never displayed on the board
+     ((or (and (= col 0) (eql direction 'LEFT))
+          (and (= row gis-200--gameboard-col-ct) (eql direction 'RIGHT)))
+      nil)
+     ((or (= col 0)
+          (= col gis-200--gameboard-col-ct))
+      (let* ((source (gis-200--gameboard-source-at-pos row cell-col)))
+        (if (not source)
+            nil
+          (car (gis-200--cell-source-data source)))))
+     (t
+      (let* ((cell-runtime (gis-200--cell-at-row-col row cell-col)))
+        (gis-200--get-value-from-direction cell-runtime direction))))))
+
 (defun gis-200--get-direction-row-registers (row col direction)
   "Return the register value for the DIRECTION registers at ROW, COL.
 ROW and COL here do not refer to the coordinates of a
@@ -574,8 +599,7 @@ cell-runtime but rather the in-between row/col."
       nil)
      ((or (= row 0)
           (= row gis-200--gameboard-row-ct))
-      (let* ((source (gis-200--gameboard-source-at-pos cell-row col))
-             (data ))
+      (let* ((source (gis-200--gameboard-source-at-pos cell-row col)))
         (if (not source)
             nil
           (car (gis-200--cell-source-data source)))))
@@ -683,8 +707,9 @@ cell-runtime but rather the in-between row/col."
 (defmacro comment (&rest x) nil)
 
 (comment
+ (gis-200--parse-tree-to-asm (gis-200--parse-assembly "(CONST 1)"))
  (gis-200--parse-assembly ")")
- (let* ((parsed (gis-200--parse-assembly "(CONST 1) (SEND LEFT) (CONST 2) (SEND LEFT)"))
+ (let* ((parsed (gis-200--parse-assembly "(CONST 1)"))
         (parsed2 (gis-200--parse-assembly "(GET LEFT) (POP)"))
         (asm (gis-200--parse-tree-to-asm parsed))
         (asm2 (gis-200--parse-tree-to-asm parsed2))

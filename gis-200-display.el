@@ -110,6 +110,20 @@
             'font-lock-face '(:weight bold)))))
     "    "))
 
+;; TODO: Dry this display logic up.
+(defun gis-200--col-register-display (row col direction)
+  ""
+  ;; Note: the space between the cells is 5 splaces.
+  (if (eql 'execute gis-200--display-mode)
+      (let ((val (gis-200--get-direction-col-registers row col direction)))
+        (cond
+         ((not val) "     ")
+         ((numberp val)
+          (propertize
+           (format "%4d " val)
+           'font-lock-face '(:weight bold)))))
+    "     "))
+
 (defun gis-200--source-sink-idx-to-name (type idx)
   (let ((start-char (if (eql type 'source) ?A ?W)))
     (format "%c" (+ start-char idx))))
@@ -203,6 +217,9 @@
              "Draw the ⇋|   |⇋|   |⇋|   |⇋|   |⇋ part of the board."
              (insert space-start)
              (cond
+              ((= 4 box-row)
+               (let ((display (gis-200--col-register-display row 0 'RIGHT))) ; NOTE: capital LEFT indicates arrow direction
+                 (insert display)))                                          ;       while lower-case represents board side.
               ((= 5 box-row)
                (let ((label (gis-200--col-arrow-label-display 'left 'source row)))
                  (if (equal label " ")
@@ -213,6 +230,9 @@
                  (if (equal label " ")
                      (insert space-between)
                    (progn (insert label) (insert arrow-left) (insert ?\s)))))
+              ((= 8 box-row)
+               (let ((display (gis-200--col-register-display row 0 'LEFT)))
+                 (insert display)))
               (t (insert space-between)))
              (dotimes (col gis-200-column-ct)
                (let ((err (gis-200--get-parse-error-at-cell row col)))
@@ -235,13 +255,22 @@
                    (insert box-vertical)))
                (when (< col (1- gis-200-column-ct))
                  (cond
+                  ((= 4 box-row)
+                   (let ((display (gis-200--col-register-display row (1+ col) 'RIGHT)))
+                     (insert display)))
                   ((= 5 box-row)
                    (progn (insert "  ") (insert arrow-right) (insert "  ")))
                   ((= 7 box-row)
                    (progn (insert "  ") (insert arrow-left) (insert "  ")))
+                  ((= 8 box-row)
+                   (let ((display (gis-200--col-register-display row (1+ col) 'LEFT)))
+                     (insert display)))
                   (t
                    (insert space-between)))))
              (cond
+              ((= 4 box-row)
+               (let ((display (gis-200--col-register-display row gis-200-column-ct 'RIGHT)))
+                 (insert display)))
               ((= 5 box-row)
                (let ((label (gis-200--col-arrow-label-display 'right 'sink row)))
                  (if (equal label " ")
@@ -252,6 +281,9 @@
                  (if (equal label " ")
                      (insert space-between)
                    (progn (insert ?\s) (insert arrow-left) (insert label)))))
+              ((= 8 box-row)
+               (let ((display (gis-200--col-register-display row gis-200-column-ct 'LEFT)))
+                 (insert display)))
               (t
                (insert space-between)))
              (insert "\n")))
@@ -313,6 +345,11 @@
       (when (eql 'execute gis-200--display-mode)
         (insert "EXECUTE"))
       (insert (format "%s" gis-200-parse-errors)))))
+
+(defun gis-200--box-point-forward ()
+  "With the point in a text box, move forward a point in box-buffer."
+  (gis-200--in-buffer
+   (forward-char)))
 
 (defun gis-200--propertize-errors ()
   "Add text properties to errors."
@@ -584,6 +621,32 @@
       (define-key map "x" #'gis-200--self-insert-command)
       (define-key map "y" #'gis-200--self-insert-command)
       (define-key map "z" #'gis-200--self-insert-command)
+      (define-key map "A" #'gis-200--self-insert-command)
+      (define-key map "B" #'gis-200--self-insert-command)
+      (define-key map "C" #'gis-200--self-insert-command)
+      (define-key map "D" #'gis-200--self-insert-command)
+      (define-key map "E" #'gis-200--self-insert-command)
+      (define-key map "F" #'gis-200--self-insert-command)
+      (define-key map "G" #'gis-200--self-insert-command)
+      (define-key map "H" #'gis-200--self-insert-command)
+      (define-key map "I" #'gis-200--self-insert-command)
+      (define-key map "J" #'gis-200--self-insert-command)
+      (define-key map "K" #'gis-200--self-insert-command)
+      (define-key map "L" #'gis-200--self-insert-command)
+      (define-key map "M" #'gis-200--self-insert-command)
+      (define-key map "N" #'gis-200--self-insert-command)
+      (define-key map "O" #'gis-200--self-insert-command)
+      (define-key map "P" #'gis-200--self-insert-command)
+      (define-key map "Q" #'gis-200--self-insert-command)
+      (define-key map "R" #'gis-200--self-insert-command)
+      (define-key map "S" #'gis-200--self-insert-command)
+      (define-key map "T" #'gis-200--self-insert-command)
+      (define-key map "U" #'gis-200--self-insert-command)
+      (define-key map "V" #'gis-200--self-insert-command)
+      (define-key map "W" #'gis-200--self-insert-command)
+      (define-key map "X" #'gis-200--self-insert-command)
+      (define-key map "Y" #'gis-200--self-insert-command)
+      (define-key map "Z" #'gis-200--self-insert-command)
       (define-key map "0" #'gis-200--self-insert-command)
       (define-key map "1" #'gis-200--self-insert-command)
       (define-key map "2" #'gis-200--self-insert-command)
@@ -638,6 +701,21 @@
       (gis-200-execution-mode)
       (let ((inhibit-read-only t))
         (gis-200-redraw-game-board)))))
+
+(defun gis-200-execution-code-highlight ()
+  "Adds highlight face to where runtime's pc is "
+  (let ((inhibit-read-only t))
+    (dotimes (row gis-200--gameboard-row-ct)
+      (dotimes (col gis-200--gameboard-col-ct)
+        (let* ((at-runtime (gis-200--cell-at-row-col row col))
+               (at-instr (gis-200--cell-runtime-current-instruction at-runtime))
+               (start-pos (gis-200-code-node-start-pos at-instr))
+               (end-pos (gis-200-code-node-end-pos at-instr)))
+          (gis-200--move-to-box row col)
+          (dotimes (i (1- start-pos))
+            (forward-char 1))
+          (put-text-property (point) (+ (point) (- end-pos start-pos))
+                             'font-lock-face '(:background "#555")))))))
 
 (defun gis-200-start-execution ()
   "Parse gameboard, displaying any errors, and display code execution buffer."
