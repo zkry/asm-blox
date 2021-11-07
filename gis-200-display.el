@@ -788,7 +788,7 @@
         (let* ((coords (car parse))
                (row (car coords))
                (col (cadr coords))
-               (asm (cadr parse)))
+               (asm (cdr parse)))
           (assert (numberp col))
           (gis-200--set-cell-at-row-col row col asm)))
       (gis-200--create-execution-buffer))))
