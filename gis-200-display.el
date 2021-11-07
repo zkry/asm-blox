@@ -250,9 +250,16 @@
                      (insert (propertize spacing
                                          'gis-200-box-id (list row col box-row)
                                          'gis-200-text-type 'spacing))))
-                 (if err
-                     (insert (propertize (char-to-string box-vertical) 'font-lock-face '(:foreground "red")))
-                   (insert box-vertical)))
+                 (let ((pipe-str (cond
+                                  ((= box-row (1- gis-200-box-height))
+                                   (propertize (char-to-string box-vertical)
+                                               'gis-200-text-type `(box-end ,row ,col)))
+                                  (err
+                                   (propertize (char-to-string box-vertical)
+                                               'font-lock-face '(:foreground "red")))
+                                  (t
+                                   (char-to-string box-vertical)))))
+                   (insert pipe-str)))
                (when (< col (1- gis-200-column-ct))
                  (cond
                   ((= 4 box-row)
@@ -418,11 +425,25 @@
   (unless (gis-200-in-box-p)
     (error "not in box 1"))
   (while (gis-200-in-box-p)
-    (next-line -1))
+    (next-line -1)) ;; TODO - is this command buggy?
   (next-line 1)
   (while (gis-200-in-box-p)
     (forward-char -1))
   (forward-char 1))
+
+(defun gis-200--move-to-end-of-box (row col)
+  (goto-char (point-min))
+  (while (let* ((prop (get-text-property (point) 'gis-200-text-type))
+                (type (and (listp prop) (car prop)))
+                (at-row (and type (cadr prop)))
+                (at-col (and type (caddr prop))))
+           (and (not (eobp))
+                (not (and (eql type 'box-end)
+                          (= at-row row)
+                          (= at-col col)))))
+    (forward-char))
+  (when (eobp)
+    (error "box %d, %d not found" row col)))
 
 (defun gis-200--move-to-box (row col)
   (goto-char (point-min))
@@ -684,7 +705,11 @@
 (defun gis-200--execution-next-command ()
   ""
   (interactive)
-  (error "not implemented"))
+  (gis-200--gameboard-step)
+  (let ((inhibit-read-only t))
+    (gis-200-redraw-game-board)
+    (gis-200-execution-code-highlight)
+    (gis-200-execution-draw-stack)))
 
 (defconst gis-200-execution-mode-map
   (let ((map (make-keymap)))
@@ -709,7 +734,9 @@
     (with-current-buffer buffer
       (gis-200-execution-mode)
       (let ((inhibit-read-only t))
-        (gis-200-redraw-game-board)))))
+        (gis-200-redraw-game-board)
+        (gis-200-execution-code-highlight)
+        (gis-200-execution-draw-stack)))))
 
 (defun gis-200-execution-code-highlight ()
   "Adds highlight face to where runtime's pc is "
@@ -724,6 +751,22 @@
           (gis-200--box-point-forward (1- start-pos))
           (put-text-property (point) (+ (point) (- end-pos start-pos))
                              'font-lock-face '(:background "#555")))))))
+
+(defun gis-200-execution-draw-stack ()
+  "Display the stack for the current cell-runtimes."
+  (let ((inhibit-read-only t))
+    (dotimes (row gis-200--gameboard-row-ct)
+      (dotimes (col gis-200--gameboard-col-ct)
+        (let* ((at-runtime (gis-200--cell-at-row-col row col))
+               (stack (gis-200--cell-runtime-stack at-runtime)))
+          (gis-200--move-to-end-of-box row col)
+          (while stack
+            (let ((stack-top (car stack)))
+              (forward-char -4)
+              (delete-forward-char 4)
+              (insert (format "%4d" stack-top))
+              (forward-char -5))
+            (setq stack (cdr stack))))))))
 
 (defun gis-200-start-execution ()
   "Parse gameboard, displaying any errors, and display code execution buffer."
@@ -773,10 +816,6 @@
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
   (set-syntax-table gis-200-mode-syntax-table))
-
-(setq gis-200--extra-gameboard-cells
-      (gis-200--problem-spec-create :sources (list (gis-200--cell-source-create :row 3 :col 2 :data '(44 55 66)))
-                                    :sinks (list (gis-200--cell-sink-create :row 0 :col 4 :expected-data '(1 2)))))
 
 (provide 'gis-200-display)
 

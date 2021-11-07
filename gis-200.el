@@ -110,7 +110,7 @@
                                      ((eql at-char ?\))
                                       (if top-level
                                           (throw 'error `(error ,(point) "SYNTAX ERROR"))
-                                          (forward-char 1)
+                                        (forward-char 1)
                                         (throw 'end nil)))
                                      ;; Symbol
                                      ((symbol-char-p at-char)
@@ -211,27 +211,27 @@
                  (then-label (gis-200--make-label))
                  (end-label (gis-200--make-label)))
             `(,(gis-200--code-node-create
-               :children (list 'JMP_IF_NOT then-label)
-               :start-pos nil
-               :end-pos nil)
+                :children (list 'JMP_IF_NOT then-label)
+                :start-pos nil
+                :end-pos nil)
               ,@(if then-case
                     (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children then-case)))
                   nil)
               ,(gis-200--code-node-create
-               :children (list 'JMP end-label)
-               :start-pos nil
-               :end-pos nil)
+                :children (list 'JMP end-label)
+                :start-pos nil
+                :end-pos nil)
               ,(gis-200--code-node-create
-               :children (list 'LABEL then-label)
-               :start-pos nil
-               :end-pos nil)
+                :children (list 'LABEL then-label)
+                :start-pos nil
+                :end-pos nil)
               ,@(if else-case
                     (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children else-case)))
                   nil)
               ,(gis-200--code-node-create
-               :children (list 'LABEL end-label)
-               :start-pos nil
-               :end-pos nil))))))))))
+                :children (list 'LABEL end-label)
+                :start-pos nil
+                :end-pos nil))))))))))
 
 (defun gis-200--resolve-labels (asm)
   "Change each label reference in ASM to index in program."
@@ -303,16 +303,17 @@
   "Create a runtime from ASM at set board cell at ROW, COL to it."
   (when (not gis-200--gameboard)
     (setq gis-200--gameboard (make-vector (* gis-200--gameboard-col-ct gis-200--gameboard-row-ct) nil)))
-  (let ((runtime (gis-200--cell-runtime-create
-                  :instructions asm
-                  :pc 0
-                  :stack nil
-                  :row row
-                  :col col
-                  :up 1
-                  :down 2
-                  :left 3
-                  :right 4)))
+  (let* ((asm (if (not (listp asm)) (list asm) asm))
+         (runtime (gis-200--cell-runtime-create
+                   :instructions asm
+                   :pc 0
+                   :stack '()
+                   :row row
+                   :col col
+                   :up 1
+                   :down 2
+                   :left 3
+                   :right 4)))
     (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-col-ct) col)) runtime)))
 
 (defun gis-200--cell-at-moved-row-col (row col dir)
@@ -680,7 +681,7 @@ cell-runtime but rather the in-between row/col."
             (message "Unexpected value"))
           (setf (gis-200--cell-sink-expected-data sink) (cdr old-stack))
           (gis-200--remove-value-from-direction cell-runtime opposite-direction))
-        'blocked)))
+      'blocked)))
 
 (defun gis-200--cell-source-pop (source)
   "Pop a value from the data of SOURCE."
@@ -699,10 +700,9 @@ cell-runtime but rather the in-between row/col."
          (expected (seq-mapn #'+ input-1 input-2)))
     (gis-200--problem-spec-create
      :sources (list (gis-200--cell-source-create :row -1 :col 0 :data input-1)
-                   (gis-200--cell-source-create :row -1 :col 1 :data input-2))
+                    (gis-200--cell-source-create :row -1 :col 1 :data input-2))
      :sinks
      (list (gis-200--cell-sink-create :row 4 :col 1 :expected-data expected)))))
-
 
 (defmacro comment (&rest x) nil)
 
