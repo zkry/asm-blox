@@ -346,10 +346,19 @@
         (insert "EXECUTE"))
       (insert (format "%s" gis-200-parse-errors)))))
 
-(defun gis-200--box-point-forward ()
+(defun gis-200--box-point-forward (ct)
   "With the point in a text box, move forward a point in box-buffer."
-  (gis-200--in-buffer
-   (forward-char)))
+  (while (> ct 0)
+    (cond
+     ((eql (get-text-property (point) 'gis-200-text-type) 'spacing)
+      (forward-char))
+     ((not (gis-200-in-box-p))
+      (let ((col (- (current-column) gis-200-box-width)))
+        (forward-line 1)
+        (move-to-column col)
+        (setq ct (1- ct))))
+     (t (forward-char)
+        (setq ct (1- ct))))))
 
 (defun gis-200--propertize-errors ()
   "Add text properties to errors."
@@ -712,8 +721,7 @@
                (start-pos (gis-200-code-node-start-pos at-instr))
                (end-pos (gis-200-code-node-end-pos at-instr)))
           (gis-200--move-to-box row col)
-          (dotimes (i (1- start-pos))
-            (forward-char 1))
+          (gis-200--box-point-forward (1- start-pos))
           (put-text-property (point) (+ (point) (- end-pos start-pos))
                              'font-lock-face '(:background "#555")))))))
 
