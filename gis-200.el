@@ -649,12 +649,12 @@ cell-runtime but rather the in-between row/col."
 (cl-defstruct (gis-200--cell-source
                (:constructor gis-200--cell-source-create)
                (:copier nil))
-  row col data)
+  row col data idx)
 
 (cl-defstruct (gis-200--cell-sink
                (:constructor gis-200--cell-sink-create)
                (:copier nil))
-  row col expected-data)
+  row col expected-data idx)
 
 (cl-defstruct (gis-200--problem-spec
                (:constructor gis-200--problem-spec-create)
@@ -674,12 +674,13 @@ cell-runtime but rather the in-between row/col."
          (cell-runtime (gis-200--cell-at-moved-row-col row col direction))
          (v (gis-200--get-value-from-direction cell-runtime opposite-direction)))
     (if v
-        (let* ((old-stack (gis-200--cell-sink-expected-data sink))
-               (expected-value (car old-stack)))
+        (let* ((data (gis-200--cell-sink-expected-data sink))
+               (idx (gis-200--cell-sink-idx sink))
+               (expected-value (nth idx data)))
           (when (not (equal expected-value v))
             ;; TODO - do something here
             (message "Unexpected value"))
-          (setf (gis-200--cell-sink-expected-data sink) (cdr old-stack))
+          (setf (gis-200--cell-sink-idx sink) (1+ idx))
           (gis-200--remove-value-from-direction cell-runtime opposite-direction))
       'blocked)))
 
@@ -688,9 +689,9 @@ cell-runtime but rather the in-between row/col."
   (unless (gis-200--cell-source-p source)
     (error "Cell-source-pop type error"))
   (let* ((data (gis-200--cell-source-data source))
-         (top (car data))
-         (rest (cdr data)))
-    (setf (gis-200--cell-source-data source) rest)
+         (idx (gis-200--cell-source-idx source))
+         (top (nth data idx)))
+    (setf (gis-200--cell-source-idx source) (1+ idx))
     top))
 
 (defun gis-200--problem--add ()
@@ -699,8 +700,8 @@ cell-runtime but rather the in-between row/col."
          (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (expected (seq-mapn #'+ input-1 input-2)))
     (gis-200--problem-spec-create
-     :sources (list (gis-200--cell-source-create :row -1 :col 0 :data input-1)
-                    (gis-200--cell-source-create :row -1 :col 1 :data input-2))
+     :sources (list (gis-200--cell-source-create :row -1 :col 0 :data input-1 :idx 0)
+                    (gis-200--cell-source-create :row -1 :col 1 :data input-2 :idx 0))
      :sinks
      (list (gis-200--cell-sink-create :row 4 :col 1 :expected-data expected)))))
 
@@ -735,7 +736,7 @@ cell-runtime but rather the in-between row/col."
                     :right nil))
         (gis-200--gameboard (vector runtime runtime-2))
         (gis-200--extra-gameboard-cells
-         (gis-200--problem-spec-create :sources (list (gis-200--cell-source-create :row -1 :col 0 :data '(44 55 66)))
+         (gis-200--problem-spec-create :sources (list (gis-200--cell-source-create :row -1 :col 0 :data '(44 55 66) :idx 0))
                                        :sinks (list (gis-200--cell-sink-create :row 0 :col -1 :expected-data '(1 2)))))
         (gis-200--gameboard-col-ct 2))
    (gis-200--gameboard-step)

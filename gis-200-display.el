@@ -48,6 +48,60 @@
 
 (defvar gis-200-box-contents nil)
 
+;;; Widget display
+
+(defvar gis-200--widget-row-idx nil)
+(defvar gis-200--current-widgets nil
+  "List of widgets to display on right of gameboard.")
+
+
+(defun gis-200--test-widget (msg)
+  (pcase msg
+    ('width 6)
+    (`(display ,n)
+     (pcase n
+       (0 " IN.A ")
+       (1 "┌────┐")
+       (47 "└────┘")
+       (_ (format "│%4d│" n))))))
+
+(defun gis-200--make-source-widget (source)
+  "Return a widget displaying a source."
+  (lambda (msg)
+    (pcase msg
+      ('width 6)
+      (`(display ,n)
+       (let ((data (gis-200--cell-source-data source)))
+         (pcase n
+           (0 " INPUT ")
+           (1 "┌────┐")
+           (47 "└────┘")
+           (_
+            (let ((num (nth (- n 2) data)))
+              (if num
+                  (format "│%4d│" num)
+                (format "│    │" num))))))))))
+
+(let ((source (gis-200--cell-source-create :row -1
+                                           :col 0
+                                           :data '(44 55 66)
+                                           :idx 0)))
+  (setq gis-200--current-widgets (list #'gis-200--test-widget (gis-200--make-source-widget source))))
+
+
+
+(defun gis-200--display-widget ()
+  "Display the current line of the active widget.
+This should normally be called when the point is at the end of the display."
+  (dolist (widget gis-200--current-widgets)
+    (let ((widget-text (funcall widget (list 'display gis-200--widget-row-idx))))
+      (insert widget-text)
+      (insert "  ")))
+  (setq gis-200--widget-row-idx (1+ gis-200--widget-row-idx)))
+
+
+;;; Main grid display
+
 (defun gis-200--initialize-box-contents ()
   (setq gis-200-box-contents (make-hash-table :test 'equal))
   (dotimes (row 3)
@@ -59,18 +113,6 @@
 
 (defun gis-200--set-box-content (row col text)
   (puthash (list row col) text gis-200-box-contents))
-
-(defun gis-200--parse-game-board ()
-  "Parse each cell in gameboard, returning Lisp object of result."
-  (let ((res '()))
-    (dotimes (row 3)
-      (let ((parsed-row '()))
-        (dotimes (col gis-200-column-ct)
-          (let* ((at-text (gis-200--get-box-content row col))
-                 (parsed (gis-200--code-cell-init at-text col row)))
-            (push parsed parsed-row)))
-        (push (reverse parsed-row) res)))
-    (reverse res)))
 
 (defun gis-200--get-box-line-content (row col line)
   (let ((text (gis-200--get-box-content row col)))
@@ -85,16 +127,6 @@
                               (substring at-line line-col))))
     (setcar (nthcdr line lines) new-at-line)
     (setq gis-200-box-content (string-join lines "\n"))))
-
-(defun gis-200--resolve-moved-point (row col line line-col)
-  (let* ((text gis-200-box-content)
-         (lines (split-string text "\n")))
-    (if (>= line (length lines))
-        'end
-      (let ((at-line (nth line lines)))
-        (if (> line-col (length at-line))
-            (gis-200--resolve-moved-point row col (1+ line) 0)
-          (list line line-col))))))
 
 (defun gis-200--row-register-display (row col direction)
   ""
@@ -147,6 +179,7 @@
       " ")))
 
 (defun gis-200-display-game-board ()
+  (setq gis-200--widget-row-idx 0)
   (let* ((display-mode 'edit) ;; TODO - finalize where this comes from. can be 'edit or 'execute
          (arrow-up "↑")
          (arrow-down "↓")
@@ -178,6 +211,8 @@
                    (insert box-line-top-bottom)
                    (insert box-top-right))
                  (insert space-between)))
+             (when (eql gis-200--display-mode 'execute)
+               (gis-200--display-widget))
              (insert "\n")))
           (insert-row-bottom
            (lambda (row)
@@ -194,6 +229,8 @@
                    (insert box-line-top-bottom)
                    (insert box-bottom-right))
                  (insert space-between)))
+             (when (eql gis-200--display-mode 'execute)
+               (gis-200--display-widget))
              (insert "\n")))
           (insert-v-border
            (lambda (position)
@@ -211,6 +248,8 @@
                      (insert (format "%s %s" source-char sink-char))))
                  (insert (make-string right-of-arrows-len ?\s))
                  (insert space-between)))
+             (when (eql gis-200--display-mode 'execute)
+               (gis-200--display-widget))
              (insert "\n")))
           (insert-row-middle
            (lambda (row box-row)
@@ -282,17 +321,19 @@
                (let ((label (gis-200--col-arrow-label-display 'right 'sink row)))
                  (if (equal label " ")
                      (insert space-between)
-                   (progn (insert ?\s) (insert arrow-right) (insert label)))))
+                   (progn (insert ?\s) (insert arrow-right) (insert label) (insert "  ")))))
               ((= 7 box-row)
                (let ((label (gis-200--col-arrow-label-display 'right 'source row)))
                  (if (equal label " ")
                      (insert space-between)
-                   (progn (insert ?\s) (insert arrow-left) (insert label)))))
+                   (progn (insert ?\s) (insert arrow-left) (insert label) (insert "  ")))))
               ((= 8 box-row)
                (let ((display (gis-200--col-register-display row gis-200-column-ct 'LEFT)))
                  (insert display)))
               (t
                (insert space-between)))
+             (when (eql gis-200--display-mode 'execute)
+               (gis-200--display-widget))
              (insert "\n")))
           (insert-middle-row-space
            (lambda (row)
@@ -334,6 +375,8 @@
                    (insert down-arrow-display))
                  (insert padding-space-right)
                  (insert space-between))
+               (when (eql gis-200--display-mode 'execute)
+                 (gis-200--display-widget))
                (insert "\n")))))
       (funcall insert-v-border 'top)
       (funcall insert-middle-row-space 0)
@@ -599,28 +642,6 @@
          (forward-char 0))
       (gis-200-redraw-game-board))))
 
-(defun gis-200-forward-char ()
-  (let ((start-pos (point)))
-    (if (not (gis-200-in-box-p))
-        (while (and (not (= (point-max) (point)))
-                    (not (gis-200-in-box-p)))
-          (forward-char 1))
-      (forward-char 1)
-      (when (not (gis-200-in-box-p))
-        (let ((column (current-column)))
-          (next-line 1)
-          (move-to-column column))
-        (forward-char (- gis-200-box-width))))
-    (let* ((box-id (get-text-property (point) 'gis-200-box-id))
-           (row (nth 0 box-id))
-           (col (nth 1 box-id))
-           (line-no (nth 2 box-id))
-           (line-col-no (gis-200-get-line-col-num))
-           (new-pt (gis-200--resolve-moved-point row col line-no line-col-no)))
-      (if (eql 'end new-pt)
-          nil
-        (apply #'gis-200--move-to-box-point new-pt)))))
-
 (defconst gis-200-mode-map
   (let ((map (make-keymap)))
     (prog1 map
@@ -694,6 +715,7 @@
       (define-key map (kbd "SPC") #'gis-200--self-insert-command)
       (define-key map (kbd "RET") #'gis-200--newline)
       (define-key map (kbd "C-c g") #'gis-200--refresh-contents)
+      (define-key map (kbd "C-c C-c") #'gis-200-start-execution)
       (define-key map (kbd "M-d") #'gis-200--kill-word)
       (define-key map (kbd "C-k") #'gis-200--kill-line)
       (define-key map (kbd "C-a") #'gis-200--move-beginning-of-line)
@@ -736,7 +758,8 @@
       (let ((inhibit-read-only t))
         (gis-200-redraw-game-board)
         (gis-200-execution-code-highlight)
-        (gis-200-execution-draw-stack)))))
+        (gis-200-execution-draw-stack)))
+    (switch-to-buffer buffer)))
 
 (defun gis-200-execution-code-highlight ()
   "Adds highlight face to where runtime's pc is "
