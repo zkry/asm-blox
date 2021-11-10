@@ -65,30 +65,49 @@
        (47 "└────┘")
        (_ (format "│%4d│" n))))))
 
-(defun gis-200--make-source-widget (source)
+(defun gis-200--make-source-widget (source name)
   "Return a widget displaying a source."
-  (lambda (msg)
-    (pcase msg
-      ('width 6)
-      (`(display ,n)
-       (let ((data (gis-200--cell-source-data source)))
-         (pcase n
-           (0 " INPUT ")
-           (1 "┌────┐")
-           (47 "└────┘")
-           (_
-            (let ((num (nth (- n 2) data)))
-              (if num
-                  (format "│%4d│" num)
-                (format "│    │" num))))))))))
+  (let ((source-widget-offset-ct 2))
+    (lambda (msg)
+      (pcase msg
+        ('width 6)
+        (`(display ,n)
+         (let ((data (gis-200--cell-source-data source))
+               (idx (gis-200--cell-source-idx source)))
+           (pcase n
+             (0 (format "IN: %s" name))
+             (1 "┌────┐")
+             (47 "└────┘")
+             (_
+              (let* ((num (nth (- n source-widget-offset-ct) data))
+                     (current-row-p (= (- n source-widget-offset-ct)
+                                       idx))
+                     (inner-str (if num (format "%4d" num) "    "))
+                     (inner-str (if current-row-p
+                                    (propertize inner-str
+                                                'font-lock-face '(:background "#777"))
+                                  inner-str)))
+                (format "│%s│" inner-str))))))))))
 
-(let ((source (gis-200--cell-source-create :row -1
-                                           :col 0
-                                           :data '(44 55 66)
-                                           :idx 0)))
-  (setq gis-200--current-widgets (list #'gis-200--test-widget (gis-200--make-source-widget source))))
-
-
+(defun gis-200--make-sink-widget (sink name)
+  "Return a widget displaying a source."
+  (let ((sink-widget-offset-ct 2))
+    (lambda (msg)
+      (pcase msg
+        ('width 6)
+        (`(display ,n)
+         (let ((data (gis-200--cell-sink-expected-data sink))
+               (idx (gis-200--cell-sink-idx sink)))
+           (pcase n
+             (0 (format "OUT: %s" name))
+             (1 "┌────┐")
+             (47 "└────┘")
+             (_
+              (let* ((num (nth (- n sink-widget-offset-ct) data))
+                     (included-p (<= (- n sink-widget-offset-ct)
+                                     (1- idx)))
+                     (inner-str (if (and num included-p) (format "%4d" num) "    ")))
+                (format "│%s│" inner-str))))))))))
 
 (defun gis-200--display-widget ()
   "Display the current line of the active widget.
@@ -268,7 +287,7 @@ This should normally be called when the point is at the end of the display."
                (let ((label (gis-200--col-arrow-label-display 'left 'sink row)))
                  (if (equal label " ")
                      (insert space-between)
-                   (progn (insert label) (insert arrow-left) (insert ?\s)))))
+                   (progn (insert "  ") (insert label) (insert arrow-left) (insert ?\s)))))
               ((= 8 box-row)
                (let ((display (gis-200--col-register-display row 0 'LEFT)))
                  (insert display)))
@@ -469,7 +488,7 @@ This should normally be called when the point is at the end of the display."
     (error "not in box 1"))
   (while (gis-200-in-box-p)
     (next-line -1)) ;; TODO - is this command buggy?
-  (next-line 1)
+  (next-line 1)     ;; TODO - use forward line
   (while (gis-200-in-box-p)
     (forward-char -1))
   (forward-char 1))
@@ -479,7 +498,7 @@ This should normally be called when the point is at the end of the display."
   (while (let* ((prop (get-text-property (point) 'gis-200-text-type))
                 (type (and (listp prop) (car prop)))
                 (at-row (and type (cadr prop)))
-                (at-col (and type (caddr prop))))
+                (at-col (and type (acddr prop))))
            (and (not (eobp))
                 (not (and (eql type 'box-end)
                           (= at-row row)
@@ -728,6 +747,7 @@ This should normally be called when the point is at the end of the display."
   ""
   (interactive)
   (gis-200--gameboard-step)
+  (gis-200--extra-gameboard-step)
   (let ((inhibit-read-only t))
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)
@@ -787,7 +807,9 @@ This should normally be called when the point is at the end of the display."
             (let ((stack-top (car stack)))
               (forward-char -4)
               (delete-forward-char 4)
-              (insert (format "%4d" stack-top))
+              (if stack-top
+                  (insert (format "%4d" stack-top))
+                (insert "    "))
               (forward-char -5))
             (setq stack (cdr stack))))))))
 
@@ -814,7 +836,22 @@ This should normally be called when the point is at the end of the display."
                (asm (cdr parse)))
           (assert (numberp col))
           (gis-200--set-cell-at-row-col row col asm)))
-      (gis-200--create-execution-buffer))))
+      ;; temp code to set up extra cells
+      (let ((source (gis-200--cell-source-create :row -1 :col 0
+                                                 :data '(44 55 66 77 88)
+                                                 :idx 0))
+            (sink (gis-200--cell-sink-create :row 0 :col -1
+                                             :expected-data '(44 55 66 77 88)
+                                             :idx 0)))
+        (setq gis-200--current-widgets
+              (list #'gis-200--test-widget
+                    (gis-200--make-source-widget source "A")
+                    (gis-200--make-sink-widget sink "W")))
+        (setq gis-200--extra-gameboard-cells
+              (gis-200--problem-spec-create
+               :sources (list source)
+               :sinks (list sink))))
+            (gis-200--create-execution-buffer))))
 
 (defun gis-200-execution-mode ()
   (kill-all-local-variables)

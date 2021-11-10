@@ -310,10 +310,10 @@
                    :stack '()
                    :row row
                    :col col
-                   :up 1
-                   :down 2
-                   :left 3
-                   :right 4)))
+                   :up nil
+                   :down nil
+                   :left nil
+                   :right nil)))
     (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-col-ct) col)) runtime)))
 
 (defun gis-200--cell-at-moved-row-col (row col dir)
@@ -472,7 +472,7 @@
   (let* ((at-row (gis-200--cell-runtime-row cell-runtime))
          (at-col (gis-200--cell-runtime-col cell-runtime))
          (source (gis-200--gameboard-source-at-pos at-row at-col direction)))
-    (if (not source)
+    (if (or (not source) (not (gis-200--cell-source-current-value source)))
         'blocked
       (let ((v (gis-200--cell-source-pop source)))
         (gis-200--cell-runtime-push cell-runtime v)))))
@@ -581,7 +581,7 @@ cell-runtime but rather the in-between row/col."
       (let* ((source (gis-200--gameboard-source-at-pos row cell-col)))
         (if (not source)
             nil
-          (car (gis-200--cell-source-data source)))))
+          (gis-200--cell-source-current-value source))))
      (t
       (let* ((cell-runtime (gis-200--cell-at-row-col row cell-col)))
         (gis-200--get-value-from-direction cell-runtime direction))))))
@@ -603,7 +603,7 @@ cell-runtime but rather the in-between row/col."
       (let* ((source (gis-200--gameboard-source-at-pos cell-row col)))
         (if (not source)
             nil
-          (car (gis-200--cell-source-data source)))))
+          (gis-200--cell-source-current-value source))))
      (t
       (let* ((cell-runtime (gis-200--cell-at-row-col cell-row col)))
         (gis-200--get-value-from-direction cell-runtime direction))))))
@@ -684,13 +684,22 @@ cell-runtime but rather the in-between row/col."
           (gis-200--remove-value-from-direction cell-runtime opposite-direction))
       'blocked)))
 
+(defun gis-200--cell-source-current-value (source)
+  "Return the value of SOURCE that will be taken next."
+  (unless (gis-200--cell-source-p source)
+    (error "Cell-source-pop type error"))
+  (let* ((data (gis-200--cell-source-data source))
+         (idx (gis-200--cell-source-idx source))
+         (top (nth idx data)))
+    top))
+
 (defun gis-200--cell-source-pop (source)
   "Pop a value from the data of SOURCE."
   (unless (gis-200--cell-source-p source)
     (error "Cell-source-pop type error"))
   (let* ((data (gis-200--cell-source-data source))
          (idx (gis-200--cell-source-idx source))
-         (top (nth data idx)))
+         (top (nth idx data)))
     (setf (gis-200--cell-source-idx source) (1+ idx))
     top))
 
