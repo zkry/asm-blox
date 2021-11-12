@@ -282,6 +282,8 @@
 
 (defvar gis-200--gameboard nil)
 (defvar gis-200--extra-gameboard-cells nil)
+(defvar gis-200--gameboard-state nil
+  "Contains the state of the board whether it be victory or error.")
 
 (defun gis-200--cell-runtime-current-instruction (cell-runtime)
   "Return the current instruction of CELL-RUNTIME based in pc."
@@ -291,6 +293,9 @@
          (_ (and (>= pc (length instrs)) (error "End of program error"))))
     (car (nthcdr pc instrs))))
 
+(defun gis-200--gameboard-in-final-state-p ()
+  ;; If gis-200--gameboard-state is not nil then it is in finalized state.
+  gis-200--gameboard-state)
 
 ;; TODO - consolidate this function with gis-200--cell-at-moved-row-col
 (defun gis-200--cell-at-row-col (row col)
@@ -556,6 +561,22 @@
       (when (not (memq idx blocked-idxs))
         (let ((cell (aref gis-200--gameboard idx)))
           (gis-200--cell-runtime-step cell))))))
+
+(defun gis-200-check-winning-conditions ()
+  "Return non-nil if all sinks are full."
+  (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+        (win-p t))
+    (while (and sinks win-p)
+      (let* ((sink (car sinks))
+             (expected-data (gis-200--cell-sink-expected-data sink))
+             (idx (gis-200--cell-sink-idx sink)))
+        (when (< idx (length expected-data))
+          (setq win-p nil))
+        (setq sinks (cdr sinks))))
+    (when win-p
+      (message "Congragulations, you won!")
+      ;; TODO: Do something else for the victory.
+      (setq gis-200--gameboard-state 'win))))
 
 
 ;;; Gameboard Display Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

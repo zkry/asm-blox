@@ -746,12 +746,14 @@ This should normally be called when the point is at the end of the display."
 (defun gis-200--execution-next-command ()
   ""
   (interactive)
-  (gis-200--gameboard-step)
-  (gis-200--extra-gameboard-step)
+  (when (not (gis-200--gameboard-in-final-state-p))
+    (gis-200--gameboard-step)
+    (gis-200--extra-gameboard-step))
   (let ((inhibit-read-only t))
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)
-    (gis-200-execution-draw-stack)))
+    (gis-200-execution-draw-stack))
+  (gis-200-check-winning-conditions))
 
 (defconst gis-200-execution-mode-map
   (let ((map (make-keymap)))
@@ -863,6 +865,7 @@ This should normally be called when the point is at the end of the display."
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
   (setq header-line-format "GIS-200 EXECUTION")
+  (setq gis-200--gameboard-state nil)
   (set-syntax-table gis-200-mode-syntax-table))
 
 (defun gis-200-mode ()
