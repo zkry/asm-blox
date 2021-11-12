@@ -125,7 +125,7 @@ This should normally be called when the point is at the end of the display."
   (setq gis-200-box-contents (make-hash-table :test 'equal))
   (dotimes (row 3)
     (dotimes (col gis-200-column-ct)
-      (puthash (list row col) "" gis-200-box-contents))))
+      (puthash (list row col) "(CONST 1)" gis-200-box-contents))))
 
 (defun gis-200--get-box-content (row col)
   (gethash (list row col) gis-200-box-contents))
@@ -815,6 +815,23 @@ This should normally be called when the point is at the end of the display."
               (forward-char -5))
             (setq stack (cdr stack))))))))
 
+(defun gis-200--create-widges-from-gameboard ()
+  ""
+  (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
+        (sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+        (widgets))
+    (let ((letter ?A))
+      (dolist (source sources)
+        (setq widgets (cons (gis-200--make-source-widget source (char-to-string letter))
+                            widgets))
+        (setq letter (1+ letter))))
+    (let ((letter ?X))
+      (dolist (sink sinks)
+        (setq widgets (cons (gis-200--make-sink-widget sink (char-to-string letter))
+                            widgets))
+        (setq letter (1+ letter))))
+    (setq gis-200--current-widgets (reverse widgets))))
+
 (defun gis-200-start-execution ()
   "Parse gameboard, displaying any errors, and display code execution buffer."
   (interactive)
@@ -839,21 +856,8 @@ This should normally be called when the point is at the end of the display."
           (assert (numberp col))
           (gis-200--set-cell-at-row-col row col asm)))
       ;; temp code to set up extra cells
-      (let ((source (gis-200--cell-source-create :row -1 :col 0
-                                                 :data '(44 55 66 77 88)
-                                                 :idx 0))
-            (sink (gis-200--cell-sink-create :row 0 :col -1
-                                             :expected-data '(44 55 66 77 88)
-                                             :idx 0)))
-        (setq gis-200--current-widgets
-              (list #'gis-200--test-widget
-                    (gis-200--make-source-widget source "A")
-                    (gis-200--make-sink-widget sink "W")))
-        (setq gis-200--extra-gameboard-cells
-              (gis-200--problem-spec-create
-               :sources (list source)
-               :sinks (list sink))))
-            (gis-200--create-execution-buffer))))
+      (gis-200--create-widges-from-gameboard)
+      (gis-200--create-execution-buffer))))
 
 (defun gis-200-execution-mode ()
   (kill-all-local-variables)
@@ -879,6 +883,68 @@ This should normally be called when the point is at the end of the display."
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
   (set-syntax-table gis-200-mode-syntax-table))
+
+;;; Puzzle Selection
+(defun gis-200--get-puzzle-by-id (id)
+  ;; TODO: fill this out with the remaining puzzles.
+  #'gis-200--problem--add)
+
+(defun gis-200--puzzle-selection-setup-buffer (id)
+  "Setup the puzzle buffer for the puzzle at ID."
+  (let ((puzzle (gis-200--get-puzzle-by-id id)))
+    (unless puzzle
+      (error "no puzzle found with id %s" id))
+    (let ((buffer (get-buffer-create "*gis-200*"))) ;; TODO: allow for 1+ puzzles at once
+      (gis-200--initialize-box-contents)
+      (setq gis-200--extra-gameboard-cells (funcall puzzle))
+      (switch-to-buffer buffer)
+      (gis-200-redraw-game-board)
+      (gis-200-mode))))
+
+(defun gis-200-select-puzzle ()
+  "Start the puzzle for the puzzle under the point."
+  (interactive)
+  (let ((at-puzzle-id (get-text-property (point) 'gis-200-puzzle-selection-id)))
+    (unless at-puzzle-id
+      (error "no puzzle under point"))
+    (gis-200--puzzle-selection-setup-buffer at-puzzle-id)))
+
+(defconst gis-200-puzzle-selection-mode-map
+  (let ((map (make-sparse-keymap)))
+    (prog1 map
+      (define-key map "q" #'quit-window)
+      (define-key map (kbd "RET") #'gis-200-select-puzzle))))
+
+(defvar gis-200-puzzles '("MOVE NUMBER"
+                          "NUMBER ADD"
+                          "NUMBER DOUBLE"))
+
+(defun gis-200-puzzle-selection-prepare-buffer ()
+  "Prepare the puzzle selection buffer."
+  (with-current-buffer (get-buffer-create "*gis-200-puzzle-selection*")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (dolist (puzzle gis-200-puzzles)
+        (insert (propertize puzzle 'gis-200-puzzle-selection-id puzzle))
+        (insert "\n")))))
+
+(defun gis-200-puzzle-selection-mode ()
+  (interactive)
+  (kill-all-local-variables)
+  (use-local-map gis-200-puzzle-selection-mode-map)
+  (setq mode-name "gis-200-puzzle-selection"
+        buffer-read-only t)
+  (setq header-line-format "GIS-200 PUZZLE SELECTION")
+  (setq-local truncate-lines 0)
+  (buffer-disable-undo))
+
+(defun gis-200 ()
+  (interactive)
+  (let ((buffer (get-buffer-create "*gis-200-puzzle-selection*")))
+    (switch-to-buffer buffer)
+    (gis-200-puzzle-selection-mode)
+    (gis-200-puzzle-selection-prepare-buffer)))
+
 
 (provide 'gis-200-display)
 

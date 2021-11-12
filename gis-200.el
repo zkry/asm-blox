@@ -733,7 +733,7 @@ cell-runtime but rather the in-between row/col."
      :sources (list (gis-200--cell-source-create :row -1 :col 0 :data input-1 :idx 0)
                     (gis-200--cell-source-create :row -1 :col 1 :data input-2 :idx 0))
      :sinks
-     (list (gis-200--cell-sink-create :row 4 :col 1 :expected-data expected)))))
+     (list (gis-200--cell-sink-create :row 3 :col 1 :expected-data expected :idx 0)))))
 
 (defmacro comment (&rest x) nil)
 
