@@ -773,9 +773,36 @@ cell-runtime but rather the in-between row/col."
                                       :name "N"))
      :description "Repeatedly send the number 1 to N. There are no inputs.")))
 
-(defun gis-200--get-puzzle-by-id (id)
+(defun gis-200--problem--identity ()
+  "Generate a simple addition problem."
+  (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (expected input-1))
+    (gis-200--problem-spec-create
+     :name "Identity"
+     :sources (list (gis-200--cell-source-create :row -1
+                                                 :col 0
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "X"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 3
+                                      :col 3
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "X"))
+     :description "Take an input from the input X and send it to the output X.")))
+
+(defvar gis-200-puzzles (list
+                         #'gis-200--problem--constant
+                         #'gis-200--problem--identity
+                         #'gis-200--problem--add))
+
+(defun gis-200--get-puzzle-by-id (name)
   ;; TODO: fill this out with the remaining puzzles.
-  #'gis-200--problem--constant)
+  (seq-find (lambda (puzzle-fn)
+              (let ((n (gis-200--problem-spec-name (funcall puzzle-fn))))
+                (equal name n)))
+            gis-200-puzzles))
 
 (provide 'gis-200)
 

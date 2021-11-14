@@ -414,7 +414,7 @@ This should normally be called when the point is at the end of the display."
         (insert description))
 
       ;;; DEBUG INFORMATION
-      (insert (format "%s" gis-200-parse-errors)))))
+      (insert (format "\n\n%s" gis-200-parse-errors)))))
 
 (defun gis-200--box-point-forward (ct)
   "With the point in a text box, move forward a point in box-buffer."
@@ -910,17 +910,20 @@ This should normally be called when the point is at the end of the display."
       (define-key map "q" #'quit-window)
       (define-key map (kbd "RET") #'gis-200-select-puzzle))))
 
-(defvar gis-200-puzzles '("MOVE NUMBER"
-                          "NUMBER ADD"
-                          "NUMBER DOUBLE"))
-
 (defun gis-200-puzzle-selection-prepare-buffer ()
   "Prepare the puzzle selection buffer."
   (with-current-buffer (get-buffer-create "*gis-200-puzzle-selection*")
     (let ((inhibit-read-only t))
       (erase-buffer)
-      (dolist (puzzle gis-200-puzzles)
-        (insert (propertize puzzle 'gis-200-puzzle-selection-id puzzle))
+      (dolist (puzzle-fn gis-200-puzzles)
+        (let* ((puzzle (funcall puzzle-fn))
+               (name (gis-200--problem-spec-name puzzle))
+               (description (gis-200--problem-spec-description puzzle))
+               (line-str (format "%-25s %-60s"
+                                 name
+                                 (truncate-string-to-width description 60
+                                                           nil nil t))))
+          (insert (propertize line-str 'gis-200-puzzle-selection-id name)))
         (insert "\n")))))
 
 (defun gis-200-puzzle-selection-mode ()
@@ -929,8 +932,10 @@ This should normally be called when the point is at the end of the display."
   (use-local-map gis-200-puzzle-selection-mode-map)
   (setq mode-name "gis-200-puzzle-selection"
         buffer-read-only t)
-  (setq header-line-format "GIS-200 PUZZLE SELECTION")
+  (setq header-line-format
+        (format " %-25s %-60s" "PUZZLE NAME" "DESCRIPTION"))
   (setq-local truncate-lines 0)
+  (hl-line-mode t)
   (buffer-disable-undo))
 
 (defun gis-200 ()
@@ -938,7 +943,8 @@ This should normally be called when the point is at the end of the display."
   (let ((buffer (get-buffer-create "*gis-200-puzzle-selection*")))
     (switch-to-buffer buffer)
     (gis-200-puzzle-selection-mode)
-    (gis-200-puzzle-selection-prepare-buffer)))
+    (gis-200-puzzle-selection-prepare-buffer)
+    (goto-char (point-min))))
 
 
 (provide 'gis-200-display)
