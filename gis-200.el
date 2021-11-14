@@ -636,30 +636,28 @@ cell-runtime but rather the in-between row/col."
 (defun gis-200--get-source-idx-at-position (row col)
   "Return name of source at position ROW, COL if exists."
   (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
-        (idx 0)
         (found))
     (while sources
       (let ((source (car sources)))
         (if (and (= (gis-200--cell-source-row source) row)
                  (= (gis-200--cell-source-col source) col))
             (progn (setq sources nil)
-                   (setq found idx))
-          (setq sources (cdr sources))
-          (setq idx (1+ idx)))))
+                   (setq found (gis-200--cell-source-name source)))
+          (setq sources (cdr sources)))))
     found))
+
 (defun gis-200--get-sink-idx-at-position (row col)
-  "Return name of source at position ROW, COL if exists."
+  "Return name of sink at position ROW, COL if exists."
   (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
         (idx 0)
         (found))
     (while sinks
-      (let ((source (car sinks)))
-        (if (and (= (gis-200--cell-sink-row source) row)
-                 (= (gis-200--cell-sink-col source) col))
+      (let ((sink (car sinks)))
+        (if (and (= (gis-200--cell-sink-row sink) row)
+                 (= (gis-200--cell-sink-col sink) col))
             (progn (setq sinks nil)
-                   (setq found idx))
-          (setq sinks (cdr sinks))
-          (setq idx (1+ idx)))))
+                   (setq found (gis-200--cell-sink-name sink)))
+          (setq sinks (cdr sinks)))))
     found))
 
 ;;; Problem Infrastructure ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -674,12 +672,12 @@ cell-runtime but rather the in-between row/col."
 (cl-defstruct (gis-200--cell-source
                (:constructor gis-200--cell-source-create)
                (:copier nil))
-  row col data idx)
+  row col data idx name)
 
 (cl-defstruct (gis-200--cell-sink
                (:constructor gis-200--cell-sink-create)
                (:copier nil))
-  row col expected-data idx)
+  row col expected-data idx name)
 
 (cl-defstruct (gis-200--problem-spec
                (:constructor gis-200--problem-spec-create)
@@ -742,51 +740,22 @@ cell-runtime but rather the in-between row/col."
          (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (expected (seq-mapn #'+ input-1 input-2)))
     (gis-200--problem-spec-create
-     :sources (list (gis-200--cell-source-create :row -1 :col 0 :data input-1 :idx 0)
-                    (gis-200--cell-source-create :row -1 :col 1 :data input-2 :idx 0))
+     :sources (list (gis-200--cell-source-create :row -1
+                                                 :col 0
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "A")
+                    (gis-200--cell-source-create :row -1
+                                                 :col 1
+                                                 :data input-2
+                                                 :idx 0
+                                                 :name "B"))
      :sinks
-     (list (gis-200--cell-sink-create :row 3 :col 1 :expected-data expected :idx 0)))))
-
-(defmacro comment (&rest x) nil)
-
-(comment
- (gis-200--parse-tree-to-asm (gis-200--parse-assembly "(CONST 1)"))
- (gis-200--parse-assembly ")")
- (let* ((parsed (gis-200--parse-assembly "(CONST 1)"))
-        (parsed2 (gis-200--parse-assembly "(GET LEFT) (POP)"))
-        (asm (gis-200--parse-tree-to-asm parsed))
-        (asm2 (gis-200--parse-tree-to-asm parsed2))
-        (runtime (gis-200--cell-runtime-create
-                  :instructions asm
-                  :pc 0
-                  :stack nil
-                  :row 0
-                  :col 0
-                  :up nil
-                  :down nil
-                  :left nil
-                  :right nil))
-        (runtime-2 (gis-200--cell-runtime-create
-                    :instructions asm2
-                    :pc 0
-                    :stack nil
-                    :row 0
-                    :col 1
-                    :up nil
-                    :down nil
-                    :left 73
-                    :right nil))
-        (gis-200--gameboard (vector runtime runtime-2))
-        (gis-200--extra-gameboard-cells
-         (gis-200--problem-spec-create :sources (list (gis-200--cell-source-create :row -1 :col 0 :data '(44 55 66) :idx 0))
-                                       :sinks (list (gis-200--cell-sink-create :row 0 :col -1 :expected-data '(1 2)))))
-        (gis-200--gameboard-col-ct 2))
-   (gis-200--gameboard-step)
-   (gis-200--gameboard-step)
-   (gis-200--gameboard-step)
-   (gis-200--extra-gameboard-step)
-   (gis-200--cell-runtime-stack runtime)
-   (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))))
+     (list (gis-200--cell-sink-create :row 3
+                                      :col 1
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "S")))))
 
 (provide 'gis-200)
 

@@ -65,7 +65,7 @@
        (47 "└────┘")
        (_ (format "│%4d│" n))))))
 
-(defun gis-200--make-source-widget (source name)
+(defun gis-200--make-source-widget (source)
   "Return a widget displaying a source."
   (let ((source-widget-offset-ct 2))
     (lambda (msg)
@@ -73,7 +73,8 @@
         ('width 6)
         (`(display ,n)
          (let ((data (gis-200--cell-source-data source))
-               (idx (gis-200--cell-source-idx source)))
+               (idx (gis-200--cell-source-idx source))
+               (name (gis-200--cell-source-name source)))
            (pcase n
              (0 (format "IN: %s" name))
              (1 "┌────┐")
@@ -89,7 +90,7 @@
                                   inner-str)))
                 (format "│%s│" inner-str))))))))))
 
-(defun gis-200--make-sink-widget (sink name)
+(defun gis-200--make-sink-widget (sink)
   "Return a widget displaying a source."
   (let ((sink-widget-offset-ct 2))
     (lambda (msg)
@@ -97,7 +98,8 @@
         ('width 6)
         (`(display ,n)
          (let ((data (gis-200--cell-sink-expected-data sink))
-               (idx (gis-200--cell-sink-idx sink)))
+               (idx (gis-200--cell-sink-idx sink))
+               (name (gis-200--cell-sink-name sink)))
            (pcase n
              (0 (format "OUT: %s" name))
              (1 "┌────┐")
@@ -181,21 +183,17 @@ This should normally be called when the point is at the end of the display."
 
 (defun gis-200--row-arrow-label-display (position type col)
   (let* ((row (if (eql position 'top) -1 3))
-         (idx (if (eql type 'source)
+         (name (if (eql type 'source)
                    (gis-200--get-source-idx-at-position row col)
-                (gis-200--get-sink-idx-at-position row col))))
-    (if idx
-        (gis-200--source-sink-idx-to-name type idx)
-      " ")))
+                 (gis-200--get-sink-idx-at-position row col))))
+    (or name " ")))
 
 (defun gis-200--col-arrow-label-display (position type row)
   (let* ((col (if (eql position 'left) -1 4))
-         (idx (if (eql type 'source)
-                  (gis-200--get-source-idx-at-position row col)
-                (gis-200--get-sink-idx-at-position row col))))
-    (if idx
-        (gis-200--source-sink-idx-to-name type idx)
-      " ")))
+         (name (if (eql type 'source)
+                   (gis-200--get-source-idx-at-position row col)
+                 (gis-200--get-sink-idx-at-position row col))))
+    (or name " ")))
 
 (defun gis-200-display-game-board ()
   (setq gis-200--widget-row-idx 0)
@@ -822,12 +820,12 @@ This should normally be called when the point is at the end of the display."
         (widgets))
     (let ((letter ?A))
       (dolist (source sources)
-        (setq widgets (cons (gis-200--make-source-widget source (char-to-string letter))
+        (setq widgets (cons (gis-200--make-source-widget source)
                             widgets))
         (setq letter (1+ letter))))
     (let ((letter ?X))
       (dolist (sink sinks)
-        (setq widgets (cons (gis-200--make-sink-widget sink (char-to-string letter))
+        (setq widgets (cons (gis-200--make-sink-widget sink)
                             widgets))
         (setq letter (1+ letter))))
     (setq gis-200--current-widgets (reverse widgets))))
