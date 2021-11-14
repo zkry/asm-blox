@@ -463,14 +463,18 @@
       ('DOWN (setq current-val (gis-200--cell-runtime-down cell-runtime)))
       ('LEFT (setq current-val (gis-200--cell-runtime-left cell-runtime)))
       ('RIGHT (setq current-val (gis-200--cell-runtime-right cell-runtime))))
-    (if current-val
-        ;; item is blocked
-        'blocked
-      (pcase direction
-        ('UP (setf (gis-200--cell-runtime-up cell-runtime) v))
-        ('DOWN (setf (gis-200--cell-runtime-down cell-runtime) v))
-        ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) v))
-        ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) v))))))
+    (let ((result
+           (if current-val
+               ;; item is blocked
+               'blocked
+             (pcase direction
+               ('UP (setf (gis-200--cell-runtime-up cell-runtime) v))
+               ('DOWN (setf (gis-200--cell-runtime-down cell-runtime) v))
+               ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) v))
+               ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) v))))))
+      (when (eql result 'blocked)
+        (gis-200--cell-runtime-push cell-runtime v))
+      result)))
 
 (defun gis-200--cell-runtime-get-extra (cell-runtime direction)
   "Perform the GET command on CELL-RUNTIME outside the gameboard at DIRECTION."
@@ -682,6 +686,14 @@ cell-runtime but rather the in-between row/col."
                (:copier nil))
   sources sinks)
 
+(defun gis-200--reset-extra-gameboard-cells-state ()
+  (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
+        (sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells)))
+    (dolist (source sources)
+      (setf (gis-200--cell-source-idx source) 0))
+    (dolist (sink sinks)
+      (setf (gis-200--cell-sink-idx sink) 0))))
+
 (defun gis-200--cell-sink-get (sink)
   "Grab a value and put it into SINK from the gameboard."
   (let* ((row (gis-200--cell-sink-row sink))
@@ -690,7 +702,7 @@ cell-runtime but rather the in-between row/col."
                      ((>= col gis-200--gameboard-col-ct) 'LEFT)
                      ((> 0 col) 'RIGHT)
                      ((> 0 row) 'DOWN)
-                     ((> row gis-200--gameboard-row-ct) 'UP)))
+                     ((>= row gis-200--gameboard-row-ct) 'UP)))
          (opposite-direction (gis-200--mirror-direction direction))
          (cell-runtime (gis-200--cell-at-moved-row-col row col direction))
          (v (gis-200--get-value-from-direction cell-runtime opposite-direction)))

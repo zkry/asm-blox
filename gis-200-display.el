@@ -855,6 +855,7 @@ This should normally be called when the point is at the end of the display."
                (asm (cdr parse)))
           (assert (numberp col))
           (gis-200--set-cell-at-row-col row col asm)))
+      (gis-200--reset-extra-gameboard-cells-state)
       ;; temp code to set up extra cells
       (gis-200--create-widges-from-gameboard)
       (gis-200--create-execution-buffer))))
