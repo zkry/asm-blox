@@ -407,10 +407,13 @@ This should normally be called when the point is at the end of the display."
       (funcall insert-middle-row-space 3)
       (funcall insert-v-border 'bottom)
 
-      ;;; DEBUG INFORMATION
       (insert "\n\n")
-      (when (eql 'execute gis-200--display-mode)
-        (insert "EXECUTE"))
+      (let ((name (gis-200--problem-spec-name gis-200--extra-gameboard-cells))
+            (description (gis-200--problem-spec-description gis-200--extra-gameboard-cells)))
+        (insert (concat name ":\n"))
+        (insert description))
+
+      ;;; DEBUG INFORMATION
       (insert (format "%s" gis-200-parse-errors)))))
 
 (defun gis-200--box-point-forward (ct)
@@ -818,16 +821,12 @@ This should normally be called when the point is at the end of the display."
   (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
         (sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
         (widgets))
-    (let ((letter ?A))
-      (dolist (source sources)
-        (setq widgets (cons (gis-200--make-source-widget source)
-                            widgets))
-        (setq letter (1+ letter))))
-    (let ((letter ?X))
-      (dolist (sink sinks)
-        (setq widgets (cons (gis-200--make-sink-widget sink)
-                            widgets))
-        (setq letter (1+ letter))))
+    (dolist (source sources)
+      (setq widgets (cons (gis-200--make-source-widget source)
+                          widgets)))
+    (dolist (sink sinks)
+      (setq widgets (cons (gis-200--make-sink-widget sink)
+                          widgets)))
     (setq gis-200--current-widgets (reverse widgets))))
 
 (defun gis-200-start-execution ()
@@ -884,9 +883,6 @@ This should normally be called when the point is at the end of the display."
   (set-syntax-table gis-200-mode-syntax-table))
 
 ;;; Puzzle Selection
-(defun gis-200--get-puzzle-by-id (id)
-  ;; TODO: fill this out with the remaining puzzles.
-  #'gis-200--problem--add)
 
 (defun gis-200--puzzle-selection-setup-buffer (id)
   "Setup the puzzle buffer for the puzzle at ID."

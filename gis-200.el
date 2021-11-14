@@ -682,7 +682,7 @@ cell-runtime but rather the in-between row/col."
 (cl-defstruct (gis-200--problem-spec
                (:constructor gis-200--problem-spec-create)
                (:copier nil))
-  sources sinks)
+  sources sinks name description)
 
 (defun gis-200--reset-extra-gameboard-cells-state ()
   (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
@@ -740,6 +740,7 @@ cell-runtime but rather the in-between row/col."
          (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (expected (seq-mapn #'+ input-1 input-2)))
     (gis-200--problem-spec-create
+     :name "Number Addition"
      :sources (list (gis-200--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
@@ -755,7 +756,26 @@ cell-runtime but rather the in-between row/col."
                                       :col 1
                                       :expected-data expected
                                       :idx 0
-                                      :name "S")))))
+                                      :name "S"))
+     :description "Take an input from A and B, add the two together, and send it to S.")))
+
+(defun gis-200--problem--constant ()
+  "Generate a simple addition problem."
+  (let* ((expected (make-list 40 1)))
+    (gis-200--problem-spec-create
+     :name "Constant Generator"
+     :sources (list )
+     :sinks
+     (list (gis-200--cell-sink-create :row 0
+                                      :col 4
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "N"))
+     :description "Repeatedly send the number 1 to N. There are no inputs.")))
+
+(defun gis-200--get-puzzle-by-id (id)
+  ;; TODO: fill this out with the remaining puzzles.
+  #'gis-200--problem--constant)
 
 (provide 'gis-200)
 
