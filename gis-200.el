@@ -804,6 +804,65 @@ cell-runtime but rather the in-between row/col."
                 (equal name n)))
             gis-200-puzzles))
 
+;;; File Saving
+
+(defconst gis-200-save-directory-name
+  (expand-file-name ".gis-200" user-emacs-directory))
+
+(defun gis-200--generate-new-puzzle-filename (name)
+  (ignore-errors
+    (make-directory gis-200-save-directory-name))
+  (let* ((dir-files (directory-files gis-200-save-directory-name))
+         (puzzle-files (seq-filter (lambda (file-name)
+                                     (string-prefix-p name file-name))
+                                   dir-files))
+         (new-idx (number-to-string (1+ (length puzzle-files)))))
+    (expand-file-name (concat name "-" new-idx ".gis")
+                      gis-200-save-directory-name)))
+
+(defun gis-200--parse-saved-buffer ()
+  "Extract the puzzle contents from the saved buffer setting up state."
+  (save-excursion
+    (goto-char (point-min))
+    (setq gis-200-box-contents (make-hash-table :test 'equal))
+    ;; Get the literal contents of each box.
+    (let ((match-regexp (format "│\\(.\\{%d\\}\\)│" gis-200-box-width)))
+     (dotimes (i (* gis-200--gameboard-row-ct
+                    gis-200--gameboard-col-ct
+                    gis-200-box-height))
+       (search-forward-regexp match-regexp)
+       (let* ((col (mod i gis-200--gameboard-col-ct))
+              (row (/ (/ i gis-200--gameboard-col-ct) gis-200-box-height))
+              (match (string-trim-right (match-string-no-properties 1)))
+              (current-text (gethash (list row col) gis-200-box-contents))
+              (next-text (if current-text
+                             (concat current-text "\n" match)
+                           match)))
+         (puthash (list row col) next-text gis-200-box-contents))))
+    ;; Trim the ends of the boxes, assume user doesn't want it.
+    (dotimes (row gis-200--gameboard-row-ct)
+      (dotimes (col gis-200--gameboard-col-ct)
+        (let ((prev-val (gethash (list row col) gis-200-box-contents)))
+          (puthash (list row col) (string-trim-right prev-val) gis-200-box-contents))))
+    ;; Find the name of the puzzle.
+    (search-forward-regexp "^\\([[:alnum:] ]+\\):")
+    (let ((match (match-string 1)))
+      (unless match
+        (error "Bad file format, no puzzle name found."))
+      (let ((puzzle (gis-200--get-puzzle-by-id match)))
+        (unless puzzle
+          (error "No puzzle with name %s found." puzzle))
+        (setq gis-200--extra-gameboard-cells (funcall puzzle))))))
+
+(defun gis-200--saved-puzzle-ct-by-id (id)
+  (length (seq-filter (lambda (file-name)
+                        (string-prefix-p id file-name))
+                      (directory-files gis-200-save-directory-name))))
+
+(defun gis-200--make-puzzle-idx-file-name (id idx)
+  (expand-file-name (concat id "-" (number-to-string idx) ".gis")
+                    gis-200-save-directory-name))
+
 (provide 'gis-200)
 
 ;;; gis-200.el ends here

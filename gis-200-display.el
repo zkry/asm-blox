@@ -127,7 +127,7 @@ This should normally be called when the point is at the end of the display."
   (setq gis-200-box-contents (make-hash-table :test 'equal))
   (dotimes (row 3)
     (dotimes (col gis-200-column-ct)
-      (puthash (list row col) "(CONST 1)" gis-200-box-contents))))
+      (puthash (list row col) "" gis-200-box-contents))))
 
 (defun gis-200--get-box-content (row col)
   (gethash (list row col) gis-200-box-contents))
@@ -870,6 +870,9 @@ This should normally be called when the point is at the end of the display."
   (setq gis-200--gameboard-state nil)
   (set-syntax-table gis-200-mode-syntax-table))
 
+(defvar gis-200--skip-initial-parsing nil
+  "When non-nil, don't parse the initial gameboard.")
+
 (defun gis-200-mode ()
   (interactive)
   (kill-all-local-variables)
@@ -880,7 +883,14 @@ This should normally be called when the point is at the end of the display."
   (setq-local truncate-lines 0)
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
-  (set-syntax-table gis-200-mode-syntax-table))
+  (set-syntax-table gis-200-mode-syntax-table)
+  (unless gis-200--skip-initial-parsing
+    (gis-200--parse-saved-buffer)
+    (let ((inhibit-read-only t))
+      (gis-200-redraw-game-board))))
+
+;;;###autoload
+(add-to-list 'auto-mode-alist (cons "\\.gis\\'" 'gis-200-mode))
 
 ;;; Puzzle Selection
 
@@ -889,20 +899,26 @@ This should normally be called when the point is at the end of the display."
   (let ((puzzle (gis-200--get-puzzle-by-id id)))
     (unless puzzle
       (error "no puzzle found with id %s" id))
-    (let ((buffer (get-buffer-create "*gis-200*"))) ;; TODO: allow for 1+ puzzles at once
+    (let ((buffer (get-buffer-create "*gis-200*"))  ;; TODO: allow for 1+ puzzles at once
+          (file-name (gis-200--generate-new-puzzle-filename id)))
       (gis-200--initialize-box-contents)
       (setq gis-200--extra-gameboard-cells (funcall puzzle))
       (switch-to-buffer buffer)
+      (let ((inhibit-read-only t))
+        (set-visited-file-name file-name))
       (gis-200-redraw-game-board)
       (gis-200-mode))))
 
 (defun gis-200-select-puzzle ()
   "Start the puzzle for the puzzle under the point."
   (interactive)
-  (let ((at-puzzle-id (get-text-property (point) 'gis-200-puzzle-selection-id)))
+  (let ((at-puzzle-id (get-text-property (point) 'gis-200-puzzle-selection-id))
+        (at-puzzle-filename (get-text-property (point) 'gis-200-puzzle-selection-filename)))
     (unless at-puzzle-id
       (error "no puzzle under point"))
-    (gis-200--puzzle-selection-setup-buffer at-puzzle-id)))
+    (if at-puzzle-filename
+        (find-file at-puzzle-filename)
+      (gis-200--puzzle-selection-setup-buffer at-puzzle-id))))
 
 (defconst gis-200-puzzle-selection-mode-map
   (let ((map (make-sparse-keymap)))
@@ -919,11 +935,17 @@ This should normally be called when the point is at the end of the display."
         (let* ((puzzle (funcall puzzle-fn))
                (name (gis-200--problem-spec-name puzzle))
                (description (gis-200--problem-spec-description puzzle))
-               (line-str (format "%-25s %-60s"
+               (line-str (format "%-25s %-60s   "
                                  name
                                  (truncate-string-to-width description 60
                                                            nil nil t))))
-          (insert (propertize line-str 'gis-200-puzzle-selection-id name)))
+          (insert (propertize line-str 'gis-200-puzzle-selection-id name))
+          (let ((saved-file-ct (gis-200--saved-puzzle-ct-by-id name)))
+            (dotimes (i saved-file-ct)
+              (insert (propertize (format "[%d]" (1+ i))
+                                  'gis-200-puzzle-selection-id name
+                                  'gis-200-puzzle-selection-filename (gis-200--make-puzzle-idx-file-name name (1+ i))))
+              (insert (propertize " " 'gis-200-puzzle-selection-id name)))))
         (insert "\n")))))
 
 (defun gis-200-puzzle-selection-mode ()
@@ -933,7 +955,7 @@ This should normally be called when the point is at the end of the display."
   (setq mode-name "gis-200-puzzle-selection"
         buffer-read-only t)
   (setq header-line-format
-        (format " %-25s %-60s" "PUZZLE NAME" "DESCRIPTION"))
+        (format " %-25s %-60s   %s" "PUZZLE NAME" "DESCRIPTION" "SAVED FILES"))
   (setq-local truncate-lines 0)
   (hl-line-mode t)
   (buffer-disable-undo))
@@ -945,7 +967,6 @@ This should normally be called when the point is at the end of the display."
     (gis-200-puzzle-selection-mode)
     (gis-200-puzzle-selection-prepare-buffer)
     (goto-char (point-min))))
-
 
 (provide 'gis-200-display)
 
