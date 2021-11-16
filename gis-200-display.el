@@ -39,6 +39,9 @@
 (defconst gis-200-box-height 12)
 
 (defvar gis-200-parse-errors nil)
+(defvar gis-200-runtime-error nil
+  "If non-nil, contains the runtime error encountered. The format
+  of the error is (list message row column).")
 
 (defvar-local gis-200--display-mode 'edit)
 
@@ -904,10 +907,11 @@ This should normally be called when the point is at the end of the display."
       (gis-200--initialize-box-contents)
       (setq gis-200--extra-gameboard-cells (funcall puzzle))
       (switch-to-buffer buffer)
-      (let ((inhibit-read-only t))
-        (set-visited-file-name file-name))
-      (gis-200-redraw-game-board)
-      (gis-200-mode))))
+      (let ((inhibit-read-only t)
+            (gis-200--skip-initial-parsing t))
+        (set-visited-file-name file-name)
+        (gis-200-redraw-game-board)
+        (gis-200-mode)))))
 
 (defun gis-200-select-puzzle ()
   "Start the puzzle for the puzzle under the point."

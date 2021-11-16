@@ -430,7 +430,14 @@
 (defun gis-200--cell-runtime-push (cell-runtime value)
   "Add VALUE to the stack of CELL-RUNTIME."
   ;; TODO: Handle stack overflow error.
-  (let ((stack (gis-200--cell-runtime-stack cell-runtime)))
+  (let* ((stack (gis-200--cell-runtime-stack cell-runtime)))
+    (when (>= (length stack) 4)
+      (let ((row (gis-200--cell-runtime-row cell-runtime))
+            (col (gis-200--cell-runtime-row cell-runtime)))
+        (setq gis-200-runtime-error
+              (list "Stack overflow" row col))
+        (setq gis-200--gameboard-state 'error)
+        (message "Stack overflow error at (%d, %d)" row col))) ;; Stack size hardcoded.
     (setf (gis-200--cell-runtime-stack cell-runtime) (cons value stack))))
 
 (defun gis-200--cell-runtime-pop (cell-runtime)
