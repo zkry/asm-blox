@@ -49,6 +49,14 @@
   (let ((err (assoc (list row col) gis-200-parse-errors)))
     (cdr err)))
 
+(defun gis-200--get-error-at-cell (row col)
+  (if (and (eql gis-200--display-mode 'execute)
+           gis-200-runtime-error
+           (equal (list row col) (cdr gis-200-runtime-error)))
+      (car gis-200-runtime-error)
+    (let ((err (assoc (list row col) gis-200-parse-errors)))
+      (cdr err))))
+
 (defvar gis-200-box-contents nil)
 
 ;;; Widget display
@@ -221,7 +229,7 @@ This should normally be called when the point is at the end of the display."
              (insert space-start)
              (insert space-between)
              (dotimes (col gis-200-column-ct)
-               (let ((err (gis-200--get-parse-error-at-cell row col)))
+               (let ((err (gis-200--get-error-at-cell row col)))
                  (if err
                      (progn
                        (insert (propertize (char-to-string box-top-left) 'font-lock-face '(:foreground "red")))
@@ -240,7 +248,7 @@ This should normally be called when the point is at the end of the display."
              (insert space-start)
              (insert space-between)
              (dotimes (col gis-200-column-ct)
-               (let ((err (gis-200--get-parse-error-at-cell row col)))
+               (let ((err (gis-200--get-error-at-cell row col)))
                  (if err
                      (progn (insert (propertize (char-to-string box-bottom-left) 'font-lock-face '(:foreground "red")))
                             (insert (propertize box-line-top-bottom 'font-lock-face '(:foreground "red")))
@@ -294,15 +302,15 @@ This should normally be called when the point is at the end of the display."
                  (insert display)))
               (t (insert space-between)))
              (dotimes (col gis-200-column-ct)
-               (let ((err (gis-200--get-parse-error-at-cell row col)))
+               (let ((err (gis-200--get-error-at-cell row col)))
                  (if err
                      (insert (propertize (char-to-string box-vertical) 'font-lock-face '(:foreground "red")))
                    (insert box-vertical))
                  ;; Draw the inner contents of the box
                  (let* ((text (gis-200--get-box-line-content row col box-row))
                         (spacing (make-string (- (length box-inside) (length text)) ?\s)))
-                   (if (and (= 11 box-row) err)
-                       (let ((err-text (caddr (gis-200--get-parse-error-at-cell row col)))) 
+                   (if (and (= 11 box-row) err (eql gis-200--display-mode 'edit))
+                       (let ((err-text (gis-200--get-error-at-cell row col))) 
                          (insert err-text)
                          (insert (make-string (- (length box-inside) (length err-text)) ?\s)))
                      (insert (propertize text 'gis-200-box-id (list row col box-row)))
@@ -413,11 +421,13 @@ This should normally be called when the point is at the end of the display."
       (insert "\n\n")
       (let ((name (gis-200--problem-spec-name gis-200--extra-gameboard-cells))
             (description (gis-200--problem-spec-description gis-200--extra-gameboard-cells)))
-        (insert (concat name ":\n"))
-        (insert description))
-
-      ;;; DEBUG INFORMATION
-      (insert (format "\n\n%s" gis-200-parse-errors)))))
+        (insert name ":\n")
+        (insert description "\n"))
+      (when (and (eql gis-200--display-mode 'execute) gis-200-runtime-error)
+        (insert (format "ERROR: %s at cell (%d, %d)\n"
+                        (car gis-200-runtime-error)
+                        (cadr gis-200-runtime-error)
+                        (caddr gis-200-runtime-error)))))))
 
 (defun gis-200--box-point-forward (ct)
   "With the point in a text box, move forward a point in box-buffer."
@@ -502,7 +512,7 @@ This should normally be called when the point is at the end of the display."
   (while (let* ((prop (get-text-property (point) 'gis-200-text-type))
                 (type (and (listp prop) (car prop)))
                 (at-row (and type (cadr prop)))
-                (at-col (and type (acddr prop))))
+                (at-col (and type (caddr prop))))
            (and (not (eobp))
                 (not (and (eql type 'box-end)
                           (= at-row row)
@@ -796,10 +806,11 @@ This should normally be called when the point is at the end of the display."
                (at-instr (gis-200--cell-runtime-current-instruction at-runtime))
                (start-pos (gis-200-code-node-start-pos at-instr))
                (end-pos (gis-200-code-node-end-pos at-instr)))
-          (gis-200--move-to-box row col)
-          (gis-200--box-point-forward (1- start-pos))
-          (put-text-property (point) (+ (point) (- end-pos start-pos))
-                             'font-lock-face '(:background "#555")))))))
+          (when (and start-pos end-pos)
+            (gis-200--move-to-box row col)
+            (gis-200--box-point-forward (1- start-pos))
+            (put-text-property (point) (+ (point) (- end-pos start-pos))
+                               'font-lock-face '(:background "#555"))))))))
 
 (defun gis-200-execution-draw-stack ()
   "Display the stack for the current cell-runtimes."
@@ -807,7 +818,8 @@ This should normally be called when the point is at the end of the display."
     (dotimes (row gis-200--gameboard-row-ct)
       (dotimes (col gis-200--gameboard-col-ct)
         (let* ((at-runtime (gis-200--cell-at-row-col row col))
-               (stack (gis-200--cell-runtime-stack at-runtime)))
+               ;; makes more sense to reverse stack 
+               (stack (reverse (gis-200--cell-runtime-stack at-runtime))))
           (gis-200--move-to-end-of-box row col)
           (while stack
             (let ((stack-top (car stack)))
@@ -870,6 +882,7 @@ This should normally be called when the point is at the end of the display."
   (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
   (setq header-line-format "GIS-200 EXECUTION")
+  (setq gis-200-runtime-error nil)
   (setq gis-200--gameboard-state nil)
   (set-syntax-table gis-200-mode-syntax-table))
 

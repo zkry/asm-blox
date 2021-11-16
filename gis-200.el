@@ -289,9 +289,11 @@
   "Return the current instruction of CELL-RUNTIME based in pc."
   (let* ((pc (gis-200--cell-runtime-pc cell-runtime))
          (instrs (gis-200--cell-runtime-instructions cell-runtime))
-         (instrs (if (not (listp instrs)) (list instrs) instrs))
-         (_ (and (>= pc (length instrs)) (error "End of program error"))))
-    (car (nthcdr pc instrs))))
+         (instrs (if (not (listp instrs)) (list instrs) instrs)))
+    (if (not instrs)
+        (gis-200--code-node-create :children '(_EMPTY))
+      (and (>= pc (length instrs)) (error "End of program error"))
+      (car (nthcdr pc instrs)))))
 
 (defun gis-200--gameboard-in-final-state-p ()
   ;; If gis-200--gameboard-state is not nil then it is in finalized state.
@@ -433,7 +435,7 @@
   (let* ((stack (gis-200--cell-runtime-stack cell-runtime)))
     (when (>= (length stack) 4)
       (let ((row (gis-200--cell-runtime-row cell-runtime))
-            (col (gis-200--cell-runtime-row cell-runtime)))
+            (col (gis-200--cell-runtime-col cell-runtime)))
         (setq gis-200-runtime-error
               (list "Stack overflow" row col))
         (setq gis-200--gameboard-state 'error)
@@ -519,6 +521,7 @@
          (cmd (car code-data))
          (status
           (pcase cmd
+            ('_EMPTY 'blocked)
             ('CONST (let ((const (cadr code-data)))
                       (gis-200--cell-runtime-push cell-runtime const)))
             ('ADD (gis-200--binary-operation cell-runtime #'+))
@@ -571,7 +574,7 @@
     (dotimes (idx (length gis-200--gameboard))
       (when (not (memq idx blocked-idxs))
         (let ((cell (aref gis-200--gameboard idx)))
-          (gis-200--cell-runtime-step cell))))))
+          (gis-200--cell-runtime-ste cell))))))
 
 (defun gis-200-check-winning-conditions ()
   "Return non-nil if all sinks are full."
