@@ -651,14 +651,18 @@ This should normally be called when the point is at the end of the display."
 (defun gis-200--beginning-of-buffer ()
   ""
   (interactive)
-  (gis-200--in-buffer
-   (beginning-of-buffer)))
+  (if (gis-200-in-box-p)
+      (gis-200--in-buffer
+       (beginning-of-buffer))
+    (beginning-of-buffer)))
 
 (defun gis-200--end-of-buffer ()
   ""
   (interactive)
-  (gis-200--in-buffer
-   (end-of-buffer)))
+  (if (gis-200-in-box-p)
+      (gis-200--in-buffer
+       (end-of-buffer))
+    (end-of-buffer)))
 
 (defun gis-200--newline ()
   ""
@@ -744,6 +748,19 @@ This should normally be called when the point is at the end of the display."
       (define-key map "," #'gis-200--self-insert-command)
       (define-key map "(" #'gis-200--self-insert-command)
       (define-key map ")" #'gis-200--self-insert-command)
+      (define-key map ":" #'gis-200--self-insert-command)
+      (define-key map "-" #'gis-200--self-insert-command)
+      (define-key map "[" #'gis-200--self-insert-command)
+      (define-key map "]" #'gis-200--self-insert-command)
+      (define-key map "\"" #'gis-200--self-insert-command)
+      (define-key map "'" #'gis-200--self-insert-command)
+      (define-key map ";" #'gis-200--self-insert-command)
+      (define-key map "#" #'gis-200--self-insert-command)
+      (define-key map "|" #'gis-200--self-insert-command)
+      (define-key map "<" #'gis-200--self-insert-command)
+      (define-key map ">" #'gis-200--self-insert-command)
+      (define-key map "=" #'gis-200--self-insert-command)
+      (define-key map "+" #'gis-200--self-insert-command)
       (define-key map (kbd "DEL") #'gis-200--backward-delete-char)
       (define-key map (kbd "SPC") #'gis-200--self-insert-command)
       (define-key map (kbd "RET") #'gis-200--newline)
