@@ -185,7 +185,9 @@ This should normally be called when the point is at the end of the display."
          ((numberp val)
           (propertize
            (format "%4d " val)
-           'font-lock-face '(:weight bold)))))
+           'font-lock-face '(:weight bold)))
+         ((symbolp val)
+          (format "%4s " (symbol-name val)))))
     "     "))
 
 (defun gis-200--source-sink-idx-to-name (type idx)
@@ -779,7 +781,8 @@ This should normally be called when the point is at the end of the display."
   (interactive)
   (when (not (gis-200--gameboard-in-final-state-p))
     (gis-200--gameboard-step)
-    (gis-200--extra-gameboard-step))
+    (gis-200--extra-gameboard-step)
+    (gis-200--resolve-port-values))
   (let ((inhibit-read-only t))
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)

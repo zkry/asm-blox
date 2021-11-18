@@ -275,7 +275,10 @@
 (cl-defstruct (gis-200--cell-runtime
                (:constructor gis-200--cell-runtime-create)
                (:copier nil))
-  instructions pc stack row col up down left right)
+  instructions pc stack row col
+  staging-up staging-down staging-left staging-right
+  up down left right
+  run-function run-spec run-state)
 
 (defconst gis-200--gameboard-col-ct 4)
 (defconst gis-200--gameboard-row-ct 3)
@@ -351,6 +354,14 @@
     ('DOWN (gis-200--cell-runtime-down cell-runtime))
     ('LEFT (gis-200--cell-runtime-left cell-runtime))))
 
+(defun gis-200--get-value-from-staging-direction (cell-runtime direction)
+  "Dynamically look up and return value at DIRECTION on CELL-RUNTIME."
+  (pcase direction
+    ('UP (gis-200--cell-runtime-staging-up cell-runtime))
+    ('RIGHT (gis-200--cell-runtime-staging-right cell-runtime))
+    ('DOWN (gis-200--cell-runtime-staging-down cell-runtime))
+    ('LEFT (gis-200--cell-runtime-staging-left cell-runtime))))
+
 (defun gis-200--gameboard-source-at-pos (row col &optional dir)
   "Return non-nil if a source exists at ROW, COL (at offset DIR)."
   (let* ((d-row (cond ((eql dir 'UP) -1)
@@ -380,34 +391,20 @@
     (and (<= 0 row* (1- gis-200--gameboard-row-ct))
          (<= 0 col* (1- gis-200--gameboard-col-ct)))))
 
-(defun gis-200--cell-is-blocked-on-get (cell-runtime)
-  "Return non-nil if CELL-RUNTIME's current instruction is a GET when no value exists."
-  (let* ((current-instruction (gis-200--cell-runtime-current-instruction cell-runtime))
-         (code-data (gis-200-code-node-children current-instruction))
-         (cmd (car code-data)))
-    (if (not (eql cmd 'GET))
-        nil
-      (let* ((direction (cadr code-data))
-             (opposite-direction (gis-200--mirror-direction direction))
-             (row (gis-200--cell-runtime-row cell-runtime))
-             (col (gis-200--cell-runtime-col cell-runtime)))
-        (cond
-         ((gis-200--gameboard-source-at-pos row col direction) nil)
-         ((not (gis-200--valid-position row col direction)) t)
-         (t (let* ((from-cell (gis-200--cell-at-moved-row-col row col direction))
-                   (recieving-val (gis-200--get-value-from-direction from-cell opposite-direction)))
-              (if recieving-val
-                  nil
-                t))))))))
-
-(defun gis-200--gameboard-get-all-blocked-cells ()
-  "Return a list of gameboard indexes of blocked cells."
-  (let ((res))
-    (dotimes (idx (length gis-200--gameboard))
-      (let ((cell (aref gis-200--gameboard idx)))
-        (when (gis-200--cell-is-blocked-on-get cell)
-          (setq res (cons idx res)))))
-    res))
+(defun gis-200--cell-runtime-merge-ports-with-staging (cell-runtime)
+  "For CELL-RUNTIME, if the staging region has a value, move it to port.
+If the port does't have a value, set staging to nil."
+  ;; This function is needed to prevent execution order from tampering with the
+  ;; execution results.
+  (dolist (direction '(UP DOWN LEFT RIGHT))
+    (let ((staging-value (gis-200--get-value-from-staging-direction cell-runtime direction))
+          (value (gis-200--get-value-from-direction cell-runtime direction)))
+      (when (and (eql staging-value 'sent) (not value))
+        (gis-200--cell-runtime-set-staging-value-from-direction cell-runtime direction nil)
+        (setq staging-value nil))
+      (when (and staging-value (not value))
+        (gis-200--cell-runtime-set-value-from-direction cell-runtime direction staging-value)
+        (gis-200--cell-runtime-set-staging-value-from-direction cell-runtime direction 'sent)))))
 
 (defun gis-200--remove-value-from-direction (cell-runtime direction)
   "Dynamically look up and return value at DIRECTION on CELL-RUNTIME."
@@ -416,6 +413,21 @@
     ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) nil))
     ('DOWN (setf (gis-200--cell-runtime-down cell-runtime) nil))
     ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) nil))))
+
+;; TODO don't repeat this logic elsewhere
+(defun gis-200--cell-runtime-set-value-from-direction (cell-runtime direction value)
+  (pcase direction
+    ('UP (setf (gis-200--cell-runtime-up cell-runtime) value))
+    ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) value))
+    ('DOWN (setf (gis-200--cell-runtime-down cell-runtime) value))
+    ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) value))))
+
+(defun gis-200--cell-runtime-set-staging-value-from-direction (cell-runtime direction value)
+  (pcase direction
+    ('UP (setf (gis-200--cell-runtime-staging-staging-up cell-runtime) value))
+    ('RIGHT (setf (gis-200--cell-runtime-staging-right cell-runtime) value))
+    ('DOWN (setf (gis-200--cell-runtime-staging-down cell-runtime) value))
+    ('LEFT (setf (gis-200--cell-runtime-staging-left cell-runtime) value))))
 
 (defun gis-200--cell-runtime-instructions-length (cell-runtime)
   "Return the length of CELL-RUNTIME."
@@ -476,11 +488,7 @@
            (if current-val
                ;; item is blocked
                'blocked
-             (pcase direction
-               ('UP (setf (gis-200--cell-runtime-up cell-runtime) v))
-               ('DOWN (setf (gis-200--cell-runtime-down cell-runtime) v))
-               ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) v))
-               ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) v))))))
+             (gis-200--cell-runtime-set-staging-value-from-direction cell-runtime direction v))))
       (when (eql result 'blocked)
         (gis-200--cell-runtime-push cell-runtime v))
       result)))
@@ -570,11 +578,15 @@
 
 (defun gis-200--gameboard-step ()
   "Perform step on all cells on the gameboard."
-  (let ((blocked-idxs (gis-200--gameboard-get-all-blocked-cells)))
-    (dotimes (idx (length gis-200--gameboard))
-      (when (not (memq idx blocked-idxs))
-        (let ((cell (aref gis-200--gameboard idx)))
-          (gis-200--cell-runtime-ste cell))))))
+  (dotimes (idx (length gis-200--gameboard))
+    (let ((cell (aref gis-200--gameboard idx)))
+      (gis-200--cell-runtime-step cell))))
+
+(defun gis-200--resolve-port-values ()
+  "Move staging port values to main, propogate nils up to staging."
+  (dotimes (idx (length gis-200--gameboard))
+    (let ((cell (aref gis-200--gameboard idx)))
+      (gis-200--cell-runtime-merge-ports-with-staging cell))))
 
 (defun gis-200-check-winning-conditions ()
   "Return non-nil if all sinks are full."
@@ -872,6 +884,91 @@ cell-runtime but rather the in-between row/col."
 (defun gis-200--make-puzzle-idx-file-name (id idx)
   (expand-file-name (concat id "-" (number-to-string idx) ".gis")
                     gis-200-save-directory-name))
+
+;;; YAML Blocks
+
+(require 'yaml)
+
+(defun gis-200--create-yaml-code-node (row col data)
+  "Create a runtime for the parsed DATA."
+  (let-alist (yaml-parse-string "
+apiVersion: v2
+kind: Stack
+spec:
+  inputPorts: [up, left]" :object-type 'alist)
+    ;; .apiVersion .kind .metadata .spec
+    (unless (equal "v1" .apiVersion)
+      (error "Unknown api version: %s" .apiVersion))
+    (pcase .kind
+      ("Stack" (gis-200--yaml-create-stack .metadata .spec))
+      ("Container" (error "Container not implemented"))
+      ("Network" (error "Network not implemented"))
+      ("Heap" (error "Heap not implemented")))))
+
+(defun gis-200--yaml-step-stack (cell-runtime)
+  (let ((row (gis-200--cell-runtime-row cell-runtime))
+        (col (gis-200--cell-runtime-col cell-runtime))
+        (spec (gis-200--cell-runtime-run-spec cell-runtime))
+        (state (gis-200--cell-runtime-run-state cell-runtime)))
+    (let-alist spec
+      ;; .inputPorts .outputPort .sizePort .size .logLevel
+      ;; First put port back on the stack
+      (let* ((port-sym (intern (upcase .outputPort)))
+             (val (gis-200--get-value-from-direction cell-runtime port-sym)))
+        (when val
+          (gis-200--remove-value-from-direction cell-runtime port-sym)
+          (setq state (cons val state))))
+      
+      ;; Then add new values to stack
+      (seq-do
+       (lambda (port)
+         (let* ((port-sym (intern (upcase port)))
+                (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
+                (opposite-port (gis-200--mirror-direction port-sym))
+                (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+           (when recieve-val
+             (gis-200--remove-value-from-direction from-cell opposite-port)
+             (setq state (cons recieve-val state))
+             (when (> (length state) .size)
+               (error "Stack overflow %d/%d" (length state) .size)))))
+       .inputPorts)
+
+      ;; Add size to sizePort
+      (when .sizePort
+        (gis-200--cell-runtime-set-staging-value-from-direction
+         cell-runtime
+         (intern (upcase .sizePort))
+         (length state)))
+
+      ;; Add top value of stack to port
+      (when state
+        (gis-200--cell-runtime-set-staging-value-from-direction
+         cell-runtime
+         (intern (upcase .outputPort))
+         (car state))
+        (setq state (cdr state)))
+
+      ;; Persist state for next rount
+      (setf (gis-200--cel-runtime-run-state cell-runtime) state))))
+
+;; TODO: this function is unnecessary
+(defun gis-200--yaml-create-stack (row col metadata spec)
+  "Return a Stack runtime according to SPEC with METADATA."
+  ;; .inputPorts .outputPort .sizePort .size .logLevel
+  (gis-200--cell-runtime-create
+   :instructions nil
+   :pc nil
+   :row row
+   :col col
+   :run-function #'gis-200--yaml-step-stack
+   :run-spec spec))
+
+(comment
+ (gis-200--create-yaml-code-node nil)
+ )
+
+
+
 
 (provide 'gis-200)
 
