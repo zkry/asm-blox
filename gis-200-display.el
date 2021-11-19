@@ -761,6 +761,8 @@ This should normally be called when the point is at the end of the display."
       (define-key map "|" #'gis-200--self-insert-command)
       (define-key map "<" #'gis-200--self-insert-command)
       (define-key map ">" #'gis-200--self-insert-command)
+      (define-key map "{" #'gis-200--self-insert-command)
+      (define-key map "}" #'gis-200--self-insert-command)
       (define-key map "=" #'gis-200--self-insert-command)
       (define-key map "+" #'gis-200--self-insert-command)
       (define-key map (kbd "DEL") #'gis-200--backward-delete-char)
@@ -872,11 +874,14 @@ This should normally be called when the point is at the end of the display."
         (parses))
     (maphash
      (lambda (coords code-text)
-       (let ((parse-result (gis-200--parse-assembly code-text)))
-         (if (gis-200--parse-error-p parse-result)
-             (setq parse-errors (cons (cons coords parse-result) parse-errors))
-           (let ((asm (gis-200--parse-tree-to-asm parse-result)))
-             (setq parses (cons (cons coords asm) parses))))))
+       (let ((parse-result (gis-200--parse-cell coords code-text)))
+         (cond
+          ((gis-200--parse-error-p parse-result)
+           (setq parse-errors (cons (cons coords parse-result) parse-errors)))
+          ((gis-200--cell-runtime-p parse-result)
+           (gis-200--set-cell-at-row-col (car coords) (cadr coords) parse-result))
+          (t (let ((asm (gis-200--parse-tree-to-asm parse-result)))
+               (setq parses (cons (cons coords asm) parses)))))))
      gis-200-box-contents)
     (if parse-errors
         (setq gis-200-parse-errors parse-errors)
@@ -886,9 +891,8 @@ This should normally be called when the point is at the end of the display."
                (col (cadr coords))
                (asm (cdr parse)))
           (assert (numberp col))
-          (gis-200--set-cell-at-row-col row col asm)))
+          (gis-200--set-cell-asm-at-row-col row col asm)))
       (gis-200--reset-extra-gameboard-cells-state)
-      ;; temp code to set up extra cells
       (gis-200--create-widges-from-gameboard)
       (gis-200--create-execution-buffer))))
 

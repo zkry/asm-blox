@@ -64,7 +64,18 @@
 
 (defun gis-200--parse-error-p (err)
   "Return non-nil if ERR is a parse error."
-  (eql 'error (car err)))
+  (and (listp err) (eql 'error (car err))))
+
+(defun gis-200--parse-cell (coords code)
+  "Parse a the CODE of a text box.  This may be YAML or WAT."
+  (let* ((first-char (substring-no-properties (string-trim-left code) 0 1))
+         ;; There is currently no switch the user can use to indicate
+         ;; filetype, thus the need of heuristic.
+         (wat-p (or (string= first-char "(")
+                    (string= first-char ";"))))
+    (if wat-p
+        (gis-200--parse-assembly code)
+      (gis-200--create-yaml-code-node (car coords) (cadr coords) code))))
 
 (defun gis-200--parse-assembly (code)
   "Parse ASM CODE returning a list of instructions."
@@ -309,10 +320,14 @@
         (+ (* row gis-200--gameboard-col-ct)
            col)))
 
-(defun gis-200--set-cell-at-row-col (row col asm)
-  "Create a runtime from ASM at set board cell at ROW, COL to it."
+(defun gis-200--set-cell-at-row-col (row col cell-runtime)
+  "Set board cell at ROW, COL to CELL-RUNTIME."
   (when (not gis-200--gameboard)
     (setq gis-200--gameboard (make-vector (* gis-200--gameboard-col-ct gis-200--gameboard-row-ct) nil)))
+  (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-col-ct) col)) cell-runtime))
+
+(defun gis-200--set-cell-asm-at-row-col (row col asm)
+  "Create a runtime from ASM at set board cell at ROW, COL to it."
   (let* ((asm (if (not (listp asm)) (list asm) asm))
          (runtime (gis-200--cell-runtime-create
                    :instructions asm
@@ -324,7 +339,7 @@
                    :down nil
                    :left nil
                    :right nil)))
-    (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-col-ct) col)) runtime)))
+    (gis-200--set-cell-at-row-col row col runtime)))
 
 (defun gis-200--cell-at-moved-row-col (row col dir)
   "Return the item at the cell in the gameboard at position DIR from ROW,COL."
@@ -480,10 +495,10 @@ If the port does't have a value, set staging to nil."
   (let ((v (gis-200--cell-runtime-pop cell-runtime))
         (current-val))
     (pcase direction
-      ('UP (setq current-val (gis-200--cell-runtime-up cell-runtime)))
-      ('DOWN (setq current-val (gis-200--cell-runtime-down cell-runtime)))
-      ('LEFT (setq current-val (gis-200--cell-runtime-left cell-runtime)))
-      ('RIGHT (setq current-val (gis-200--cell-runtime-right cell-runtime))))
+      ('UP (setq current-val (gis-200--cell-runtime-staging-up cell-runtime)))
+      ('DOWN (setq current-val (gis-200--cell-runtime-staging-down cell-runtime)))
+      ('LEFT (setq current-val (gis-200--cell-runtime-staging-left cell-runtime)))
+      ('RIGHT (setq current-val (gis-200--cell-runtime-staging-right cell-runtime))))
     (let ((result
            (if current-val
                ;; item is blocked
@@ -578,9 +593,17 @@ If the port does't have a value, set staging to nil."
 
 (defun gis-200--gameboard-step ()
   "Perform step on all cells on the gameboard."
-  (dotimes (idx (length gis-200--gameboard))
-    (let ((cell (aref gis-200--gameboard idx)))
-      (gis-200--cell-runtime-step cell))))
+  (let ((last-cell-fns '()))
+    (dotimes (idx (length gis-200--gameboard))
+      (let ((cell (aref gis-200--gameboard idx)))
+        (let ((fn (gis-200--cell-runtime-run-function cell)))
+          (if (functionp fn)
+              (setq last-cell-fns (cons (cons fn cell) last-cell-fns))
+            (gis-200--cell-runtime-step cell)))))
+    ;; We need to run the non-code cells last because they directly
+    ;; manipulate their ports.
+    (dolist (fn+cell last-cell-fns)
+      (funcall (car fn+cell) (cdr fn+cell)))))
 
 (defun gis-200--resolve-port-values ()
   "Move staging port values to main, propogate nils up to staging."
@@ -889,18 +912,14 @@ cell-runtime but rather the in-between row/col."
 
 (require 'yaml)
 
-(defun gis-200--create-yaml-code-node (row col data)
+(defun gis-200--create-yaml-code-node (row col code)
   "Create a runtime for the parsed DATA."
-  (let-alist (yaml-parse-string "
-apiVersion: v2
-kind: Stack
-spec:
-  inputPorts: [up, left]" :object-type 'alist)
+  (let-alist (yaml-parse-string code :object-type 'alist)
     ;; .apiVersion .kind .metadata .spec
     (unless (equal "v1" .apiVersion)
       (error "Unknown api version: %s" .apiVersion))
     (pcase .kind
-      ("Stack" (gis-200--yaml-create-stack .metadata .spec))
+      ("Stack" (gis-200--yaml-create-stack row col .metadata .spec))
       ("Container" (error "Container not implemented"))
       ("Network" (error "Network not implemented"))
       ("Heap" (error "Heap not implemented")))))
@@ -949,7 +968,7 @@ spec:
         (setq state (cdr state)))
 
       ;; Persist state for next rount
-      (setf (gis-200--cel-runtime-run-state cell-runtime) state))))
+      (setf (gis-200--cell-runtime-run-state cell-runtime) state))))
 
 ;; TODO: this function is unnecessary
 (defun gis-200--yaml-create-stack (row col metadata spec)
@@ -962,13 +981,6 @@ spec:
    :col col
    :run-function #'gis-200--yaml-step-stack
    :run-spec spec))
-
-(comment
- (gis-200--create-yaml-code-node nil)
- )
-
-
-
 
 (provide 'gis-200)
 
