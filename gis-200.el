@@ -68,10 +68,11 @@
 
 (defun gis-200--parse-cell (coords code)
   "Parse a the CODE of a text box.  This may be YAML or WAT."
-  (let* ((first-char (substring-no-properties (string-trim-left code) 0 1))
+  (let* ((first-char (and (not (string-empty-p (string-trim code))) (substring-no-properties (string-trim-left code) 0 1)))
          ;; There is currently no switch the user can use to indicate
          ;; filetype, thus the need of heuristic.
-         (wat-p (or (string= first-char "(")
+         (wat-p (or (not first-char)
+                    (string= first-char "(")
                     (string= first-char ";"))))
     (if wat-p
         (gis-200--parse-assembly code)
@@ -97,7 +98,8 @@
                             (forward-char)))
            (symbol-char-p (c)
                           (or (<= ?a c ?z)
-                              (<= ?A c ?Z)))
+                              (<= ?A c ?Z)
+                              (= ?_ c)))
            (digit-char-p (c) (<= ?0 c ?9))
            (parse-element (&optional top-level)
                           (let ((elements '()))
@@ -134,7 +136,7 @@
                                           (push symbol elements))))
 
                                      ;; digit
-                                     ((digit-char-p at-char)
+                                     ((or (digit-char-p at-char) (eql at-char ?-))
                                       (let ((start (point)))
                                         (forward-char 1)
                                         (while (and (not (eobp))
@@ -151,7 +153,8 @@
 (defconst gis-200-base-operations
   '(GET SET TEE CONST NULL IS_NULL DROP
         NOP ADD SUB MUL DIV REM AND OR EQZ
-        EQ NE LT GT GE LE SEND PUSH POP))
+        EQ NE LT GT GE LE SEND PUSH POP
+        CLR NOT DUPL))
 
 (defvar gis-200--parse-depth nil)
 (defvar gis-200--branch-labels nil)
@@ -463,7 +466,7 @@ If the port does't have a value, set staging to nil."
     (when (>= (length stack) 4)
       (let ((row (gis-200--cell-runtime-row cell-runtime))
             (col (gis-200--cell-runtime-col cell-runtime)))
-        (setq gis-200-runtime-error
+        (setq gis-200-runtime-error ;; TODO: extract the logic here to separate function
               (list "Stack overflow" row col))
         (setq gis-200--gameboard-state 'error)
         (message "Stack overflow error at (%d, %d)" row col))) ;; Stack size hardcoded.
@@ -481,7 +484,7 @@ If the port does't have a value, set staging to nil."
   "Perform binary operation FUNCTION on the top two items of CELL-RUNTIME."
   (let* ((v1 (gis-200--cell-runtime-pop cell-runtime))
          (v2 (gis-200--cell-runtime-pop cell-runtime))
-         (res (funcall function v1 v2)))
+         (res (funcall function v2 v1)))
     (gis-200--cell-runtime-push cell-runtime res)))
 
 (defun gis-200--unary-operation (cell-runtime function)
@@ -518,20 +521,41 @@ If the port does't have a value, set staging to nil."
       (let ((v (gis-200--cell-source-pop source)))
         (gis-200--cell-runtime-push cell-runtime v)))))
 
+(defun gis-200--cell-runtime-stack-get (cell-runtime loc)
+  "Perform a variant of the GET command, grabbing the LOC value from CELL-RUNTIME's stack. "
+  (let ((row (gis-200--cell-runtime-row cell-runtime))
+        (col (gis-200--cell-runtime-col cell-runtime))
+        (stack (seq-reverse (gis-200--cell-runtime-stack cell-runtime)))
+        (val))
+    ;; Error checking
+    (if (>= loc 0)
+        (progn
+          (when (>= loc (length stack))
+            (setq gis-200-runtime-error ;; TODO: extract the logic here to separate function
+                  (list (format "Bad idx %d/%d" loc (length stack)) row col)))
+          (setq val (nth loc stack)))
+      (when (> (- loc) (length stack))
+        (setq gis-200-runtime-error ;; TODO: extract the logic here to separate function
+                  (list (format "Bad idx %d/%d" loc (length stack)) row col)))
+      (setq val (nth (+ (length stack) loc) stack)))
+    (gis-200--cell-runtime-push cell-runtime val)))
+
 (defun gis-200--cell-runtime-get (cell-runtime direction)
   "Perform the GET command running from CELL-RUNTIME, recieving from DIRECTION."
-  (let* ((at-row (gis-200--cell-runtime-row cell-runtime))
-         (at-col (gis-200--cell-runtime-col cell-runtime)))
-    (if (not (gis-200--valid-position at-row at-col direction))
-        (gis-200--cell-runtime-get-extra cell-runtime direction)
-      (let* ((opposite-direction (gis-200--mirror-direction direction))
-             (from-cell (gis-200--cell-at-moved-row-col at-row at-col direction))
-             (recieve-val (gis-200--get-value-from-direction from-cell opposite-direction)))
-        (if recieve-val
-            (progn
-              (gis-200--cell-runtime-push cell-runtime recieve-val)
-              (gis-200--remove-value-from-direction from-cell opposite-direction))
-          'blocked)))))
+  (if (integerp direction)
+      (gis-200--cell-runtime-stack-get cell-runtime direction)
+    (let* ((at-row (gis-200--cell-runtime-row cell-runtime))
+           (at-col (gis-200--cell-runtime-col cell-runtime)))
+      (if (not (gis-200--valid-position at-row at-col direction))
+          (gis-200--cell-runtime-get-extra cell-runtime direction)
+        (let* ((opposite-direction (gis-200--mirror-direction direction))
+               (from-cell (gis-200--cell-at-moved-row-col at-row at-col direction))
+               (recieve-val (gis-200--get-value-from-direction from-cell opposite-direction)))
+          (if recieve-val
+              (progn
+                (gis-200--cell-runtime-push cell-runtime recieve-val)
+                (gis-200--remove-value-from-direction from-cell opposite-direction))
+            'blocked))))))
 
 (defun gis-200--true-p (v)
   "Return non-nil if V is truthy."
@@ -547,19 +571,23 @@ If the port does't have a value, set staging to nil."
             ('_EMPTY 'blocked)
             ('CONST (let ((const (cadr code-data)))
                       (gis-200--cell-runtime-push cell-runtime const)))
+            ('CLR (setf (gis-200--cell-runtime-stack cell-runtime) nil))
+            ('DUPL (let ((stack (gis-200--cell-runtime-stack cell-runtime)))
+                     (setf (gis-200--cell-runtime-stack cell-runtime) (append stack stack))))
             ('ADD (gis-200--binary-operation cell-runtime #'+))
             ('SUB (gis-200--binary-operation cell-runtime #'-))
             ('MUL (gis-200--binary-operation cell-runtime #'*))
             ('DIV (gis-200--binary-operation cell-runtime #'/))
             ('REM (gis-200--binary-operation cell-runtime #'%))
             ('AND (gis-200--binary-operation cell-runtime #'logand))
+            ('NOT (gis-200--unary-operation cell-runtime (lambda (x) (if (gis-200--true-p x) 0 1))))
             ('OR (gis-200--binary-operation cell-runtime #'logior))
             ('EQZ (gis-200--unary-operation cell-runtime (lambda (x) (= 0 x))))
             ('EQ (gis-200--binary-operation cell-runtime  #'=))
             ('NE (gis-200--binary-operation cell-runtime (lambda (a b) (not (= a b)))))
-            ('LT (gis-200--binary-operation cell-runtime #'<))
+            ('LT (gis-200--binary-operation cell-runtime (lambda (a b) (if (< a b) 1 0))))
             ('LE (gis-200--binary-operation cell-runtime #'<=))
-            ('GT (gis-200--binary-operation cell-runtime #'>))
+            ('GT (gis-200--binary-operation cell-runtime (lambda (a b) (if (> a b) 1 0))))
             ('GE (gis-200--binary-operation cell-runtime #'>=))
             ('NOP (ignore))
             ('DROP (gis-200--cell-runtime-pop cell-runtime))
@@ -722,7 +750,7 @@ cell-runtime but rather the in-between row/col."
 (cl-defstruct (gis-200--cell-sink
                (:constructor gis-200--cell-sink-create)
                (:copier nil))
-  row col expected-data idx name)
+  row col expected-data idx name err-val)
 
 (cl-defstruct (gis-200--problem-spec
                (:constructor gis-200--problem-spec-create)
@@ -735,7 +763,9 @@ cell-runtime but rather the in-between row/col."
     (dolist (source sources)
       (setf (gis-200--cell-source-idx source) 0))
     (dolist (sink sinks)
-      (setf (gis-200--cell-sink-idx sink) 0))))
+      (setf (gis-200--cell-sink-idx sink) 0))
+    (dolist (sink sinks)
+      (setf (gis-200--cell-sink-err-val sink) nil))))
 
 (defun gis-200--cell-sink-get (sink)
   "Grab a value and put it into SINK from the gameboard."
@@ -755,6 +785,8 @@ cell-runtime but rather the in-between row/col."
                (expected-value (nth idx data)))
           (when (not (equal expected-value v))
             ;; TODO - do something here
+            (setq gis-200--gameboard-state 'error)
+            (setf (gis-200--cell-sink-err-val sink) v)
             (message "Unexpected value"))
           (setf (gis-200--cell-sink-idx sink) (1+ idx))
           (gis-200--remove-value-from-direction cell-runtime opposite-direction))
@@ -783,7 +815,8 @@ cell-runtime but rather the in-between row/col."
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
-         (expected (seq-mapn #'+ input-1 input-2)))
+         (input-3 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (expected (seq-mapn #'+ input-1 input-2 input-3)))
     (gis-200--problem-spec-create
      :name "Number Addition"
      :sources (list (gis-200--cell-source-create :row -1
@@ -795,14 +828,50 @@ cell-runtime but rather the in-between row/col."
                                                  :col 1
                                                  :data input-2
                                                  :idx 0
-                                                 :name "B"))
+                                                 :name "B")
+                    (gis-200--cell-source-create :row -1
+                                                 :col 2
+                                                 :data input-3
+                                                 :idx 0
+                                                 :name "C"))
      :sinks
      (list (gis-200--cell-sink-create :row 3
                                       :col 1
                                       :expected-data expected
                                       :idx 0
                                       :name "S"))
-     :description "Take an input from A and B, add the two together, and send it to S.")))
+     :description "Take input from A, B, and C, add the three together, and send it to S.")))
+
+(defun gis-200--problem--number-sorter ()
+  "Generate problem for comparing two numbers and sending them in different places."
+  (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (expected-1 (seq-mapn (lambda (a b) (if (> a b) a 0)) input-1 input-2))
+         (expected-2 (seq-mapn (lambda (a b) (if (> b a) b 0)) input-1 input-2)))
+    (gis-200--problem-spec-create
+     :name "Number Chooser"
+     :sources (list (gis-200--cell-source-create :row -1
+                                                 :col 0
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "A")
+                    (gis-200--cell-source-create :row -1
+                                                 :col 1
+                                                 :data input-2
+                                                 :idx 0
+                                                 :name "B"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 0
+                                      :col 4
+                                      :expected-data expected-1
+                                      :idx 0
+                                      :name "L")
+           (gis-200--cell-sink-create :row 2
+                                      :col 4
+                                      :expected-data expected-2
+                                      :idx 0
+                                      :name "R"))
+     :description "Take an input from A and B. If A>B then send A to L, 0 to R; If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
 (defun gis-200--problem--constant ()
   "Generate a simple addition problem."
@@ -840,7 +909,8 @@ cell-runtime but rather the in-between row/col."
 (defvar gis-200-puzzles (list
                          #'gis-200--problem--constant
                          #'gis-200--problem--identity
-                         #'gis-200--problem--add))
+                         #'gis-200--problem--add
+                         #'gis-200--problem--number-sorter))
 
 (defun gis-200--get-puzzle-by-id (name)
   ;; TODO: fill this out with the remaining puzzles.
