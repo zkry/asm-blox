@@ -173,6 +173,8 @@
         (apply #'append asm-stmts)))
      ((gis-200-code-node-p parse)
       (let* ((children (gis-200-code-node-children parse))
+             (start-pos (gis-200-code-node-start-pos parse))
+             (end-pos (gis-200-code-node-end-pos parse))
              (first-child (car children))
              (rest-children (cdr children)))
         (cond
@@ -206,8 +208,8 @@
                                    (concat "NOT_FOUND_" (number-to-string br-num) "_" (number-to-string gis-200--parse-depth) "_" (assoc br-num gis-200--branch-labels)))))
             (gis-200--code-node-create
              :children (list 'JMP label-symbol)
-             :start-pos nil
-             :end-pos nil)))
+             :start-pos start-pos
+             :end-pos end-pos)))
 
          ((eql first-child 'BR_IF)
           (let* ((br-num (car rest-children))
@@ -216,8 +218,8 @@
                                    (concat "NOT_FOUND_" (number-to-string br-num) "_" (number-to-string gis-200--parse-depth) "_" (assoc br-num gis-200--branch-labels)))))
             (gis-200--code-node-create
              :children (list 'JMP_IF label-symbol)
-             :start-pos nil
-             :end-pos nil)))
+             :start-pos start-pos
+             :end-pos end-pos)))
 
          ((eql first-child 'IF)
           (let* ((then-case (car rest-children))
@@ -561,6 +563,15 @@ If the port does't have a value, set staging to nil."
   "Return non-nil if V is truthy."
   (not (= 0 v)))
 
+(defun gis-200--cell-runtime-skip-labels (cell-runtime)
+  "Skip PC over any label instructions. This is needed to display current command properly."
+  (while (let* ((current-instr (gis-200--cell-runtime-current-instruction cell-runtime))
+                (code-data (gis-200-code-node-children current-instr))
+                (cmd (car code-data)))
+           (eql cmd 'LABEL))
+    ;; TODO: check case of all LABEL commands
+    (gis-200--cell-runtime-pc-inc cell-runtime)))
+
 (defun gis-200--cell-runtime-step (cell-runtime)
   "Perform one step of CELL-RUNTIME."
   (let* ((current-instr (gis-200--cell-runtime-current-instruction cell-runtime))
@@ -611,7 +622,8 @@ If the port does't have a value, set staging to nil."
       ('label (progn
                 (gis-200--cell-runtime-pc-inc cell-runtime)
                 (gis-200--cell-runtime-step cell-runtime)))
-      (_ (gis-200--cell-runtime-pc-inc cell-runtime)))))
+      (_ (gis-200--cell-runtime-pc-inc cell-runtime)))
+    (gis-200--cell-runtime-skip-labels cell-runtime)))
 
 (defun gis-200--extra-gameboard-step ()
   "Perform step on all things not on the gameboard."
