@@ -210,6 +210,10 @@ This should normally be called when the point is at the end of the display."
 
 (defun gis-200-display-game-board ()
   (setq gis-200--widget-row-idx 0)
+  (when (not (hash-table-p gis-200--end-of-box-points))
+    (setq gis-200--end-of-box-points (make-hash-table :test 'equal)))
+  (when (not (hash-table-p gis-200--beginning-of-box-points))
+    (setq gis-200--beginning-of-box-points (make-hash-table :test 'equal)))
   (let* ((display-mode 'edit) ;; TODO - finalize where this comes from. can be 'edit or 'execute
          (arrow-up "↑")
          (arrow-down "↓")
@@ -303,11 +307,14 @@ This should normally be called when the point is at the end of the display."
                (let ((display (gis-200--col-register-display row 0 'LEFT)))
                  (insert display)))
               (t (insert space-between)))
+             ;; Draw each box column
              (dotimes (col gis-200-column-ct)
                (let ((err (gis-200--get-error-at-cell row col)))
                  (if err
                      (insert (propertize (char-to-string box-vertical) 'font-lock-face '(:foreground "red")))
                    (insert box-vertical))
+                 (when (= box-row 0)
+                   (puthash (list row col) (point) gis-200--beginning-of-box-points))
                  ;; Draw the inner contents of the box
                  (let* ((text (gis-200--get-box-line-content row col box-row))
                         (spacing (make-string (- (length box-inside) (length text)) ?\s)))
@@ -319,6 +326,8 @@ This should normally be called when the point is at the end of the display."
                      (insert (propertize spacing
                                          'gis-200-box-id (list row col box-row)
                                          'gis-200-text-type 'spacing))))
+                 (when (= box-row (1- gis-200-box-height))
+                   (puthash (list row col) (point) gis-200--end-of-box-points))
                  (let ((pipe-str (cond
                                   ((= box-row (1- gis-200-box-height))
                                    (propertize (char-to-string box-vertical)
@@ -509,32 +518,21 @@ This should normally be called when the point is at the end of the display."
     (forward-char -1))
   (forward-char 1))
 
+(defvar gis-200--end-of-box-points nil
+  "Contains a hashmap of the points where each box ends.
+This was added for performance reasons.")
+
 (defun gis-200--move-to-end-of-box (row col)
-  (goto-char (point-min))
-  (while (let* ((prop (get-text-property (point) 'gis-200-text-type))
-                (type (and (listp prop) (car prop)))
-                (at-row (and type (cadr prop)))
-                (at-col (and type (caddr prop))))
-           (and (not (eobp))
-                (not (and (eql type 'box-end)
-                          (= at-row row)
-                          (= at-col col)))))
-    (forward-char))
-  (when (eobp)
-    (error "box %d, %d not found" row col)))
+  (let ((end-pos (gethash (list row col) gis-200--end-of-box-points)))
+    (goto-char end-pos)))
+
+(defvar gis-200--beginning-of-box-points nil
+  "Contains a hashmap of the points where each box begins.
+This was added for performance reasons.")
 
 (defun gis-200--move-to-box (row col)
-  (goto-char (point-min))
-  (while (let* ((prop (get-text-property (point) 'gis-200-box-id))
-                (at-row (car prop))
-                (at-col (cadr prop)))
-           (and (not (eobp))
-            (or (not prop)
-                (not (and (= row at-row)
-                          (= col at-col))))))
-    (forward-char))
-  (when (eobp)
-    (error "box %d, %d not found" row col)))
+  (let ((begin-pos (gethash (list row col) gis-200--beginning-of-box-points)))
+    (goto-char begin-pos)))
 
 (defun gis-200--move-to-box-point (row col)
   (unless (gis-200-in-box-p)
