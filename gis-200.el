@@ -132,7 +132,7 @@
                                         (while (and (not (eobp))
                                                     (symbol-char-p (current-char)))
                                           (forward-char 1))
-                                        (let ((symbol (intern (buffer-substring-no-properties start (point)))))
+                                        (let ((symbol (intern (upcase (buffer-substring-no-properties start (point))))))
                                           (push symbol elements))))
 
                                      ;; digit
