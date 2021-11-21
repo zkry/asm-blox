@@ -157,6 +157,82 @@
         EQ NE LT GT GE LE SEND PUSH POP
         CLR NOT DUPL))
 
+(defconst gis-200-command-specs
+  '((SET integerp gis-200--subexpressions) ;; TODO 
+    (CLR) 
+    (CONST integerp)
+    (DUPL)
+    (ADD gis-200--subexpressions)
+    (SUB gis-200--subexpressions)
+    (MUL gis-200--subexpressions)
+    (DIV gis-200--subexpressions)
+    (NEG gis-200--subexpressions)
+    (REM gis-200--subexpressions)
+    (AND gis-200--subexpressions)
+    (NOT gis-200--subexpressions)
+    (OR gis-200--subexpressions)
+    (EQ gis-200--subexpressions)
+    (NE gis-200--subexpressions)
+    (LT gis-200--subexpressions)
+    (LE gis-200--subexpressions)
+    (GT gis-200--subexpressions)
+    (GE gis-200--subexpressions)
+    (BLOCK gis-200--subexpressions)
+    (LOOP gis-200--subexpressions)
+    (BR_IF integerp)
+    (BR integerp)
+    (NOP)
+    (DROP integerp)
+    (SEND gis-200--portp)
+    (GET (lambda (x) (or (gis-200--portp x) (integerp x))))
+    (LEFT gis-200--subexpressions)  ;; TODO
+    (RIGHT gis-200--subexpressions) ;; TODO
+    (UP gis-200--subexpressions)    ;; TODO
+    (DOWN gis-200--subexpressions)  ;; TODO
+    (FN t) ;; FN needs special verification code
+    ))
+
+(defun gis-200--portp (x)
+  "Return non-nil if X is a port direction."
+  (memq x '(UP DOWN LEFT RIGHT)))
+
+(defun gis-200--code-node-validate (code-node)
+  (let* ((children (gis-200-code-node-children code-node))
+         (start-pos (gis-200-code-node-start-pos code-node))
+         (end-pos (gis-200-code-node-end-pos code-node))
+         (first-child (car children))
+         (cmd-spec (assoc first-child gis-200-command-specs)))
+    (cond
+     ((not first-child)
+      `(error ,start-pos "No command found"))
+     ((not cmd-spec)
+      `(error ,start-pos "Command not found"))
+     (t
+      (let* ((specs (cdr cmd-spec))
+             (rest-children (cdr children))
+             (at-spec (car specs)))
+        (catch 'err
+          (while (or specs rest-children)
+            (cond
+             ((eql at-spec 'gis-200--subexpressions)
+              (if (seq-every-p #'gis-200-code-node-p rest-children)
+                  (setq rest-children nil)
+                (throw 'err `(error ,start-pos "bad end expressions"))))
+             ((and rest-children (not specs))
+              (throw 'err `(error ,start-pos "too many args")))
+             ((and specs (not rest-children))
+              (throw 'err `(error ,start-pos "not enough args")))
+             (t
+              (let* ((at-child (car rest-children))
+                     (ok-p (funcall at-spec at-child)))
+                (if ok-p
+                    (setq rest-children (cdr rest-children))
+                  (throw 'err `(error ,start-pos ,(format "bad arg '%s'" at-child)))))))
+            
+            (setq specs (cdr specs)))))))))
+
+;; (gis-200--code-node-validate (gis-200--code-node-create :children '(DROP beep) :start-pos 0 :end-pos 1))
+
 (defvar gis-200--parse-depth nil)
 (defvar gis-200--branch-labels nil)
 
@@ -173,86 +249,96 @@
       (let ((asm-stmts (mapcar #'gis-200--parse-tree-to-asm* parse)))
         (apply #'append asm-stmts)))
      ((gis-200-code-node-p parse)
-      (let* ((children (gis-200-code-node-children parse))
-             (start-pos (gis-200-code-node-start-pos parse))
-             (end-pos (gis-200-code-node-end-pos parse))
-             (first-child (car children))
-             (rest-children (cdr children)))
-        (cond
+      (let ((err (gis-200--code-node-validate parse)))
+        (if err
+            (throw 'err err)
+          (let* ((children (gis-200-code-node-children parse))
+                 (start-pos (gis-200-code-node-start-pos parse))
+                 (end-pos (gis-200-code-node-end-pos parse))
+                 (first-child (car children))
+                 (rest-children (cdr children)))
+            (cond
 
-         ((not first-child)
-          `(error ,start-pos "No cmd found"))
-         
-         ((memq first-child gis-200-base-operations)
-          (list parse))
+             ((not first-child)
+              (throw 'err `(error ,start-pos "No cmd found")))
+             
+             ((memq first-child gis-200-base-operations)
+              (list parse))
 
-         ((eql first-child 'BLOCK)
-          (let* ((label-symbol (gis-200--make-label))
-                 (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
-                 (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
-            (append rest-asm-stmts
-                    (list (gis-200--code-node-create
-                           :children (list 'LABEL label-symbol)
-                           :start-pos nil
-                           :end-pos nil)))))
-         
-         ((eql first-child 'LOOP)
-          (let* ((label-symbol (gis-200--make-label))
-                 (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
-                 (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
-            (append (list (gis-200--code-node-create
-                           :children (list 'LABEL label-symbol)
-                           :start-pos nil
-                           :end-pos nil))
-                    rest-asm-stmts)))
-         ((eql first-child 'BR)
-          (let* ((br-num (car rest-children))
-                 (lbl-ref-level (- gis-200--parse-depth br-num 1))
-                 (label-symbol (or (cdr (assoc lbl-ref-level gis-200--branch-labels))
-                                   (concat "NOT_FOUND_" (number-to-string br-num) "_" (number-to-string gis-200--parse-depth) "_" (assoc br-num gis-200--branch-labels)))))
-            (gis-200--code-node-create
-             :children (list 'JMP label-symbol)
-             :start-pos start-pos
-             :end-pos end-pos)))
+             ((eql first-child 'BLOCK)
+              (let* ((label-symbol (gis-200--make-label))
+                     (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
+                     (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
+                (append rest-asm-stmts
+                        (list (gis-200--code-node-create
+                               :children (list 'LABEL label-symbol)
+                               :start-pos nil
+                               :end-pos nil)))))
+             
+             ((eql first-child 'LOOP)
+              (let* ((label-symbol (gis-200--make-label))
+                     (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
+                     (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
+                (append (list (gis-200--code-node-create
+                               :children (list 'LABEL label-symbol)
+                               :start-pos nil
+                               :end-pos nil))
+                        rest-asm-stmts)))
+             ((eql first-child 'BR)
+              (let* ((br-num (car rest-children))
+                     (lbl-ref-level (- gis-200--parse-depth br-num 1))
+                     (label-symbol (or (cdr (assoc lbl-ref-level gis-200--branch-labels))
+                                       (concat "NOT_FOUND_" (number-to-string br-num) "_" (number-to-string gis-200--parse-depth) "_" (assoc br-num gis-200--branch-labels)))))
+                (gis-200--code-node-create
+                 :children (list 'JMP label-symbol)
+                 :start-pos start-pos
+                 :end-pos end-pos)))
 
-         ((eql first-child 'BR_IF)
-          (let* ((br-num (car rest-children))
-                 (lbl-ref-level (- gis-200--parse-depth br-num 1))
-                 (label-symbol (or (cdr (assoc lbl-ref-level gis-200--branch-labels))
-                                   (concat "NOT_FOUND_" (number-to-string br-num) "_" (number-to-string gis-200--parse-depth) "_" (assoc br-num gis-200--branch-labels)))))
-            (gis-200--code-node-create
-             :children (list 'JMP_IF label-symbol)
-             :start-pos start-pos
-             :end-pos end-pos)))
+             ((eql first-child 'BR_IF)
+              (let* ((br-num (car rest-children))
+                     (lbl-ref-level (- gis-200--parse-depth br-num 1))
+                     (label-symbol (or (cdr (assoc lbl-ref-level gis-200--branch-labels))
+                                       (concat "NOT_FOUND_" (number-to-string br-num) "_" (number-to-string gis-200--parse-depth) "_" (assoc br-num gis-200--branch-labels)))))
+                (gis-200--code-node-create
+                 :children (list 'JMP_IF label-symbol)
+                 :start-pos start-pos
+                 :end-pos end-pos)))
 
-         ((eql first-child 'IF)
-          (let* ((then-case (car rest-children))
-                 (else-case (cadr rest-children))
-                 (then-label (gis-200--make-label))
-                 (end-label (gis-200--make-label)))
-            `(,(gis-200--code-node-create
-                :children (list 'JMP_IF_NOT then-label)
-                :start-pos nil
-                :end-pos nil)
-              ,@(if then-case
-                    (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children then-case)))
-                  nil)
-              ,(gis-200--code-node-create
-                :children (list 'JMP end-label)
-                :start-pos nil
-                :end-pos nil)
-              ,(gis-200--code-node-create
-                :children (list 'LABEL then-label)
-                :start-pos nil
-                :end-pos nil)
-              ,@(if else-case
-                    (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children else-case)))
-                  nil)
-              ,(gis-200--code-node-create
-                :children (list 'LABEL end-label)
-                :start-pos nil
-                :end-pos nil))))
-         (t `(error ,start-pos ,(format "Bad cmd: %s " first-child)))))))))
+             ((eql first-child 'IF)
+              (let* ((then-case (car rest-children))
+                     (else-case (cadr rest-children))
+                     (then-label (gis-200--make-label))
+                     (end-label (gis-200--make-label)))
+                `(,(gis-200--code-node-create
+                    :children (list 'JMP_IF_NOT then-label)
+                    :start-pos nil
+                    :end-pos nil)
+                  ,@(if then-case
+                        (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children then-case)))
+                      nil)
+                  ,(gis-200--code-node-create
+                    :children (list 'JMP end-label)
+                    :start-pos nil
+                    :end-pos nil)
+                  ,(gis-200--code-node-create
+                    :children (list 'LABEL then-label)
+                    :start-pos nil
+                    :end-pos nil)
+                  ,@(if else-case
+                        (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children else-case)))
+                      nil)
+                  ,(gis-200--code-node-create
+                    :children (list 'LABEL end-label)
+                    :start-pos nil
+                    :end-pos nil))))
+             (t `(error ,start-pos ,(format "Bad cmd: %s " first-child)))))))))))
+
+(defun gis-200--parse-tree-to-asm (parse)
+  "Generate game bytecode from tree of PARSE, resolving labels."
+  (catch 'err
+    (let ((asm (flatten-list (gis-200--parse-tree-to-asm* parse))))
+      (gis-200--resolve-labels asm)
+      asm)))
 
 (defun gis-200--resolve-labels (asm)
   "Change each label reference in ASM to index in program."
@@ -274,13 +360,6 @@
           (let* ((label-name (cadr code-data))
                  (jmp-to-idx (cdr (assoc label-name idxs))))
             (setcdr code-data (list jmp-to-idx))))))))
-
-(defun gis-200--parse-tree-to-asm (parse)
-  "Generate game bytecode from tree of PARSE, resolving labels."
-  (let ((asm (flatten-list (gis-200--parse-tree-to-asm* parse))))
-    (unless (gis-200--parse-error-p asm)
-      (gis-200--resolve-labels asm))
-    asm))
 
 (defun gis-200--pprint-asm (instructions)
   (message "%s" "======INSTRUCTIONS=======")
@@ -596,16 +675,17 @@ If the port does't have a value, set staging to nil."
             ('MUL (gis-200--binary-operation cell-runtime #'*))
             ('DIV (gis-200--binary-operation cell-runtime #'/))
             ('REM (gis-200--binary-operation cell-runtime #'%))
-            ('AND (gis-200--binary-operation cell-runtime #'logand))
+            ('AND (gis-200--binary-operation cell-runtime(lambda (a b) (and a b))))
             ('NOT (gis-200--unary-operation cell-runtime (lambda (x) (if (gis-200--true-p x) 0 1))))
-            ('OR (gis-200--binary-operation cell-runtime #'logior))
+            ('NEG (gis-200--unary-operation cell-runtime (lambda (x) (- x))))
+            ('OR (gis-200--binary-operation cell-runtime (lambda (a b) (or a b))))
             ('EQZ (gis-200--unary-operation cell-runtime (lambda (x) (= 0 x))))
-            ('EQ (gis-200--binary-operation cell-runtime  #'=))
-            ('NE (gis-200--binary-operation cell-runtime (lambda (a b) (not (= a b)))))
+            ('EQ (gis-200--binary-operation cell-runtime (lambda (a b) (if (= a b) 1 0))))
+            ('NE (gis-200--binary-operation cell-runtime (lambda (a b) (if (not (= a b)) 1 0))))
             ('LT (gis-200--binary-operation cell-runtime (lambda (a b) (if (< a b) 1 0))))
-            ('LE (gis-200--binary-operation cell-runtime #'<=))
+            ('LE (gis-200--binary-operation cell-runtime (lambda (a b) (if (<= a b) 1 0))))
             ('GT (gis-200--binary-operation cell-runtime (lambda (a b) (if (> a b) 1 0))))
-            ('GE (gis-200--binary-operation cell-runtime #'>=))
+            ('GE (gis-200--binary-operation cell-runtime (lambda (a b) (if (>= a b) 1 0))))
             ('NOP (ignore))
             ('DROP (gis-200--cell-runtime-pop cell-runtime))
             ('SEND (gis-200--cell-runtime-send cell-runtime (cadr code-data)))
