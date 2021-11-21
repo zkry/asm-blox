@@ -324,7 +324,7 @@ This should normally be called when the point is at the end of the display."
                  (let* ((text (gis-200--get-box-line-content row col box-row))
                         (spacing (make-string (- (length box-inside) (length text)) ?\s)))
                    (if (and (= 11 box-row) err (eql gis-200--display-mode 'edit))
-                       (let ((err-text (gis-200--get-error-at-cell row col))) 
+                       (let ((err-text (nth 2 (gis-200--get-error-at-cell row col)))) 
                          (insert err-text)
                          (insert (make-string (- (length box-inside) (length err-text)) ?\s)))
                      (insert (propertize text 'gis-200-box-id (list row col box-row)))
@@ -335,8 +335,12 @@ This should normally be called when the point is at the end of the display."
                    (puthash (list row col) (point) gis-200--end-of-box-points))
                  (let ((pipe-str (cond
                                   ((= box-row (1- gis-200-box-height))
-                                   (propertize (char-to-string box-vertical)
-                                               'gis-200-text-type `(box-end ,row ,col)))
+                                   (if err 
+                                       (propertize (char-to-string box-vertical)
+                                                   'gis-200-text-type `(box-end ,row ,col)
+                                                   'font-lock-face '(:foreground "red"))
+                                     (propertize (char-to-string box-vertical)
+                                                   'gis-200-text-type `(box-end ,row ,col))))
                                   (err
                                    (propertize (char-to-string box-vertical)
                                                'font-lock-face '(:foreground "red")))
@@ -443,7 +447,8 @@ This should normally be called when the point is at the end of the display."
         (insert (format "\nERROR: %s at cell (%d, %d)\n"
                         (car gis-200-runtime-error)
                         (cadr gis-200-runtime-error)
-                        (caddr gis-200-runtime-error)))))))
+                        (caddr gis-200-runtime-error))))))
+  (gis-200--propertize-errors))
 
 (defun gis-200--box-point-forward (ct)
   "With the point in a text box, move forward a point in box-buffer."
@@ -459,13 +464,17 @@ This should normally be called when the point is at the end of the display."
      (t (forward-char)
         (setq ct (1- ct))))))
 
+(defvar gis-200--disable-redraw nil
+  "If non-nil, commands should not opt-in to redrawing the gameboard.")
+
 (defun gis-200--propertize-errors ()
   "Add text properties to errors."
   (let ((errs gis-200-parse-errors))
     (dolist (err errs)
       (let ((row (caar err))
             (col (cadar err))
-            (pt (1- (caddr err))))
+            (pt (1- (caddr err)))
+            (gis-200--disable-redraw t))
         (gis-200--move-to-box row col)
         ;; move to the point where the error occured.
         ;; TODO: create box-point-forward to save this logic
@@ -536,7 +545,8 @@ This was added for performance reasons.")
 This was added for performance reasons.")
 
 (defun gis-200--move-to-box (row col)
-  (when (eql gis-200--display-mode 'edit)
+  (when (and (eql gis-200--display-mode 'edit)
+             (not gis-200--disable-redraw))
     (let ((inhibit-read-only t))
       (gis-200-redraw-game-board)))
   (let ((begin-pos (gethash (list row col) gis-200--beginning-of-box-points)))
@@ -964,10 +974,18 @@ This was added for performance reasons.")
           ((gis-200--cell-runtime-p parse-result)
            (gis-200--set-cell-at-row-col (car coords) (cadr coords) parse-result))
           (t (let ((asm (gis-200--parse-tree-to-asm parse-result)))
+               (if (gis-200--parse-error-p asm)
+                   (setq parse-errors (cons (cons coords asm) parse-errors)))
                (setq parses (cons (cons coords asm) parses)))))))
      gis-200-box-contents)
     (if parse-errors
-        (setq gis-200-parse-errors parse-errors)
+        (progn 
+          (setq gis-200-parse-errors parse-errors)
+          (let ((inhibit-read-only t))
+            (gis-200-redraw-game-board)))
+      (setq gis-200-parse-errors nil)
+      (let ((inhibit-read-only t))
+        (gis-200-redraw-game-board))
       (dolist (parse parses)
         (let* ((coords (car parse))
                (row (car coords))

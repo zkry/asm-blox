@@ -73,6 +73,7 @@
          ;; filetype, thus the need of heuristic.
          (wat-p (or (not first-char)
                     (string= first-char "(")
+                    (string= first-char ")")
                     (string= first-char ";"))))
     (if wat-p
         (gis-200--parse-assembly code)
@@ -179,6 +180,9 @@
              (rest-children (cdr children)))
         (cond
 
+         ((not first-child)
+          `(error ,start-pos "No cmd found"))
+         
          ((memq first-child gis-200-base-operations)
           (list parse))
 
@@ -247,7 +251,8 @@
               ,(gis-200--code-node-create
                 :children (list 'LABEL end-label)
                 :start-pos nil
-                :end-pos nil))))))))))
+                :end-pos nil))))
+         (t `(error ,start-pos ,(format "Bad cmd: %s " first-child)))))))))
 
 (defun gis-200--resolve-labels (asm)
   "Change each label reference in ASM to index in program."
@@ -273,7 +278,8 @@
 (defun gis-200--parse-tree-to-asm (parse)
   "Generate game bytecode from tree of PARSE, resolving labels."
   (let ((asm (flatten-list (gis-200--parse-tree-to-asm* parse))))
-    (gis-200--resolve-labels asm)
+    (unless (gis-200--parse-error-p asm)
+      (gis-200--resolve-labels asm))
     asm))
 
 (defun gis-200--pprint-asm (instructions)
