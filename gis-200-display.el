@@ -529,13 +529,16 @@ This was added for performance reasons.")
 
 (defun gis-200--move-to-end-of-box (row col)
   (let ((end-pos (gethash (list row col) gis-200--end-of-box-points)))
-    (goto-char end-pos)))
+      (goto-char end-pos)))
 
 (defvar gis-200--beginning-of-box-points nil
   "Contains a hashmap of the points where each box begins.
 This was added for performance reasons.")
 
 (defun gis-200--move-to-box (row col)
+  (when (eql gis-200--display-mode 'edit)
+    (let ((inhibit-read-only t))
+      (gis-200-redraw-game-board)))
   (let ((begin-pos (gethash (list row col) gis-200--beginning-of-box-points)))
     (goto-char begin-pos)))
 
@@ -684,6 +687,40 @@ This was added for performance reasons.")
          (forward-char 0))
       (gis-200-redraw-game-board))))
 
+(defun gis-200--coords-to-end-of-box ()
+  "Return (lines-down columns-right) to reach the end of the box."
+  (unless (gis-200-in-box-p)
+    (error "not in box"))
+  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+         (row (car box-id))
+         (col (cadr box-id))
+         (text (gis-200--get-box-content row col))
+         (lines (split-string text "\n"))
+         (line-ct (length lines))
+         (last-line-len (length (car (last lines)))))
+    (list line-ct last-line-len)))
+
+(defun gis-200--next-cell ()
+  "Move the point to the end of the next box."
+  (interactive)
+  (if (gis-200-in-box-p)
+      (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+             (row (car box-id))
+             (col (cadr box-id))
+             (next-col (if (= col (1- gis-200-column-ct)) 0 (1+ col)))
+             (next-row (if (= col (1- gis-200-column-ct)) (1+ row) row))
+             (next-row (if (= next-row gis-200--gameboard-row-ct) 0 next-row)))
+        (gis-200--move-to-box next-row next-col)
+        (let* ((coords (gis-200--coords-to-end-of-box))
+               (lines (car coords))
+               (cols (cadr coords)))
+          (let ((col (current-column)))
+            (forward-line (1- lines))
+            (move-to-column col))
+          ;; (message "%d" cols)
+          (forward-char cols)))
+    nil))
+
 (defconst gis-200-mode-map
   (let ((map (make-keymap)))
     (prog1 map
@@ -779,8 +816,8 @@ This was added for performance reasons.")
       (define-key map (kbd "C-a") #'gis-200--move-beginning-of-line)
       (define-key map (kbd "C-e") #'gis-200--move-end-of-line)
       (define-key map (kbd "M-<") #'gis-200--beginning-of-buffer)
-      (define-key map (kbd "M->") #'gis-200--end-of-buffer))))
-
+      (define-key map (kbd "M->") #'gis-200--end-of-buffer)
+      (define-key map (kbd "TAB") #'gis-200--next-cell))))
 
 (defun gis-200--execution-next-command ()
   ""
