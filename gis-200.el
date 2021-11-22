@@ -185,10 +185,10 @@
     (DROP integerp)
     (SEND gis-200--portp)
     (GET (lambda (x) (or (gis-200--portp x) (integerp x))))
-    (LEFT gis-200--subexpressions)  ;; TODO
-    (RIGHT gis-200--subexpressions) ;; TODO
-    (UP gis-200--subexpressions)    ;; TODO
-    (DOWN gis-200--subexpressions)  ;; TODO
+    (LEFT)  ;; TODO
+    (RIGHT) ;; TODO
+    (UP)    ;; TODO
+    (DOWN)  ;; TODO
     (FN t) ;; FN needs special verification code
     ))
 
@@ -258,12 +258,22 @@
                  (first-child (car children))
                  (rest-children (cdr children)))
             (cond
-
              ((not first-child)
               (throw 'err `(error ,start-pos "No cmd found")))
              
              ((memq first-child gis-200-base-operations)
-              (list parse))
+              (let* ((cmd-spec (assoc first-child gis-200-command-specs))
+                     (spec (cdr cmd-spec))
+                     (rest-children (cdr children))
+                     (children-cmds '()))
+                ;; Determine which children are commands
+                ;; that run before the command we're at.
+                (while (and spec rest-children)
+                  (when (eql (car spec) 'gis-200--subexpressions)
+                    (setq children-cmds (seq-map #'gis-200--parse-tree-to-asm* rest-children)))
+                  (setq spec (cdr spec))
+                  (setq rest-children (cdr rest-children)))
+                (append children-cmds (list parse))))
 
              ((eql first-child 'BLOCK)
               (let* ((label-symbol (gis-200--make-label))
@@ -1149,6 +1159,11 @@ cell-runtime but rather the in-between row/col."
    :col col
    :run-function #'gis-200--yaml-step-stack
    :run-spec spec))
+
+
+(#s(gis-200-code-node (CONST 1) 6 15)
+   #s(gis-200-code-node (CONST 2) 16 25)
+   #s(gis-200-code-node (ADD #s(gis-200-code-node (CONST 1) 6 15) #s(gis-200-code-node (CONST 2) 16 25)) 1 26))
 
 (provide 'gis-200)
 
