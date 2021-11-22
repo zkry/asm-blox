@@ -183,7 +183,7 @@
     (BR integerp)
     (NOP)
     (DROP integerp)
-    (SEND gis-200--portp)
+    (SEND gis-200--portp gis-200--subexpressions)
     (GET (lambda (x) (or (gis-200--portp x) (integerp x))))
     (LEFT)  ;; TODO
     (RIGHT) ;; TODO
@@ -229,7 +229,8 @@
                     (setq rest-children (cdr rest-children))
                   (throw 'err `(error ,start-pos ,(format "bad arg '%s'" at-child)))))))
             
-            (setq specs (cdr specs)))))))))
+            (setq specs (cdr specs))
+            (setq at-spec (car specs)))))))))
 
 ;; (gis-200--code-node-validate (gis-200--code-node-create :children '(DROP beep) :start-pos 0 :end-pos 1))
 
@@ -261,7 +262,7 @@
              ((not first-child)
               (throw 'err `(error ,start-pos "No cmd found")))
              
-             ((memq first-child gis-200-base-operations)
+             ((assoc first-child gis-200-command-specs)
               (let* ((cmd-spec (assoc first-child gis-200-command-specs))
                      (spec (cdr cmd-spec))
                      (rest-children (cdr children))
@@ -700,6 +701,10 @@ If the port does't have a value, set staging to nil."
             ('DROP (gis-200--cell-runtime-pop cell-runtime))
             ('SEND (gis-200--cell-runtime-send cell-runtime (cadr code-data)))
             ('GET (gis-200--cell-runtime-get cell-runtime (cadr code-data)))
+            ('RIGHT (gis-200--cell-runtime-get cell-runtime 'RIGHT))
+            ('LEFT (gis-200--cell-runtime-get cell-runtime 'LEFT))
+            ('UP (gis-200--cell-runtime-get cell-runtime 'UP))
+            ('DOWN (gis-200--cell-runtime-get cell-runtime 'DOWN))
             ('JMP (let ((position (cadr code-data)))
                     (setf (gis-200--cell-runtime-pc cell-runtime) position)))
             ('LABEL 'label)

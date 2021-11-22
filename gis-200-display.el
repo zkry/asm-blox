@@ -688,6 +688,12 @@ This was added for performance reasons.")
   (gis-200--in-buffer
    (newline)))
 
+(defun gis-200--forward-line ()
+  ""
+  (interactive)
+  (gis-200--in-buffer
+   (forward-line)))
+
 (defun gis-200--refresh-contents ()
   ""
   (interactive)
@@ -924,8 +930,18 @@ This was added for performance reasons.")
           (when (and start-pos end-pos)
             (gis-200--move-to-box row col)
             (gis-200--box-point-forward (1- start-pos))
-            (put-text-property (point) (+ (point) (- end-pos start-pos))
-                               'font-lock-face '(:background "#555"))))))))
+            (let* ((text (gis-200--get-box-content row col))
+                   (hl-text (substring-no-properties text (1- start-pos) (1- end-pos)))
+                   (hl-lines (split-string hl-text "\n")))
+              (while hl-lines
+                (put-text-property (point) (+ (point) (length (car hl-lines)))
+                                   'font-lock-face '(:background "#555"))
+                (let ((at-col (current-column)))
+                  (forward-line 1)
+                  (move-to-column at-col)
+                  (while (not (looking-back "│"))
+                    (forward-char -1)))
+                (setq hl-lines (cdr hl-lines))))))))))
 
 (defun gis-200-execution-draw-stack ()
   "Display the stack for the current cell-runtimes."
