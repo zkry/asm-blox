@@ -33,6 +33,10 @@
   "?"
   :group 'gis-200)
 
+(defface gis-200-show-paren-match-face
+  '((t (:inherit show-paren-match)))
+  "`gis-200-mode' face used for a matching paren pair."
+  :group 'gis-200)
 
 (defconst gis-200-column-ct 4)
 (defconst gis-200-box-width 20)
@@ -302,7 +306,7 @@ This should normally be called when the point is at the end of the display."
                (let ((label (gis-200--col-arrow-label-display 'left 'source row)))
                  (if (equal label " ")
                      (insert space-between)
-                   (progn (insert label) (insert arrow-right) (insert ?\s)))))
+                   (progn (insert "  ") (insert label) (insert arrow-right) (insert ?\s)))))
               ((= 7 box-row)
                (let ((label (gis-200--col-arrow-label-display 'left 'sink row)))
                  (if (equal label " ")
@@ -1030,6 +1034,8 @@ This was added for performance reasons.")
 (defvar gis-200--skip-initial-parsing nil
   "When non-nil, don't parse the initial gameboard.")
 
+(defvar gis-200--show-pair-idle-timer nil)
+
 (defun gis-200-mode ()
   (interactive)
   (kill-all-local-variables)
@@ -1044,10 +1050,127 @@ This was added for performance reasons.")
   (unless gis-200--skip-initial-parsing
     (gis-200--parse-saved-buffer)
     (let ((inhibit-read-only t))
-      (gis-200-redraw-game-board))))
+      (gis-200-redraw-game-board)))
+  (unless gis-200--show-pair-idle-timer
+    (setq gis-200--show-pair-idle-timer
+          (run-with-idle-timer 0.125 t 'gis-200--highlight-pairs))))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.gis\\'" 'gis-200-mode))
+
+;;; Parenthesis match code
+
+(defvar gis-200-pair-overlays nil "List of overlays used to highlight parenthesis pairs.")
+
+(defun gis-200--find-closing-match ()
+  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+         (row (car box-id))
+         (col (cadr box-id))
+         (line (caddr box-id))
+         (line-col (gis-200-get-line-col-num))
+         (text (gis-200--get-box-content row col)))
+    (with-temp-buffer
+      (insert text)
+      (goto-char (point-min))
+      (forward-line line)
+      (forward-char line-col)
+      (let ((ct 1))
+        (while (and (not (eobp))
+                    (not (zerop ct)))
+          (forward-char 1)
+          (when (looking-at "(")
+            (setq ct (1+ ct)))
+          (when (looking-at ")")
+            (setq ct (1- ct)))))
+      (when (not (eobp))
+        (let* ((new-col (current-column))
+               (new-row (1- (line-number-at-pos)))
+               (dcol (- new-col line-col))
+               (drow (- new-row line)))
+          (list drow dcol))))))
+
+(defun gis-200--find-opening-match ()
+  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+         (row (car box-id))
+         (col (cadr box-id))
+         (line (caddr box-id))
+         (line-col (gis-200-get-line-col-num))
+         (text (gis-200--get-box-content row col)))
+    (with-temp-buffer
+      (insert text)
+      (goto-char (point-min))
+      (forward-line line)
+      (forward-char line-col)
+      (forward-char -1) ;; to highlight if after closing
+      (let ((ct 1))
+        (while (and (not (bobp))
+                    (not (zerop ct)))
+          (forward-char -1)
+          (when (looking-at ")")
+            (setq ct (1+ ct)))
+          (when (looking-at "(")
+            (setq ct (1- ct)))))
+      (when (or (looking-at "(") (not (bobp)))
+        (let* ((new-col (current-column))
+               (new-row (1- (line-number-at-pos)))
+               (dcol (- new-col line-col))
+               (drow (- new-row line)))
+          (list drow dcol))))))
+
+(defun  gis-200--pair-delete-overlays ()
+  "Remove both show pair overlays."
+  (when gis-200-pair-overlays
+    (dolist (overlay gis-200-pair-overlays)
+      (delete-overlay overlay))
+    (setq gis-200-pair-overlays nil)))
+
+(defun gis-200--pair-create-overlays (start end)
+  "Create the show pair overlays."
+  (when gis-200-pair-overlays
+    (gis-200--pair-delete-overlays))
+  (let ((oleft (make-overlay start (1+ start) nil t nil))
+        (oright (make-overlay end (1+ end) nil t nil)))
+    (setq gis-200-pair-overlays (list oleft oright))
+    (overlay-put oleft 'face 'gis-200-show-paren-match-face)
+    (overlay-put oright 'face 'gis-200-show-paren-match-face)
+    (overlay-put oleft 'type 'show-pair)))
+
+(defun gis-200--highlight-pairs ()
+  (when (equal mode-name "gis-200") ;; TODO: use eql to make this faster
+    (if (gis-200-in-box-p)
+        (save-excursion
+          (save-match-data
+            (while-no-input 
+              (cond
+               ((looking-back ")")
+                (let* ((start-point (1- (point)))
+                       (opening-match-coords (gis-200--find-opening-match))
+                       (d-row (car opening-match-coords))
+                       (d-col (cadr opening-match-coords))
+                       (at-col (current-column)))
+                  (forward-line d-row)
+                  (move-to-column at-col)
+                  (forward-char d-col)
+                  (let ((end-point (point)))
+                    (gis-200--pair-create-overlays start-point end-point))))
+               ((looking-at "(")
+                (let* ((start-point (point))
+                       (closing-match-coords (gis-200--find-closing-match)))
+                  (if closing-match-coords
+                      (let ((d-row (car closing-match-coords))
+                            (d-col (cadr closing-match-coords))
+                            (at-col (current-column)))
+                        (forward-line d-row)
+                        (move-to-column at-col)
+                        (forward-char d-col)
+                        (let ((end-point (point)))
+                          (gis-200--pair-create-overlays start-point end-point)))
+                    (when gis-200-pair-overlays
+                      (gis-200--pair-delete-overlays))))) ;; TODO: should display red match instead
+               (gis-200-pair-overlays
+                (gis-200--pair-delete-overlays))))))
+      (when gis-200-pair-overlays
+        (gis-200--pair-delete-overlays)))))
 
 ;;; Puzzle Selection
 

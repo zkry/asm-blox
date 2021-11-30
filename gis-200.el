@@ -155,13 +155,13 @@
   '(GET SET TEE CONST NULL IS_NULL DROP
         NOP ADD SUB MUL DIV REM AND OR EQZ
         EQ NE LT GT GE LE SEND PUSH POP
-        CLR NOT DUPL))
+        CLR NOT DUP))
 
 (defconst gis-200-command-specs
   '((SET integerp gis-200--subexpressions) ;; TODO 
     (CLR) 
     (CONST integerp)
-    (DUPL)
+    (DUP gis-200--subexpressions)
     (ADD gis-200--subexpressions)
     (SUB gis-200--subexpressions)
     (MUL gis-200--subexpressions)
@@ -262,20 +262,6 @@
              ((not first-child)
               (throw 'err `(error ,start-pos "No cmd found")))
              
-             ((assoc first-child gis-200-command-specs)
-              (let* ((cmd-spec (assoc first-child gis-200-command-specs))
-                     (spec (cdr cmd-spec))
-                     (rest-children (cdr children))
-                     (children-cmds '()))
-                ;; Determine which children are commands
-                ;; that run before the command we're at.
-                (while (and spec rest-children)
-                  (when (eql (car spec) 'gis-200--subexpressions)
-                    (setq children-cmds (seq-map #'gis-200--parse-tree-to-asm* rest-children)))
-                  (setq spec (cdr spec))
-                  (setq rest-children (cdr rest-children)))
-                (append children-cmds (list parse))))
-
              ((eql first-child 'BLOCK)
               (let* ((label-symbol (gis-200--make-label))
                      (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
@@ -342,6 +328,22 @@
                     :children (list 'LABEL end-label)
                     :start-pos nil
                     :end-pos nil))))
+
+             ((assoc first-child gis-200-command-specs)
+              (let* ((cmd-spec (assoc first-child gis-200-command-specs))
+                     (spec (cdr cmd-spec))
+                     (rest-children (cdr children))
+                     (children-cmds '()))
+                ;; Determine which children are commands
+                ;; that run before the command we're at.
+                (while (and spec rest-children)
+                  (when (eql (car spec) 'gis-200--subexpressions)
+                    (setq children-cmds (seq-map #'gis-200--parse-tree-to-asm* rest-children)))
+                  (setq spec (cdr spec))
+                  (setq rest-children (cdr rest-children)))
+                (append children-cmds (list parse))))
+
+
              (t `(error ,start-pos ,(format "Bad cmd: %s " first-child)))))))))))
 
 (defun gis-200--parse-tree-to-asm (parse)
@@ -540,7 +542,7 @@ If the port does't have a value, set staging to nil."
 
 (defun gis-200--cell-runtime-set-staging-value-from-direction (cell-runtime direction value)
   (pcase direction
-    ('UP (setf (gis-200--cell-runtime-staging-staging-up cell-runtime) value))
+    ('UP (setf (gis-200--cell-runtime-staging-up cell-runtime) value))
     ('RIGHT (setf (gis-200--cell-runtime-staging-right cell-runtime) value))
     ('DOWN (setf (gis-200--cell-runtime-staging-down cell-runtime) value))
     ('LEFT (setf (gis-200--cell-runtime-staging-left cell-runtime) value))))
@@ -584,6 +586,18 @@ If the port does't have a value, set staging to nil."
          (v2 (gis-200--cell-runtime-pop cell-runtime))
          (res (funcall function v2 v1)))
     (gis-200--cell-runtime-push cell-runtime res)))
+
+(defun gis-200--cell-runtime-set-stack (cell-runtime offset)
+  (let ((v (gis-200--cell-runtime-pop cell-runtime))
+        (row (gis-200--cell-runtime-row cell-runtime))
+        (col (gis-200--cell-runtime-col cell-runtime))
+        (stack (gis-200--cell-runtime-stack cell-runtime))
+        (offset (if (< offset 0) (+ offset (length stack)) offset)))
+    (when (or (< offset 0) (>= offset (length stack)))
+      (setq gis-200-runtime-error  ;; TODO: extract this logic
+            (list "Idx out of bounds" row col))
+      (setq gis-200--gameboard-state 'error))
+    (setcar (nthcdr (- (length stack) offset 1) stack) v)))
 
 (defun gis-200--unary-operation (cell-runtime function)
   "Perform binary operation FUNCTION on the top two items of CELL-RUNTIME."
@@ -678,8 +692,10 @@ If the port does't have a value, set staging to nil."
             ('_EMPTY 'blocked)
             ('CONST (let ((const (cadr code-data)))
                       (gis-200--cell-runtime-push cell-runtime const)))
+            ('SET (let ((stack-offset (cadr code-data)))
+                    (gis-200--cell-runtime-set-stack cell-runtime stack-offset)))
             ('CLR (setf (gis-200--cell-runtime-stack cell-runtime) nil))
-            ('DUPL (let ((stack (gis-200--cell-runtime-stack cell-runtime)))
+            ('DUP (let ((stack (gis-200--cell-runtime-stack cell-runtime)))
                      (setf (gis-200--cell-runtime-stack cell-runtime) (append stack stack))))
             ('ADD (gis-200--binary-operation cell-runtime #'+))
             ('SUB (gis-200--binary-operation cell-runtime #'-))
@@ -759,8 +775,10 @@ If the port does't have a value, set staging to nil."
     (while (and sinks win-p)
       (let* ((sink (car sinks))
              (expected-data (gis-200--cell-sink-expected-data sink))
-             (idx (gis-200--cell-sink-idx sink)))
-        (when (< idx (length expected-data))
+             (idx (gis-200--cell-sink-idx sink))
+             (err-val (gis-200--cell-sink-err-val sink)))
+        (when (or (< idx (length expected-data))
+                  err-val)
           (setq win-p nil))
         (setq sinks (cdr sinks))))
     (when win-p
@@ -924,6 +942,116 @@ cell-runtime but rather the in-between row/col."
     (setf (gis-200--cell-source-idx source) (1+ idx))
     top))
 
+(defun gis-200--problem--tax ()
+  "Generate a simple addition problem."
+  (let* ((high-start-ct (random 20))
+         (start-seq (seq-map (lambda (_) (random 999)) (make-list high-start-ct nil)))
+         (high-seq (seq-map (lambda (_) (+ 500 (random 499))) (make-list 12 nil)))
+         (rest-seq (seq-map (lambda (_) (random 999)) (make-list (- 40 high-start-ct 12) nil)))
+         (input-1 (append start-seq high-seq rest-seq))
+         (expected (cdr (seq-reduce (lambda (acc x)
+                                      (if (listp acc)
+                                          acc
+                                        (let ((at-ct (if (>= x 500)
+                                                         (1+ acc)
+                                                       0)))
+                                          (if (= at-ct 12)
+                                              (list 'done (/ x 40))
+                                            at-ct))))
+                                    input-1
+                                    0))))
+    (gis-200--problem-spec-create
+     :name "Tax"
+     :sources (list (gis-200--cell-source-create :row 1
+                                                 :col -1
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "I"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 1
+                                      :col 4
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "O"))
+     :description "Read a value from I. If it is even send 0 to O, else send the value.")))
+
+(defun gis-200--problem--list-length ()
+  "Generate a simple addition problem."
+  (let* ((nums)
+         (lengths))
+    (while (< (length nums) 30)
+      (let ((len (1+ (random 10))))
+        (setq lengths (cons len lengths))
+        (setq nums (append nums
+                           (seq-map (lambda (_)
+                                      (1+ (random 10)))
+                                    (make-list len nil))
+                           (list 0)))))
+    (setq lengths (reverse lengths))
+    lengths
+    (gis-200--problem-spec-create
+     :name "List Length"
+     :sources (list (gis-200--cell-source-create :row 1
+                                                 :col -1
+                                                 :data nums
+                                                 :idx 0
+                                                 :name "I"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 1
+                                      :col 4
+                                      :expected-data lengths
+                                      :idx 0
+                                      :name "O"))
+     :description "Lists are 0 terminated. Read a list from I, calculate its length and send it to O.")))
+
+(defun gis-200--problem--filter ()
+  "Generate a simple addition problem."
+  (let* ((input-1 (seq-map (lambda (_) (random 100)) (make-list 40 nil)))
+         (expected (seq-map (lambda (x)
+                              (if (= (mod x 2) 0)
+                                  0
+                                x))
+                               input-1)))
+    (gis-200--problem-spec-create
+     :name "Number Filter"
+     :sources (list (gis-200--cell-source-create :row 1
+                                                 :col -1
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "I"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 1
+                                      :col 4
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "O"))
+     :description "Read a value from I. If it is even send 0 to O, else send the value.")))
+
+(defun gis-200--problem--clock ()
+  "Generate a simple addition problem."
+  (let* ((input-1 (seq-map (lambda (_) (random 24)) (make-list 40 nil)))
+         (expected (cdr (seq-reverse
+                         (seq-reduce (lambda (acc x)
+                                       (let ((top (car acc)))
+                                         (cons (mod (+ top x) 24)
+                                               acc)))
+                                     input-1
+                                     '(0))))))
+    (gis-200--problem-spec-create
+     :name "Clock Hours"
+     :sources (list (gis-200--cell-source-create :row 1
+                                                 :col -1
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "H"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 3
+                                      :col 1
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "T"))
+     :description "On a clock with hours 0 to 23, read a value from H and add that value to the current time which starts at 0. \nWrite the currenttime to T for every time you move the current time.")))
+
 (defun gis-200--problem--add ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
@@ -1023,7 +1151,11 @@ cell-runtime but rather the in-between row/col."
                          #'gis-200--problem--constant
                          #'gis-200--problem--identity
                          #'gis-200--problem--add
-                         #'gis-200--problem--number-sorter))
+                         #'gis-200--problem--filter
+                         #'gis-200--problem--number-sorter
+                         #'gis-200--problem--clock
+                         #'gis-200--problem--tax
+                         #'gis-200--problem--list-length))
 
 (defun gis-200--get-puzzle-by-id (name)
   ;; TODO: fill this out with the remaining puzzles.
