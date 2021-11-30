@@ -182,7 +182,7 @@
     (BR_IF integerp)
     (BR integerp)
     (NOP)
-    (DROP integerp)
+    (DROP gis-200--subexpressions)
     (SEND gis-200--portp gis-200--subexpressions)
     (GET (lambda (x) (or (gis-200--portp x) (integerp x))))
     (LEFT)  ;; TODO
@@ -227,7 +227,7 @@
                      (ok-p (funcall at-spec at-child)))
                 (if ok-p
                     (setq rest-children (cdr rest-children))
-                  (throw 'err `(error ,start-pos ,(format "bad arg '%s'" at-child)))))))
+                  (throw 'err `(error ,start-pos ,(format "bad arg to '%s'" first-child)))))))
             
             (setq specs (cdr specs))
             (setq at-spec (car specs)))))))))
@@ -942,6 +942,38 @@ cell-runtime but rather the in-between row/col."
     (setf (gis-200--cell-source-idx source) (1+ idx))
     top))
 
+(defun gis-200--problem-list-of-lists-to-lisp (lists)
+  "Return a list of lisp list objects from 0-terminated list of number lists."
+  (thread-last (list '() '())
+    (seq-reduce (lambda (acc x)
+                  (let ((lol (car acc))
+                        (curr-list (cadr acc)))
+                    (if (= x 0)
+                        (list (cons (reverse curr-list) lol) '())
+                      (list lol (cons  x curr-list)))))
+                lists)
+    (car)
+    (reverse)))
+
+(defun gis-200--problem-random-list-of-lists ()
+  "Generate list of 0-terminated lists as helper."
+  (let* ((nums (seq-map (lambda (_) (random 999)) (make-list 40 nil)))
+         (breaks (seq-map (lambda (_) (random 5)) (make-list 40 nil)))
+         (switched nil)
+         (i 0))
+    (seq-mapn (lambda (a b)
+                     (setq i (1+ i))
+                     (if (or (= i 40)
+                             (and (not (= i 39))
+                                  (not (= i 1))
+                                  (and (not switched) (= b 0))))
+                         (progn
+                           (setq switched t)
+                           0)
+                       (setq switched nil)
+                       a))
+                   nums breaks)))
+
 (defun gis-200--problem--tax ()
   "Generate a simple addition problem."
   (let* ((high-start-ct (random 20))
@@ -974,6 +1006,28 @@ cell-runtime but rather the in-between row/col."
                                       :idx 0
                                       :name "O"))
      :description "Read a value from I. If it is even send 0 to O, else send the value.")))
+
+(defun gis-200--problem--list-reverse ()
+  "Generate a simple addition problem."
+  (let* ((input-1 (gis-200--problem-random-list-of-lists))
+         (lists (gis-200--problem-list-of-lists-to-lisp input-1))
+         (expected (flatten-list (seq-map (lambda (l)
+                                       (append (reverse l) (list 0)))
+                                     lists))))
+    (gis-200--problem-spec-create
+     :name "List Reverse"
+     :sources (list (gis-200--cell-source-create :row -1
+                                                 :col 2
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "L"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 3
+                                      :col 1
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "R"))
+     :description "Lists are 0 terminated. Read a list from L, reverse it, and send it to R (terminating it with 0).")))
 
 (defun gis-200--problem--list-length ()
   "Generate a simple addition problem."
@@ -1155,7 +1209,8 @@ cell-runtime but rather the in-between row/col."
                          #'gis-200--problem--number-sorter
                          #'gis-200--problem--clock
                          #'gis-200--problem--tax
-                         #'gis-200--problem--list-length))
+                         #'gis-200--problem--list-length
+                         #'gis-200--problem--list-reverse))
 
 (defun gis-200--get-puzzle-by-id (name)
   ;; TODO: fill this out with the remaining puzzles.
@@ -1248,10 +1303,13 @@ cell-runtime but rather the in-between row/col."
       ;; .inputPorts .outputPort .sizePort .size .logLevel
       ;; First put port back on the stack
       (let* ((port-sym (intern (upcase .outputPort)))
+             (size-port-sym (and .sizePort (intern (upcase .sizePort))))
              (val (gis-200--get-value-from-direction cell-runtime port-sym)))
         (when val
           (gis-200--remove-value-from-direction cell-runtime port-sym)
-          (setq state (cons val state))))
+          (setq state (cons val state)))
+        (when .sizePort
+          (gis-200--remove-value-from-direction cell-runtime size-port-sym)))
       
       ;; Then add new values to stack
       (seq-do
@@ -1296,11 +1354,6 @@ cell-runtime but rather the in-between row/col."
    :col col
    :run-function #'gis-200--yaml-step-stack
    :run-spec spec))
-
-
-(#s(gis-200-code-node (CONST 1) 6 15)
-   #s(gis-200-code-node (CONST 2) 16 25)
-   #s(gis-200-code-node (ADD #s(gis-200-code-node (CONST 1) 6 15) #s(gis-200-code-node (CONST 2) 16 25)) 1 26))
 
 (provide 'gis-200)
 
