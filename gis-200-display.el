@@ -646,10 +646,7 @@ This was added for performance reasons.")
       (ding)
     (gis-200--in-buffer
      (insert (this-command-keys)))
-    (let* ((box-id (get-text-property (point) 'gis-200-box-id))
-           (row (car box-id))
-           (col (cadr box-id)))
-      (gis-200--push-undo-stack-value row col))))
+    (gis-200--push-undo-stack-value)))
 
 (defun gis-200--backward-delete-char ()
   ""
@@ -1002,21 +999,37 @@ This was added for performance reasons.")
 (defvar gis-200--undo-stacks nil
   "Hashmap of stacks containing undo history of each buffer.")
 
+(cl-defstruct (gis-200--undo-state
+               (:constructor gis-200--undo-state-create)
+               (:copier nil))
+  text box-row box-col)
+
 (defun gis-200--initialize-undo-stacks ()
   (setq gis-200--undo-stacks (make-hash-table :test 'equal))
   (dotimes (row 3)
     (dotimes (col gis-200-column-ct)
       (let* ((current-value (gis-200--get-box-content row col)))
-        (puthash (list row col) (list current-value) gis-200--undo-stacks)))))
+        (puthash (list row col)
+                 (list (gis-200--undo-state-create :text current-value
+                                                   :box-row 0
+                                                   :box-col 0)) ;; TODO: better if this was at end not beginning
+                 gis-200--undo-stacks)))))
 
-(defun gis-200--push-undo-stack-value (row col)
-  (message "DEBUG: pushing to (%d, %d)" row col)
-  (let* ((text (gis-200--get-box-content row col))
+(defun gis-200--push-undo-stack-value ()
+  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+         (row (car box-id))
+         (col (cadr box-id))
+         (line-row (caddr box-id))
+         (text (gis-200--get-box-content row col))
          (key (list row col))
-         (l (gethash key gis-200--undo-stacks))
-         (top (car l)))
-    (unless (equal top text)
-      (puthash key (cons text l) gis-200--undo-stacks))))
+         (states (gethash key gis-200--undo-stacks))
+         (top-text (and states (gis-200--undo-state-text (car states)))))
+    (unless (equal top-text text)
+      (let* ((line-col (gis-200-get-line-col-num))
+             (state (gis-200--undo-state-create :text text
+                                                :box-row line-row
+                                                :box-col line-col)))
+        (puthash key (cons state states) gis-200--undo-stacks)))))
 
 (defun gis-200--undo ()
   ""
@@ -1027,16 +1040,17 @@ This was added for performance reasons.")
            (row (car box-id))
            (col (cadr box-id)))
       (let* ((stack (gethash (list row col) gis-200--undo-stacks))
-             (prev-val (cadr stack)))
-        (puthash (list row col) (cdr stack) gis-200--undo-stacks)
-        (gis-200--set-box-content row col prev-val)
-        (let ((inhibit-read-only t)) ;; code-smell: always inhibiting read only
-          (gis-200-redraw-game-board))))))
-
-;; experiment:
-(gis-200--initialize-undo-stacks)
-(gethash (list 0 0) gis-200--undo-stacks)
-(gis-200--push-undo-stack-value 0 0 "hello")
+             (prev-state (cadr stack)))
+        (if (<= (length stack) 1)
+            (ding)
+          (puthash (list row col) (cdr stack) gis-200--undo-stacks)
+          (let ((text (gis-200--undo-state-text prev-state))
+                (box-row (gis-200--undo-state-box-row prev-state))
+                (box-col (gis-200--undo-state-box-col prev-state)))
+            (gis-200--set-box-content row col text)
+            (let ((inhibit-read-only t)) ;; code-smell: always inhibiting read only
+              (gis-200-redraw-game-board))
+            (gis-200--move-to-box-point box-row box-col)))))))
 
 ;;; Parenthesis match code ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
