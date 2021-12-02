@@ -1320,7 +1320,7 @@ cell-runtime but rather the in-between row/col."
         (let ((prev-val (gethash (list row col) gis-200-box-contents)))
           (puthash (list row col) (string-trim-right prev-val) gis-200-box-contents))))
     ;; Find the name of the puzzle.
-    (search-forward-regexp "^\\([[:alnum:] ]+\\):")
+    (search-forward-regexp "^\\([[:alnum:] -]+\\):")
     (let ((match (match-string 1)))
       (unless match
         (error "Bad file format, no puzzle name found."))

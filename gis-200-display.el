@@ -63,7 +63,7 @@
 
 (defvar gis-200-box-contents nil)
 
-;;; Widget display
+;;; Widget display ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defvar gis-200--widget-row-idx nil)
 (defvar gis-200--current-widgets nil
@@ -141,7 +141,7 @@ This should normally be called when the point is at the end of the display."
   (setq gis-200--widget-row-idx (1+ gis-200--widget-row-idx)))
 
 
-;;; Main grid display
+;;; Main grid display ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun gis-200--initialize-box-contents ()
   (setq gis-200-box-contents (make-hash-table :test 'equal))
@@ -497,8 +497,13 @@ This should normally be called when the point is at the end of the display."
           (put-text-property (point) (1+ (point)) 'font-lock-face '(:underline (:color "red" :style wave))))))))
 
 (defun gis-200-redraw-game-board ()
-  (erase-buffer)
-  (gis-200-display-game-board))
+  (let ((at-row (line-number-at-pos nil))
+        (at-col (current-column)))
+    (erase-buffer)
+    (gis-200-display-game-board)
+    (goto-char (point-min))
+    (forward-line (1- at-row))
+    (forward-char at-col)))
 
 (defun gis-200-in-box-p ()
   (get-text-property (point) 'gis-200-box-id))
@@ -637,8 +642,14 @@ This was added for performance reasons.")
 (defun gis-200--self-insert-command ()
   ""
   (interactive)
-  (gis-200--in-buffer
-   (insert (this-command-keys))))
+  (if (not (gis-200-in-box-p))
+      (ding)
+    (gis-200--in-buffer
+     (insert (this-command-keys)))
+    (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+           (row (car box-id))
+           (col (cadr box-id)))
+      (gis-200--push-undo-stack-value row col))))
 
 (defun gis-200--backward-delete-char ()
   ""
@@ -785,105 +796,20 @@ This was added for performance reasons.")
       (gis-200--move-to-box 0 0))
     (gis-200--prev-cell)))
 
-(defun gis-200--undo (ct)
-  (interactive "p")
-  (undo ct)
-  (let ((undo-inhibit-record-point t))
-    (buffer-disable-undo)
-    (gis-200--parse-saved-buffer)
-    (let ((inhibit-read-only t))
-      (gis-200-redraw-game-board))
-    (buffer-enable-undo)))
+(defun gis-200--printable-char-p (c)
+  (<= 32 c 126))
 
 (defconst gis-200-mode-map
   (let ((map (make-keymap)))
     (prog1 map
       ;;(suppress-keymap map)
-      (define-key map "a" #'gis-200--self-insert-command)
-      (define-key map "b" #'gis-200--self-insert-command)
-      (define-key map "c" #'gis-200--self-insert-command)
-      (define-key map "d" #'gis-200--self-insert-command)
-      (define-key map "e" #'gis-200--self-insert-command)
-      (define-key map "f" #'gis-200--self-insert-command)
-      (define-key map "g" #'gis-200--self-insert-command)
-      (define-key map "h" #'gis-200--self-insert-command)
-      (define-key map "i" #'gis-200--self-insert-command)
-      (define-key map "j" #'gis-200--self-insert-command)
-      (define-key map "k" #'gis-200--self-insert-command)
-      (define-key map "l" #'gis-200--self-insert-command)
-      (define-key map "m" #'gis-200--self-insert-command)
-      (define-key map "n" #'gis-200--self-insert-command)
-      (define-key map "o" #'gis-200--self-insert-command)
-      (define-key map "p" #'gis-200--self-insert-command)
-      (define-key map "q" #'gis-200--self-insert-command)
-      (define-key map "r" #'gis-200--self-insert-command)
-      (define-key map "s" #'gis-200--self-insert-command)
-      (define-key map "t" #'gis-200--self-insert-command)
-      (define-key map "u" #'gis-200--self-insert-command)
-      (define-key map "v" #'gis-200--self-insert-command)
-      (define-key map "w" #'gis-200--self-insert-command)
-      (define-key map "x" #'gis-200--self-insert-command)
-      (define-key map "y" #'gis-200--self-insert-command)
-      (define-key map "z" #'gis-200--self-insert-command)
-      (define-key map "A" #'gis-200--self-insert-command)
-      (define-key map "B" #'gis-200--self-insert-command)
-      (define-key map "C" #'gis-200--self-insert-command)
-      (define-key map "D" #'gis-200--self-insert-command)
-      (define-key map "E" #'gis-200--self-insert-command)
-      (define-key map "F" #'gis-200--self-insert-command)
-      (define-key map "G" #'gis-200--self-insert-command)
-      (define-key map "H" #'gis-200--self-insert-command)
-      (define-key map "I" #'gis-200--self-insert-command)
-      (define-key map "J" #'gis-200--self-insert-command)
-      (define-key map "K" #'gis-200--self-insert-command)
-      (define-key map "L" #'gis-200--self-insert-command)
-      (define-key map "M" #'gis-200--self-insert-command)
-      (define-key map "N" #'gis-200--self-insert-command)
-      (define-key map "O" #'gis-200--self-insert-command)
-      (define-key map "P" #'gis-200--self-insert-command)
-      (define-key map "Q" #'gis-200--self-insert-command)
-      (define-key map "R" #'gis-200--self-insert-command)
-      (define-key map "S" #'gis-200--self-insert-command)
-      (define-key map "T" #'gis-200--self-insert-command)
-      (define-key map "U" #'gis-200--self-insert-command)
-      (define-key map "V" #'gis-200--self-insert-command)
-      (define-key map "W" #'gis-200--self-insert-command)
-      (define-key map "X" #'gis-200--self-insert-command)
-      (define-key map "Y" #'gis-200--self-insert-command)
-      (define-key map "Z" #'gis-200--self-insert-command)
-      (define-key map "0" #'gis-200--self-insert-command)
-      (define-key map "1" #'gis-200--self-insert-command)
-      (define-key map "2" #'gis-200--self-insert-command)
-      (define-key map "3" #'gis-200--self-insert-command)
-      (define-key map "4" #'gis-200--self-insert-command)
-      (define-key map "5" #'gis-200--self-insert-command)
-      (define-key map "6" #'gis-200--self-insert-command)
-      (define-key map "7" #'gis-200--self-insert-command)
-      (define-key map "8" #'gis-200--self-insert-command)
-      (define-key map "9" #'gis-200--self-insert-command)
-      (define-key map "," #'gis-200--self-insert-command)
-      (define-key map "(" #'gis-200--self-insert-command)
-      (define-key map ")" #'gis-200--self-insert-command)
-      (define-key map ":" #'gis-200--self-insert-command)
-      (define-key map "-" #'gis-200--self-insert-command)
-      (define-key map "[" #'gis-200--self-insert-command)
-      (define-key map "]" #'gis-200--self-insert-command)
-      (define-key map "\"" #'gis-200--self-insert-command)
-      (define-key map "'" #'gis-200--self-insert-command)
-      (define-key map ";" #'gis-200--self-insert-command)
-      (define-key map "#" #'gis-200--self-insert-command)
-      (define-key map "|" #'gis-200--self-insert-command)
-      (define-key map "<" #'gis-200--self-insert-command)
-      (define-key map ">" #'gis-200--self-insert-command)
-      (define-key map "{" #'gis-200--self-insert-command)
-      (define-key map "}" #'gis-200--self-insert-command)
-      (define-key map "=" #'gis-200--self-insert-command)
-      (define-key map "+" #'gis-200--self-insert-command)
-      (define-key map "_" #'gis-200--self-insert-command)
+      (dotimes (i 128)
+        (when (gis-200--printable-char-p i)
+          (define-key map (char-to-string i) #'gis-200--self-insert-command)))
       (define-key map (kbd "DEL") #'gis-200--backward-delete-char)
       (define-key map (kbd "SPC") #'gis-200--self-insert-command)
       (define-key map (kbd "RET") #'gis-200--newline)
-      (define-key map (kbd "C-c g") #'gis-200--refresh-contents)
+      (define-key map (kbd "C-c C-g") #'gis-200--refresh-contents)
       (define-key map (kbd "C-c C-c") #'gis-200-start-execution)
       (define-key map (kbd "M-d") #'gis-200--kill-word)
       (define-key map (kbd "C-k") #'gis-200--kill-line)
@@ -1071,7 +997,48 @@ This was added for performance reasons.")
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.gis\\'" 'gis-200-mode))
 
-;;; Parenthesis match code
+;;; Undo ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar gis-200--undo-stacks nil
+  "Hashmap of stacks containing undo history of each buffer.")
+
+(defun gis-200--initialize-undo-stacks ()
+  (setq gis-200--undo-stacks (make-hash-table :test 'equal))
+  (dotimes (row 3)
+    (dotimes (col gis-200-column-ct)
+      (let* ((current-value (gis-200--get-box-content row col)))
+        (puthash (list row col) (list current-value) gis-200--undo-stacks)))))
+
+(defun gis-200--push-undo-stack-value (row col)
+  (message "DEBUG: pushing to (%d, %d)" row col)
+  (let* ((text (gis-200--get-box-content row col))
+         (key (list row col))
+         (l (gethash key gis-200--undo-stacks))
+         (top (car l)))
+    (unless (equal top text)
+      (puthash key (cons text l) gis-200--undo-stacks))))
+
+(defun gis-200--undo ()
+  ""
+  (interactive)
+  (if (not (gis-200-in-box-p))
+      (ding)
+    (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+           (row (car box-id))
+           (col (cadr box-id)))
+      (let* ((stack (gethash (list row col) gis-200--undo-stacks))
+             (prev-val (cadr stack)))
+        (puthash (list row col) (cdr stack) gis-200--undo-stacks)
+        (gis-200--set-box-content row col prev-val)
+        (let ((inhibit-read-only t)) ;; code-smell: always inhibiting read only
+          (gis-200-redraw-game-board))))))
+
+;; experiment:
+(gis-200--initialize-undo-stacks)
+(gethash (list 0 0) gis-200--undo-stacks)
+(gis-200--push-undo-stack-value 0 0 "hello")
+
+;;; Parenthesis match code ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defvar gis-200-pair-overlays nil "List of overlays used to highlight parenthesis pairs.")
 
