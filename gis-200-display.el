@@ -652,19 +652,22 @@ This was added for performance reasons.")
   ""
   (interactive)
   (gis-200--in-buffer
-   (backward-delete-char 1)))
+   (backward-delete-char 1))
+  (gis-200--push-undo-stack-value))
 
 (defun gis-200--kill-word ()
   ""
   (interactive)
   (gis-200--in-buffer
-   (kill-word 1)))
+   (kill-word 1))
+  (gis-200--push-undo-stack-value))
 
 (defun gis-200--kill-line ()
   ""
   (interactive)
   (gis-200--in-buffer
-   (kill-line)))
+   (kill-line))
+  (gis-200--push-undo-stack-value))
 
 (defun gis-200--move-beginning-of-line ()
   ""
@@ -702,7 +705,8 @@ This was added for performance reasons.")
   ""
   (interactive)
   (gis-200--in-buffer
-   (newline)))
+   (newline))
+  (gis-200--push-undo-stack-value))
 
 (defun gis-200--forward-line ()
   ""
@@ -817,7 +821,9 @@ This was added for performance reasons.")
       (define-key map (kbd "<tab>") #'gis-200--next-cell)
       (define-key map (kbd "<backtab>") #'gis-200--prev-cell)
       (define-key map (kbd "<S-return>") #'gis-200--next-row-cell)
-      (define-key map [remap undo] #'gis-200--undo))))
+      (define-key map [remap undo] #'gis-200--undo)
+      (define-key map (kbd "s-z") #'gis-200--undo)
+      (define-key map (kbd "s-y") #'gis-200--redo))))
 
 (defun gis-200--execution-next-command ()
   ""
