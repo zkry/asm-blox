@@ -1002,7 +1002,7 @@ This was added for performance reasons.")
 (cl-defstruct (gis-200--undo-state
                (:constructor gis-200--undo-state-create)
                (:copier nil))
-  text box-row box-col)
+  text box-row box-col redo-list)
 
 (defun gis-200--initialize-undo-stacks ()
   (setq gis-200--undo-stacks (make-hash-table :test 'equal))
@@ -1012,7 +1012,8 @@ This was added for performance reasons.")
         (puthash (list row col)
                  (list (gis-200--undo-state-create :text current-value
                                                    :box-row 0
-                                                   :box-col 0)) ;; TODO: better if this was at end not beginning
+                                                   :box-col 0
+                                                   :redo-list '())) ;; TODO: better if this was at end not beginning
                  gis-200--undo-stacks)))))
 
 (defun gis-200--push-undo-stack-value ()
@@ -1043,6 +1044,10 @@ This was added for performance reasons.")
              (prev-state (cadr stack)))
         (if (<= (length stack) 1)
             (ding)
+          ;; handle redo
+          (let* ((at-state-redo (gis-200--undo-state-redo-list (car stack)))
+                 (new-redo (cons (car stack) at-state-redo)))
+            (setf (gis-200--undo-state-redo-list prev-state) new-redo))
           (puthash (list row col) (cdr stack) gis-200--undo-stacks)
           (let ((text (gis-200--undo-state-text prev-state))
                 (box-row (gis-200--undo-state-box-row prev-state))
@@ -1051,6 +1056,32 @@ This was added for performance reasons.")
             (let ((inhibit-read-only t)) ;; code-smell: always inhibiting read only
               (gis-200-redraw-game-board))
             (gis-200--move-to-box-point box-row box-col)))))))
+
+(defun gis-200--redo ()
+  ""
+  (interactive)
+  (if (not (gis-200-in-box-p))
+      (ding)
+    (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+           (row (car box-id))
+           (col (cadr box-id)))
+      (let* ((stack (gethash (list row col) gis-200--undo-stacks))
+             (top-state (car stack))
+             (redo-list (gis-200--undo-state-redo-list top-state)))
+        (if (not redo-list)
+            (ding)
+          (let ((next-redo (car redo-list))
+                (rest-redos (cdr redo-list)))
+            (setf (gis-200--undo-state-redo-list next-redo) rest-redos)
+            (puthash (list row col) (cons next-redo stack) gis-200--undo-stacks)
+            (let ((text (gis-200--undo-state-text next-redo))
+                  (box-row (gis-200--undo-state-box-row next-redo))
+                  (box-col (gis-200--undo-state-box-col next-redo)))
+              (gis-200--set-box-content row col text)
+              (let ((inhibit-read-only t)) ;; code-smell: always inhibiting read only
+                (gis-200-redraw-game-board))
+              (gis-200--move-to-box-point box-row box-col))))))))
+
 
 ;;; Parenthesis match code ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
