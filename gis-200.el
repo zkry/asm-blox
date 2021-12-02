@@ -153,7 +153,7 @@
 
 (defconst gis-200-base-operations
   '(GET SET TEE CONST NULL IS_NULL DROP
-        NOP ADD SUB MUL DIV REM AND OR EQZ
+        NOP ADD INC SUB MUL DIV REM AND OR EQZ
         EQ NE LT GT GE LE SEND PUSH POP
         CLR NOT DUP))
 
@@ -177,8 +177,10 @@
     (LE gis-200--subexpressions)
     (GT gis-200--subexpressions)
     (GE gis-200--subexpressions)
+    (EQZ gis-200--subexpressions)
     (BLOCK gis-200--subexpressions)
     (LOOP gis-200--subexpressions)
+    (INC integerp)
     (BR_IF integerp)
     (BR integerp)
     (NOP)
@@ -587,12 +589,15 @@ If the port does't have a value, set staging to nil."
          (res (funcall function v2 v1)))
     (gis-200--cell-runtime-push cell-runtime res)))
 
-(defun gis-200--cell-runtime-set-stack (cell-runtime offset)
-  (let ((v (gis-200--cell-runtime-pop cell-runtime))
-        (row (gis-200--cell-runtime-row cell-runtime))
-        (col (gis-200--cell-runtime-col cell-runtime))
-        (stack (gis-200--cell-runtime-stack cell-runtime))
-        (offset (if (< offset 0) (+ offset (length stack)) offset)))
+(defun gis-200--cell-runtime-set-stack (cell-runtime offset &optional op)
+  (let* ((row (gis-200--cell-runtime-row cell-runtime))
+         (col (gis-200--cell-runtime-col cell-runtime))
+         (stack (gis-200--cell-runtime-stack cell-runtime))
+         (offset (if (< offset 0) (+ offset (length stack)) offset))
+         (curr-val (nth (- (length stack) offset 1) stack))
+         (v (cond
+             ((eql op 'INC) (1+ curr-val))
+             (t (gis-200--cell-runtime-pop cell-runtime)))))
     (when (or (< offset 0) (>= offset (length stack)))
       (setq gis-200-runtime-error  ;; TODO: extract this logic
             (list "Idx out of bounds" row col))
@@ -694,6 +699,8 @@ If the port does't have a value, set staging to nil."
                       (gis-200--cell-runtime-push cell-runtime const)))
             ('SET (let ((stack-offset (cadr code-data)))
                     (gis-200--cell-runtime-set-stack cell-runtime stack-offset)))
+            ('INC (let ((stack-offset (cadr code-data)))
+                    (gis-200--cell-runtime-set-stack cell-runtime stack-offset 'INC)))
             ('CLR (setf (gis-200--cell-runtime-stack cell-runtime) nil))
             ('DUP (let ((stack (gis-200--cell-runtime-stack cell-runtime)))
                      (setf (gis-200--cell-runtime-stack cell-runtime) (append stack stack))))
@@ -706,7 +713,7 @@ If the port does't have a value, set staging to nil."
             ('NOT (gis-200--unary-operation cell-runtime (lambda (x) (if (gis-200--true-p x) 0 1))))
             ('NEG (gis-200--unary-operation cell-runtime (lambda (x) (- x))))
             ('OR (gis-200--binary-operation cell-runtime (lambda (a b) (or a b))))
-            ('EQZ (gis-200--unary-operation cell-runtime (lambda (x) (= 0 x))))
+            ('EQZ (gis-200--unary-operation cell-runtime (lambda (x) (if (= 0 x) 1 0))))
             ('EQ (gis-200--binary-operation cell-runtime (lambda (a b) (if (= a b) 1 0))))
             ('NE (gis-200--binary-operation cell-runtime (lambda (a b) (if (not (= a b)) 1 0))))
             ('LT (gis-200--binary-operation cell-runtime (lambda (a b) (if (< a b) 1 0))))
@@ -974,6 +981,57 @@ cell-runtime but rather the in-between row/col."
                        a))
                    nums breaks)))
 
+(defun gis-200--problem--upcase ()
+  ""
+  (let* ((input-1 (seq-map (lambda (_)
+                             (+ (random 95) 32))
+                           (make-list 40 nil)))
+         (expected (string-to-list (upcase (apply #'string input-1)))))
+    (gis-200--problem-spec-create
+     :name "AoC 2021-1"
+     :sources (list (gis-200--cell-source-create :row 1
+                                                 :col -1
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "C"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 1
+                                      :col 4
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "O"))
+     :description "Read a character from C and send it to O, upcasing it if it is a lowercase letter.")
+    expected))
+
+
+
+(defun gis-200--problem--aoc1 ()
+  "Generate a simple addition problem."
+  (let* ((input-1 (append (seq-map (lambda (_)
+                                     (random 999))
+                                   (make-list 39 nil))
+                          (list 0)))
+         (expected (list (seq-reduce #'+
+                          (seq-mapn (lambda (a b)
+                                      (if (> b a) 1 0))
+                                    input-1
+                                    (cdr input-1))
+                          0))))
+    (gis-200--problem-spec-create
+     :name "AoC 2021-1"
+     :sources (list (gis-200--cell-source-create :row 1
+                                                 :col -1
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "I"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 1
+                                      :col 4
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "O"))
+     :description "Return the number of times sumsequent values of I increase.")))
+
 (defun gis-200--problem--tax ()
   "Generate a simple addition problem."
   (let* ((high-start-ct (random 20))
@@ -1210,7 +1268,9 @@ cell-runtime but rather the in-between row/col."
                          #'gis-200--problem--clock
                          #'gis-200--problem--tax
                          #'gis-200--problem--list-length
-                         #'gis-200--problem--list-reverse))
+                         #'gis-200--problem--list-reverse
+                         #'gis-200--problem--aoc1
+                         #'gis-200--problem--upcase))
 
 (defun gis-200--get-puzzle-by-id (name)
   ;; TODO: fill this out with the remaining puzzles.
@@ -1343,7 +1403,6 @@ cell-runtime but rather the in-between row/col."
       ;; Persist state for next rount
       (setf (gis-200--cell-runtime-run-state cell-runtime) state))))
 
-;; TODO: this function is unnecessary
 (defun gis-200--yaml-create-stack (row col metadata spec)
   "Return a Stack runtime according to SPEC with METADATA."
   ;; .inputPorts .outputPort .sizePort .size .logLevel

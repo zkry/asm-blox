@@ -661,14 +661,18 @@ This was added for performance reasons.")
 (defun gis-200--move-beginning-of-line ()
   ""
   (interactive)
-  (gis-200--in-buffer
-   (move-beginning-of-line 1)))
+  (if (gis-200-in-box-p)
+      (gis-200--in-buffer
+       (move-beginning-of-line 1))
+    (beginning-of-line)))
 
 (defun gis-200--move-end-of-line ()
   ""
   (interactive)
-  (gis-200--in-buffer
-   (move-end-of-line 1)))
+  (if (gis-200-in-box-p)
+      (gis-200--in-buffer
+       (move-end-of-line 1))
+    (end-of-line)))
 
 (defun gis-200--beginning-of-buffer ()
   ""
@@ -781,6 +785,16 @@ This was added for performance reasons.")
       (gis-200--move-to-box 0 0))
     (gis-200--prev-cell)))
 
+(defun gis-200--undo (ct)
+  (interactive "p")
+  (undo ct)
+  (let ((undo-inhibit-record-point t))
+    (buffer-disable-undo)
+    (gis-200--parse-saved-buffer)
+    (let ((inhibit-read-only t))
+      (gis-200-redraw-game-board))
+    (buffer-enable-undo)))
+
 (defconst gis-200-mode-map
   (let ((map (make-keymap)))
     (prog1 map
@@ -879,7 +893,8 @@ This was added for performance reasons.")
       (define-key map (kbd "M->") #'gis-200--end-of-buffer)
       (define-key map (kbd "<tab>") #'gis-200--next-cell)
       (define-key map (kbd "<backtab>") #'gis-200--prev-cell)
-      (define-key map (kbd "<S-return>") #'gis-200--next-row-cell))))
+      (define-key map (kbd "<S-return>") #'gis-200--next-row-cell)
+      (define-key map [remap undo] #'gis-200--undo))))
 
 (defun gis-200--execution-next-command ()
   ""
@@ -1024,7 +1039,6 @@ This was added for performance reasons.")
         buffer-read-only t)
   (setq-local truncate-lines 0
               gis-200--display-mode 'execute)
-  (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
   (setq header-line-format "GIS-200 EXECUTION")
   (setq gis-200-runtime-error nil)
@@ -1044,7 +1058,6 @@ This was added for performance reasons.")
         buffer-read-only t)
   (setq gis-200-parse-errors nil)
   (setq-local truncate-lines 0)
-  (buffer-disable-undo)
   (setq font-lock-defaults gis-200-mode-highlights)
   (set-syntax-table gis-200-mode-syntax-table)
   (unless gis-200--skip-initial-parsing
@@ -1238,8 +1251,7 @@ This was added for performance reasons.")
   (setq header-line-format
         (format " %-25s %-60s   %s" "PUZZLE NAME" "DESCRIPTION" "SAVED FILES"))
   (setq-local truncate-lines 0)
-  (hl-line-mode t)
-  (buffer-disable-undo))
+  (hl-line-mode t))
 
 (defun gis-200 ()
   (interactive)
