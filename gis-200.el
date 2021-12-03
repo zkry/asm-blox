@@ -888,7 +888,8 @@ cell-runtime but rather the in-between row/col."
 (cl-defstruct (gis-200--cell-sink
                (:constructor gis-200--cell-sink-create)
                (:copier nil))
-  row col expected-data idx name err-val)
+  row col expected-data idx name err-val
+  editor-text editor-point)
 
 (cl-defstruct (gis-200--problem-spec
                (:constructor gis-200--problem-spec-create)
@@ -929,6 +930,18 @@ cell-runtime but rather the in-between row/col."
           (setf (gis-200--cell-sink-idx sink) (1+ idx))
           (gis-200--remove-value-from-direction cell-runtime opposite-direction))
       'blocked)))
+
+(defun gis-200--cell-sink-insert-character (sink char)
+  (let ((text (gis-200--cell-sink-editor-text sink))
+        (point (gis-200--cell-sink-editor-point sink)))
+    (cond
+     ((<= 32 char 126)
+      (setf (gis-200--cell-sink-editor-text sink)
+            (concat (substring text 0 (1- point))
+                    (char-to-string char)
+                    (substring text (1- point))))
+      (setf (gis-200--cell-sink-editor-point sink)
+            (1+ point))))))
 
 (defun gis-200--cell-source-current-value (source)
   "Return the value of SOURCE that will be taken next."
@@ -981,6 +994,25 @@ cell-runtime but rather the in-between row/col."
                        a))
                    nums breaks)))
 
+(defun gis-200--problem--hello-world ()
+  ""
+  (gis-200--problem-spec-create
+   :name "EDITOR DEMO"
+   :sources (list (gis-200--cell-source-create :row 1
+                                               :col -1
+                                               :data '(1 2 3)
+                                               :idx 0
+                                               :name "C"))
+   :sinks
+   (list (gis-200--cell-sink-create :row 1
+                                    :col 4
+                                    :expected-data '(1 2 3)
+                                    :idx 0
+                                    :name "O"
+                                    :editor-text "this is a test\none\ntwo\nthree"
+                                    :editor-point 3))
+   :description "EDITOR DEMO"))
+
 (defun gis-200--problem--upcase ()
   ""
   (let* ((input-1 (seq-map (lambda (_)
@@ -1000,8 +1032,7 @@ cell-runtime but rather the in-between row/col."
                                       :expected-data expected
                                       :idx 0
                                       :name "O"))
-     :description "Read a character from C and send it to O, upcasing it if it is a lowercase letter.")
-    expected))
+     :description "Read a character from C and send it to O, upcasing it if it is a lowercase letter.")))
 
 
 
@@ -1270,7 +1301,8 @@ cell-runtime but rather the in-between row/col."
                          #'gis-200--problem--list-length
                          #'gis-200--problem--list-reverse
                          #'gis-200--problem--aoc1
-                         #'gis-200--problem--upcase))
+                         #'gis-200--problem--upcase
+                         #'gis-200--problem--hello-world))
 
 (defun gis-200--get-puzzle-by-id (name)
   ;; TODO: fill this out with the remaining puzzles.

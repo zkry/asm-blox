@@ -69,17 +69,6 @@
 (defvar gis-200--current-widgets nil
   "List of widgets to display on right of gameboard.")
 
-
-(defun gis-200--test-widget (msg)
-  (pcase msg
-    ('width 6)
-    (`(display ,n)
-     (pcase n
-       (0 " IN.A ")
-       (1 "┌────┐")
-       (47 "└────┘")
-       (_ (format "│%4d│" n))))))
-
 (defun gis-200--make-source-widget (source)
   "Return a widget displaying a source."
   (let ((source-widget-offset-ct 2))
@@ -91,7 +80,7 @@
                (idx (gis-200--cell-source-idx source))
                (name (gis-200--cell-source-name source)))
            (pcase n
-             (0 (format "IN: %s" name))
+             (0 (format "IN: %s " name))
              (1 "┌────┐")
              (47 "└────┘")
              (_
@@ -130,6 +119,56 @@
                                     (propertize (format "%4d" err-val) 'font-lock-face '(:background "red"))
                                   inner-str)))
                 (format "│%s│" inner-str))))))))))
+
+(defun gis-200--make-editor-widget (sink)
+  "Return a widget displaying a source."
+  (let ((width 32)
+        (sink-widget-offset-ct 2))
+    (lambda (msg)
+      (pcase msg
+        ('width width)
+        (`(display ,n)
+         (let* ((box-top (concat "┌" (make-string 30 ?─) "┐"))
+                (box-bottom (concat "└" (make-string 30 ?─) "┘"))
+                (spacing (make-string 32 ?\s))
+                (data (gis-200--cell-sink-expected-data sink))
+                (text (gis-200--cell-sink-editor-text sink))
+                (point (1- (gis-200--cell-sink-editor-point sink))))
+           (cl-labels ((text-line (n) (or (nth n (split-string text "\n")) ""))
+                       (line-pt-idx (line-no)
+                                    (when (> 20 n 1)
+                                      (let ((line-offset (seq-reduce
+                                                          #'+
+                                                          (seq-map-indexed
+                                                           (lambda (l idx)
+                                                             (if (< idx line-no)
+                                                                 (+ (length l) 1)
+                                                               0))
+                                                           (split-string text "\n"))
+                                                          0)))
+                                        (- point line-offset)))))
+             (pcase n
+               (0 (format "%-32s" "BUFFER:"))
+               (1 box-top)
+               ((pred (lambda (x) (> 20 x 1)))
+                (let ((line-pt-idx (line-pt-idx (- n 2)))
+                      (line-text (text-line (- n 2))))
+                  (when (and (>= (length line-text) line-pt-idx 0))
+                    (setq line-text
+                          (concat (substring line-text 0 line-pt-idx)
+                                  (propertize
+                                   (substring line-text line-pt-idx (1+ line-pt-idx))
+                                   'font-lock-face
+                                   '(:background "#777"))
+                                  (substring line-text (1+ line-pt-idx)))))
+                  (format "│%-30s│" (truncate-string-to-width line-text 30))))
+               (20 box-bottom)
+               (21 spacing)
+               (22 (format "%-32s" "TARGET:"))
+               (23 box-top)
+               (42 box-bottom)
+               ((pred (lambda (x) (> x 42))) (format "%32s" " "))
+               (_ (format "│%-30s│" (text-line 0)))))))))))
 
 (defun gis-200--display-widget ()
   "Display the current line of the active widget.
@@ -919,8 +958,11 @@ This was added for performance reasons.")
       (setq widgets (cons (gis-200--make-source-widget source)
                           widgets)))
     (dolist (sink sinks)
-      (setq widgets (cons (gis-200--make-sink-widget sink)
-                          widgets)))
+      (if (gis-200--cell-sink-editor-text sink)
+          (setq widgets (cons (gis-200--make-editor-widget sink)
+                              widgets))
+        (setq widgets (cons (gis-200--make-sink-widget sink)
+                            widgets))))
     (setq gis-200--current-widgets (reverse widgets))))
 
 (defun gis-200-start-execution ()
