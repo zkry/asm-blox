@@ -941,7 +941,26 @@ cell-runtime but rather the in-between row/col."
                     (char-to-string char)
                     (substring text (1- point))))
       (setf (gis-200--cell-sink-editor-point sink)
-            (1+ point))))))
+            (1+ point)))
+     ((= char ?\n)
+      (setf (gis-200--cell-sink-editor-text sink)
+            (concat (substring text 0 (1- point))
+                    (char-to-string char)
+                    (substring text (1- point))))
+      (setf (gis-200--cell-sink-editor-point sink)
+            (1+ point)))
+     ((= char ?\b)
+      (when (not (= 1 point))
+        (setf (gis-200--cell-sink-editor-text sink)
+              (concat (substring text 0 (- point 2))
+                      (substring text (- point 1))))
+        (setf (gis-200--cell-sink-editor-point sink)
+              (max (1- point) 1)))))))
+
+(gis-200--cell-sink-insert-character
+ (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+ ?\b)
+
 
 (defun gis-200--cell-source-current-value (source)
   "Return the value of SOURCE that will be taken next."
@@ -1009,8 +1028,8 @@ cell-runtime but rather the in-between row/col."
                                     :expected-data '(1 2 3)
                                     :idx 0
                                     :name "O"
-                                    :editor-text "this is a test\none\ntwo\nthree"
-                                    :editor-point 3))
+                                    :editor-text "0123456789"
+                                    :editor-point 4))
    :description "EDITOR DEMO"))
 
 (defun gis-200--problem--upcase ()

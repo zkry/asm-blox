@@ -153,14 +153,25 @@
                ((pred (lambda (x) (> 20 x 1)))
                 (let ((line-pt-idx (line-pt-idx (- n 2)))
                       (line-text (text-line (- n 2))))
-                  (when (and (>= (length line-text) line-pt-idx 0))
-                    (setq line-text
-                          (concat (substring line-text 0 line-pt-idx)
-                                  (propertize
-                                   (substring line-text line-pt-idx (1+ line-pt-idx))
-                                   'font-lock-face
-                                   '(:background "#777"))
-                                  (substring line-text (1+ line-pt-idx)))))
+                  (when (<= 0 line-pt-idx (length line-text))
+                    (cond
+                     ((= 0 (length line-text))
+                      (setq line-text (concat (propertize " "
+                                                  'font-lock-face
+                                                  '(:background "#777"))
+                                              " ")))
+                     ((= line-pt-idx (length line-text))
+                      (setq line-text (concat line-text
+                                              (propertize " " 'font-lock-face '(:background "#777"))
+                                              " ")))
+                     (t
+                      (setq line-text (concat (substring line-text 0 line-pt-idx)
+                                              (propertize
+                                               (substring line-text line-pt-idx (1+ line-pt-idx))
+                                               'font-lock-face
+                                               '(:background "#777"))
+                                              (substring line-text (1+ line-pt-idx))
+                                              " ")))))
                   (format "│%-30s│" (truncate-string-to-width line-text 30))))
                (20 box-bottom)
                (21 spacing)
