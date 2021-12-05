@@ -889,7 +889,7 @@ cell-runtime but rather the in-between row/col."
                (:constructor gis-200--cell-sink-create)
                (:copier nil))
   row col expected-data idx name err-val
-  editor-text editor-point)
+  editor-text editor-point expected-text)
 
 (cl-defstruct (gis-200--problem-spec
                (:constructor gis-200--problem-spec-create)
@@ -902,9 +902,11 @@ cell-runtime but rather the in-between row/col."
     (dolist (source sources)
       (setf (gis-200--cell-source-idx source) 0))
     (dolist (sink sinks)
-      (setf (gis-200--cell-sink-idx sink) 0))
-    (dolist (sink sinks)
-      (setf (gis-200--cell-sink-err-val sink) nil))))
+      (setf (gis-200--cell-sink-idx sink) 0)
+      (setf (gis-200--cell-sink-err-val sink) nil)
+      (when (gis-200--cell-sink-expected-text sink)
+        (setf (gis-200--cell-sink-editor-text sink) "")
+        (setf (gis-200--cell-sink-editor-point sink) 1)))))
 
 (defun gis-200--cell-sink-get (sink)
   "Grab a value and put it into SINK from the gameboard."
@@ -957,9 +959,18 @@ cell-runtime but rather the in-between row/col."
         (setf (gis-200--cell-sink-editor-point sink)
               (max (1- point) 1)))))))
 
+(defun gis-200--cell-sink-move-point (sink point)
+  (let* ((text (gis-200--cell-sink-editor-text sink))
+         (bounded-pt (max (min point (1+ (length text))) 1)))
+    (setf (gis-200--cell-sink-editor-point sink) bounded-pt)))
+
 (gis-200--cell-sink-insert-character
  (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
- ?\b)
+ ?x)
+
+(gis-200--cell-sink-move-point
+ (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+ 100)
 
 
 (defun gis-200--cell-source-current-value (source)
@@ -1024,12 +1035,13 @@ cell-runtime but rather the in-between row/col."
                                                :name "C"))
    :sinks
    (list (gis-200--cell-sink-create :row 1
-                                    :col 4
+                                    :col 5
                                     :expected-data '(1 2 3)
                                     :idx 0
                                     :name "O"
                                     :editor-text "0123456789"
-                                    :editor-point 4))
+                                    :editor-point 4
+                                    :expected-text "Hello World"))
    :description "EDITOR DEMO"))
 
 (defun gis-200--problem--upcase ()
@@ -1052,8 +1064,6 @@ cell-runtime but rather the in-between row/col."
                                       :idx 0
                                       :name "O"))
      :description "Read a character from C and send it to O, upcasing it if it is a lowercase letter.")))
-
-
 
 (defun gis-200--problem--aoc1 ()
   "Generate a simple addition problem."

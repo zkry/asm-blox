@@ -133,8 +133,10 @@
                 (spacing (make-string 32 ?\s))
                 (data (gis-200--cell-sink-expected-data sink))
                 (text (gis-200--cell-sink-editor-text sink))
+                (expected-text (gis-200--cell-sink-expected-text sink))
                 (point (1- (gis-200--cell-sink-editor-point sink))))
            (cl-labels ((text-line (n) (or (nth n (split-string text "\n")) ""))
+                       (expected-text-line (n) (or (nth n (split-string expected-text "\n")) ""))
                        (line-pt-idx (line-no)
                                     (when (> 20 n 1)
                                       (let ((line-offset (seq-reduce
@@ -179,7 +181,7 @@
                (23 box-top)
                (42 box-bottom)
                ((pred (lambda (x) (> x 42))) (format "%32s" " "))
-               (_ (format "│%-30s│" (text-line 0)))))))))))
+               (_ (format "│%-30s│" (expected-text-line (- n 24))))))))))))
 
 (defun gis-200--display-widget ()
   "Display the current line of the active widget.
