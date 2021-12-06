@@ -1078,6 +1078,8 @@ This was added for performance reasons.")
                  gis-200--undo-stacks)))))
 
 (defun gis-200--push-undo-stack-value ()
+  (unless gis-200--undo-stacks
+    (setq gis-200--undo-stacks (make-hash-table :test #'equal)))
   (let* ((box-id (get-text-property (point) 'gis-200-box-id))
          (row (car box-id))
          (col (cadr box-id))

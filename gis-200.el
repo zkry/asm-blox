@@ -121,11 +121,28 @@
                                                                                 :end-pos (point))))
                                           (push node elements))))
                                      ;; End of children list
-                                     ((eql at-char ?\))
+                                     ((eql at-char ?\) )
                                       (if top-level
                                           (throw 'error `(error ,(point) "SYNTAX ERROR"))
                                         (forward-char 1)
                                         (throw 'end nil)))
+                                     ((eql at-char ?\?)
+                                      (forward-char 1)
+                                      (let ((c))
+                                        (if (looking-at "\\\\")
+                                            (progn
+                                              (forward-char 1)
+                                              (let ((escape-c (char-after (point))))
+                                                (pcase escape-c
+                                                  (?n (setq c ?\n))
+                                                  (?s (setq c ?\s))
+                                                  (?b (setq c ?\b))
+                                                  (_ (throw 'error `(error ,(point) "BAD ESCAPE CODE"))))))
+                                          (setq c (char-after (point)))
+                                          (when (or (= c ?\s) (= c ?\n))
+                                            (_ (throw 'error `(error ,(point) "INVALID CHAR")))))
+                                        (forward-char 1)
+                                        (push c elements)))
                                      ;; Symbol
                                      ((symbol-char-p at-char)
                                       (let ((start (point)))
@@ -784,15 +801,26 @@ If the port does't have a value, set staging to nil."
              (expected-data (gis-200--cell-sink-expected-data sink))
              (idx (gis-200--cell-sink-idx sink))
              (err-val (gis-200--cell-sink-err-val sink)))
-        (when (or (< idx (length expected-data))
-                  err-val)
-          (setq win-p nil))
+        (if (gis-200--cell-sink-expected-text sink)
+            ;; If expected text exists we are dealing with an editor sink
+            (let* ((expected-text (string-trim-right (gis-200--cell-sink-expected-text sink)))
+                   (expected-lines (split-string expected-text "\n"))
+                   (text (string-trim-right (gis-200--cell-sink-editor-text sink)))
+                   (text-lines (split-string text "\n")))
+              (if (not (equal (length text-lines) (length expected-lines)))
+                  (setq win-p nil)
+                (unless (cl-loop for expected-line in expected-lines
+                                 for line in text-lines
+                                 always (equal (string-trim-right expected-line) (string-trim-right line)))
+                  (setq win-p nil))))
+          (when (or (< idx (length expected-data))
+                    err-val)
+            (setq win-p nil)))
         (setq sinks (cdr sinks))))
     (when win-p
       (message "Congragulations, you won!")
       ;; TODO: Do something else for the victory.
       (setq gis-200--gameboard-state 'win))))
-
 
 ;;; Gameboard Display Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -963,15 +991,6 @@ cell-runtime but rather the in-between row/col."
   (let* ((text (gis-200--cell-sink-editor-text sink))
          (bounded-pt (max (min point (1+ (length text))) 1)))
     (setf (gis-200--cell-sink-editor-point sink) bounded-pt)))
-
-(gis-200--cell-sink-insert-character
- (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
- ?x)
-
-(gis-200--cell-sink-move-point
- (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
- 100)
-
 
 (defun gis-200--cell-source-current-value (source)
   "Return the value of SOURCE that will be taken next."
@@ -1411,6 +1430,7 @@ cell-runtime but rather the in-between row/col."
       (error "Unknown api version: %s" .apiVersion))
     (pcase .kind
       ("Stack" (gis-200--yaml-create-stack row col .metadata .spec))
+      ("Controller" (gis-200--yaml-create-controller row col .metadata .spec))
       ("Container" (error "Container not implemented"))
       ("Network" (error "Network not implemented"))
       ("Heap" (error "Heap not implemented")))))
@@ -1464,6 +1484,65 @@ cell-runtime but rather the in-between row/col."
       ;; Persist state for next rount
       (setf (gis-200--cell-runtime-run-state cell-runtime) state))))
 
+(defun gis-200--yaml-get-editor-sink (cell-runtime)
+  "Return the sink corresponding to CELL-RUNTIME"
+  ;; For now there will only be one editor.
+  (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells)))
+
+(defun gis-200--yaml-step-controller (cell-runtime)
+  "Perform runtime step for a Controller YAML."
+  (let ((row (gis-200--cell-runtime-row cell-runtime))
+        (col (gis-200--cell-runtime-col cell-runtime))
+        (spec (gis-200--cell-runtime-run-spec cell-runtime))
+        (state (gis-200--cell-runtime-run-state cell-runtime))
+        (sink (gis-200--yaml-get-editor-sink cell-runtime)))
+    (let-alist spec
+      ;; .inputPort  .setPointPort
+      ;; .charAtPort .pointPort
+      ;; First consume setPoint port
+      (when .setPointPort
+        (let* ((port-sym (intern (upcase .setPointPort)))
+               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
+               (opposite-port (gis-200--mirror-direction port-sym))
+               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+          (when recieve-val
+            (gis-200--remove-value-from-direction from-cell opposite-port)
+            (gis-200--cell-sink-move-point sink recieve-val))))
+      
+      ;; Next consume inputPort
+      (when .inputPort
+        (let* ((port-sym (intern (upcase .inputPort)))
+               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
+               (opposite-port (gis-200--mirror-direction port-sym))
+               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+          (when recieve-val
+            (gis-200--remove-value-from-direction from-cell opposite-port)
+            (gis-200--cell-sink-insert-character sink recieve-val))))
+
+      ;; Get the point and atChar and send them to respective ports
+      (when .charAtPort
+        (let* ((port-sym (intern (upcase .charAtPort)))
+               (val (gis-200--get-value-from-direction cell-runtime port-sym))
+               (point (gis-200--cell-sink-editor-point sink))
+               (text (gis-200--cell-sink-editor-text sink)))
+          (when val
+            (gis-200--remove-value-from-direction cell-runtime port-sym))
+          (gis-200--cell-runtime-set-staging-value-from-direction
+           cell-runtime
+           (intern (upcase .charAtPort))
+           (aref text (1- point)))))
+      
+      (when .pointPort
+        (let* ((port-sym (intern (upcase .pointPort)))
+               (val (gis-200--get-value-from-direction cell-runtime port-sym))
+               (point (gis-200--cell-sink-editor-point sink)))
+          (when val
+            (gis-200--remove-value-from-direction cell-runtime port-sym))
+          (gis-200--cell-runtime-set-staging-value-from-direction
+           cell-runtime
+           (intern (upcase .pointPort))
+           point))))))
+
 (defun gis-200--yaml-create-stack (row col metadata spec)
   "Return a Stack runtime according to SPEC with METADATA."
   ;; .inputPorts .outputPort .sizePort .size .logLevel
@@ -1473,6 +1552,16 @@ cell-runtime but rather the in-between row/col."
    :row row
    :col col
    :run-function #'gis-200--yaml-step-stack
+   :run-spec spec))
+
+(defun gis-200--yaml-create-controller (row col metadata spec)
+  "Return a Stack runtime according to SPEC with METADATA."
+  (gis-200--cell-runtime-create
+   :instructions nil
+   :pc nil
+   :row row
+   :col col
+   :run-function #'gis-200--yaml-step-controller
    :run-spec spec))
 
 (provide 'gis-200)
