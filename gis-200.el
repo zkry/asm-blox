@@ -170,15 +170,16 @@
 
 (defconst gis-200-base-operations
   '(GET SET TEE CONST NULL IS_NULL DROP
-        NOP ADD INC SUB MUL DIV REM AND OR EQZ
+        NOP ADD INC DEC SUB MUL DIV REM AND OR EQZ GZ LZ
         EQ NE LT GT GE LE SEND PUSH POP
-        CLR NOT DUP))
+        CLR NOT DUP ABS))
 
 (defconst gis-200-command-specs
   '((SET integerp gis-200--subexpressions) ;; TODO 
     (CLR) 
     (CONST integerp)
     (DUP gis-200--subexpressions)
+    (ABS gis-200--subexpressions)
     (ADD gis-200--subexpressions)
     (SUB gis-200--subexpressions)
     (MUL gis-200--subexpressions)
@@ -194,10 +195,13 @@
     (LE gis-200--subexpressions)
     (GT gis-200--subexpressions)
     (GE gis-200--subexpressions)
+    (GZ gis-200--subexpressions)
+    (LZ gis-200--subexpressions)
     (EQZ gis-200--subexpressions)
     (BLOCK gis-200--subexpressions)
     (LOOP gis-200--subexpressions)
     (INC integerp)
+    (DEC integerp)
     (BR_IF integerp)
     (BR integerp)
     (NOP)
@@ -543,6 +547,14 @@ If the port does't have a value, set staging to nil."
         (gis-200--cell-runtime-set-value-from-direction cell-runtime direction staging-value)
         (gis-200--cell-runtime-set-staging-value-from-direction cell-runtime direction 'sent)))))
 
+(defun gis-200--remove-value-from-staging-direction (cell-runtime direction)
+  "Dynamically look up and return value at staging DIRECTION on CELL-RUNTIME."
+  (pcase direction
+    ('UP (setf (gis-200--cell-runtime-staging-up cell-runtime) nil))
+    ('RIGHT (setf (gis-200--cell-runtime-staging-right cell-runtime) nil))
+    ('DOWN (setf (gis-200--cell-runtime-staging-down cell-runtime) nil))
+    ('LEFT (setf (gis-200--cell-runtime-staging-left cell-runtime) nil))))
+
 (defun gis-200--remove-value-from-direction (cell-runtime direction)
   "Dynamically look up and return value at DIRECTION on CELL-RUNTIME."
   (pcase direction
@@ -614,6 +626,7 @@ If the port does't have a value, set staging to nil."
          (curr-val (nth (- (length stack) offset 1) stack))
          (v (cond
              ((eql op 'INC) (1+ curr-val))
+             ((eql op 'DEC) (1- curr-val))
              (t (gis-200--cell-runtime-pop cell-runtime)))))
     (when (or (< offset 0) (>= offset (length stack)))
       (setq gis-200-runtime-error  ;; TODO: extract this logic
@@ -718,6 +731,8 @@ If the port does't have a value, set staging to nil."
                     (gis-200--cell-runtime-set-stack cell-runtime stack-offset)))
             ('INC (let ((stack-offset (cadr code-data)))
                     (gis-200--cell-runtime-set-stack cell-runtime stack-offset 'INC)))
+            ('DEC (let ((stack-offset (cadr code-data)))
+                    (gis-200--cell-runtime-set-stack cell-runtime stack-offset 'DEC)))
             ('CLR (setf (gis-200--cell-runtime-stack cell-runtime) nil))
             ('DUP (let ((stack (gis-200--cell-runtime-stack cell-runtime)))
                      (setf (gis-200--cell-runtime-stack cell-runtime) (append stack stack))))
@@ -729,8 +744,13 @@ If the port does't have a value, set staging to nil."
             ('AND (gis-200--binary-operation cell-runtime(lambda (a b) (and a b))))
             ('NOT (gis-200--unary-operation cell-runtime (lambda (x) (if (gis-200--true-p x) 0 1))))
             ('NEG (gis-200--unary-operation cell-runtime (lambda (x) (- x))))
+            ('ABS (gis-200--unary-operation cell-runtime (lambda (x) (abs x))))
             ('OR (gis-200--binary-operation cell-runtime (lambda (a b) (or a b))))
             ('EQZ (gis-200--unary-operation cell-runtime (lambda (x) (if (= 0 x) 1 0))))
+
+            ('LZ (gis-200--unary-operation cell-runtime (lambda (x) (if (< x 0) 1 0))))
+            ('GZ (gis-200--unary-operation cell-runtime (lambda (x) (if (> x 0) 1 0))))
+
             ('EQ (gis-200--binary-operation cell-runtime (lambda (a b) (if (= a b) 1 0))))
             ('NE (gis-200--binary-operation cell-runtime (lambda (a b) (if (not (= a b)) 1 0))))
             ('LT (gis-200--binary-operation cell-runtime (lambda (a b) (if (< a b) 1 0))))
@@ -765,6 +785,11 @@ If the port does't have a value, set staging to nil."
                 (gis-200--cell-runtime-step cell-runtime)))
       (_ (gis-200--cell-runtime-pc-inc cell-runtime)))
     (gis-200--cell-runtime-skip-labels cell-runtime)))
+
+(defun gis-200--step ()
+  (gis-200--gameboard-step)
+  (gis-200--resolve-port-values) 
+  (gis-200--extra-gameboard-step))
 
 (defun gis-200--extra-gameboard-step ()
   "Perform step on all things not on the gameboard."
@@ -1042,6 +1067,52 @@ cell-runtime but rather the in-between row/col."
                        (setq switched nil)
                        a))
                    nums breaks)))
+
+(defun gis-200--problem-meeting-point ()
+  ""
+  (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
+         (expected-output (list (cl-loop for i from 1 to 1000
+                                         minimize (cl-loop for d in input
+                                                           sum (abs (- i d)))))))
+    (gis-200--problem-spec-create
+     :name "Meeting point"
+     :sources (list (gis-200--cell-source-create :row 1
+                                                 :col -1
+                                                 :data input
+                                                 :idx 0
+                                                 :name "N"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 2
+                                      :col 4
+                                      :expected-data expected-output
+                                      :idx 0
+                                      :name "O"
+                                      :editor-text nil
+                                      :editor-point nil
+                                      :expected-text nil))
+     :description "Read the 10 numbers from N (n1, n2, ..., n40). Send a number x which minimizes the equation (cl-loop for n in N sum (abs (- n x))).")))
+
+(defun gis-200--problem--simple-graph ()
+  ""
+  (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
+         (expected-text (string-join (seq-map (lambda (x) (make-string x ?#)) input) "\n")))
+    (gis-200--problem-spec-create
+     :name "Simple Graph"
+     :sources (list (gis-200--cell-source-create :row 1
+                                                 :col -1
+                                                 :data input
+                                                 :idx 0
+                                                 :name "A"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 1
+                                      :col 5
+                                      :expected-data nil
+                                      :idx 0
+                                      :name "O"
+                                      :editor-text ""
+                                      :editor-point 1
+                                      :expected-text expected-text))
+     :description "Read a number from A, draw a line with that many '#' characters.")))
 
 (defun gis-200--problem--hello-world ()
   ""
@@ -1350,7 +1421,9 @@ cell-runtime but rather the in-between row/col."
                          #'gis-200--problem--list-reverse
                          #'gis-200--problem--aoc1
                          #'gis-200--problem--upcase
-                         #'gis-200--problem--hello-world))
+                         #'gis-200--problem--hello-world
+                         #'gis-200--problem--simple-graph
+                         #'gis-200--problem-meeting-point))
 
 (defun gis-200--get-puzzle-by-id (name)
   ;; TODO: fill this out with the remaining puzzles.
@@ -1433,7 +1506,7 @@ cell-runtime but rather the in-between row/col."
       ("Controller" (gis-200--yaml-create-controller row col .metadata .spec))
       ("Container" (error "Container not implemented"))
       ("Network" (error "Network not implemented"))
-      ("Heap" (error "Heap not implemented")))))
+      ("Heap" (gis-200--yaml-create-heap row col .metadata .spec)))))
 
 (defun gis-200--yaml-step-stack (cell-runtime)
   (let ((row (gis-200--cell-runtime-row cell-runtime))
@@ -1462,8 +1535,8 @@ cell-runtime but rather the in-between row/col."
            (when recieve-val
              (gis-200--remove-value-from-direction from-cell opposite-port)
              (setq state (cons recieve-val state))
-             (when (> (length state) .size)
-               (error "Stack overflow %d/%d" (length state) .size)))))
+             (when (> (length state) (or .size 20)) ;; TODO: find a good way of setting defualts.
+               (error "Stack overflow %d/%d" (length state) (or .size 20))))))
        .inputPorts)
 
       ;; Add size to sizePort
@@ -1543,6 +1616,66 @@ cell-runtime but rather the in-between row/col."
            (intern (upcase .pointPort))
            point))))))
 
+(defun gis-200--yaml-step-heap (cell-runtime)
+  "Perform runtime step for a Controller YAML."
+  (let* ((row (gis-200--cell-runtime-row cell-runtime))
+         (col (gis-200--cell-runtime-col cell-runtime))
+         (spec (gis-200--cell-runtime-run-spec cell-runtime))
+         (state (gis-200--cell-runtime-run-state cell-runtime))
+         (offset (car state))
+         (data (cdr state)))
+    (let-alist spec
+      ;; A heap contains as state two elements:
+      ;; - current address
+      ;; - offset, starting at 1
+      ;; .readPort .writePort
+      ;; .seekPort .offsetPort
+      (when .readPort
+        (when (not (gis-200--get-value-from-direction cell-runtime (intern (upcase .readPort))))
+          (setq offset (1+ offset))))
+      (when .seekPort
+        (let* ((port-sym (intern (upcase .seekPort)))
+               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
+               (opposite-port (gis-200--mirror-direction port-sym))
+               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port))
+               (stage-recieve-val (gis-200--get-value-from-staging-direction from-cell opposite-port)))
+          (cond
+           (recieve-val
+            (gis-200--remove-value-from-direction from-cell opposite-port)
+            (setq offset recieve-val))
+           (stage-recieve-val
+            (gis-200--remove-value-from-staging-direction from-cell opposite-port)
+            (setq offset stage-recieve-val)))))
+      (when .writePort
+        (let* ((port-sym (intern (upcase .writePort)))
+               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
+               (opposite-port (gis-200--mirror-direction port-sym))
+               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+          (when recieve-val
+            (gis-200--remove-value-from-direction from-cell opposite-port)
+            (aset data offset recieve-val)
+            (setq offset (1+ offset)))))
+      (when .offsetPort
+        (let* ((port-sym (intern (upcase .offsetPort)))
+               (val (gis-200--get-value-from-direction cell-runtime port-sym)))
+          (when val
+            (gis-200--remove-value-from-direction cell-runtime port-sym))
+          (gis-200--cell-runtime-set-staging-value-from-direction
+           cell-runtime
+           (intern (upcase .offsetPort))
+           offset)))
+      (when .readPort
+        (let* ((port-sym (intern (upcase .readPort)))
+               (val (gis-200--get-value-from-direction cell-runtime port-sym))
+               (datum (if (>= offset (length data)) -1 (aref data offset))))
+          (when val
+            (gis-200--remove-value-from-direction cell-runtime port-sym))
+          (gis-200--cell-runtime-set-staging-value-from-direction
+           cell-runtime
+           (intern (upcase .readPort))
+           datum)))
+      (setf (gis-200--cell-runtime-run-state cell-runtime) (cons offset data)))))
+
 (defun gis-200--yaml-create-stack (row col metadata spec)
   "Return a Stack runtime according to SPEC with METADATA."
   ;; .inputPorts .outputPort .sizePort .size .logLevel
@@ -1563,6 +1696,25 @@ cell-runtime but rather the in-between row/col."
    :col col
    :run-function #'gis-200--yaml-step-controller
    :run-spec spec))
+
+(defun gis-200--yaml-create-heap (row col metadata spec)
+  "Return a Stack runtime according to SPEC with METADATA."
+  ;; .size
+  (let-alist spec
+    (let ((data (make-vector (or .size 20) 0)))
+      (cl-loop for elt across .data
+               for i from 0
+               do (aset data i elt))
+      (gis-200--cell-runtime-create
+       :instructions nil
+       :pc nil
+       :row row
+       :col col
+       :run-function #'gis-200--yaml-step-heap
+       ;; -1 because used hack to increment offset which will
+       ;; run once at the start of the game.
+       :run-state (cons -1 data) 
+       :run-spec spec))))
 
 (provide 'gis-200)
 

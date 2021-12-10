@@ -877,24 +877,53 @@ This was added for performance reasons.")
       (define-key map (kbd "s-z") #'gis-200--undo)
       (define-key map (kbd "s-y") #'gis-200--redo))))
 
+
+
 (defun gis-200--execution-next-command ()
   ""
   (interactive)
   (when (not (gis-200--gameboard-in-final-state-p))
-    (gis-200--gameboard-step)
-    (gis-200--resolve-port-values)    ;; ports need to be resolved before extra-cells run
-    (gis-200--extra-gameboard-step))  ;; so they can consume immediately 
+    (gis-200--step)) 
   (let ((inhibit-read-only t))
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)
     (gis-200-execution-draw-stack))
   (gis-200-check-winning-conditions))
 
+(defvar gis-200-multi-step-ct 10)
+
+(defun gis-200--execution-next-multiple-commands ()
+  ""
+  (interactive)
+  (dotimes (_ gis-200-multi-step-ct)
+    (when (not (gis-200--gameboard-in-final-state-p))
+      (gis-200--step)
+      (gis-200-check-winning-conditions))) 
+  (let ((inhibit-read-only t))
+    (gis-200-redraw-game-board)
+    (gis-200-execution-code-highlight)
+    (gis-200-execution-draw-stack))
+  (gis-200-check-winning-conditions))
+
+(defun gis-200--execution-run ()
+  ""
+  (interactive)
+  (while (and (not (gis-200--gameboard-in-final-state-p))
+              (not (input-pending-p)))
+    (gis-200--step)
+    (gis-200-check-winning-conditions))
+  (let ((inhibit-read-only t))
+    (gis-200-redraw-game-board)
+    (gis-200-execution-code-highlight)
+    (gis-200-execution-draw-stack)))
+
 (defconst gis-200-execution-mode-map
   (let ((map (make-keymap)))
     (prog1 map
       ;;(suppress-keymap map)
       (define-key map "n" #'gis-200--execution-next-command)
+      (define-key map "N" #'gis-200--execution-next-multiple-commands)
+      (define-key map "r" #'gis-200--execution-run)
       (define-key map "q" #'quit-window))))
 
 (defconst gis-200-mode-syntax-table
@@ -1276,7 +1305,8 @@ This was added for performance reasons.")
             (gis-200--skip-initial-parsing t))
         (set-visited-file-name file-name)
         (gis-200-redraw-game-board)
-        (gis-200-mode)))))
+        (gis-200-mode)
+        (save-buffer)))))
 
 (defun gis-200-select-puzzle ()
   "Start the puzzle for the puzzle under the point."
@@ -1287,12 +1317,15 @@ This was added for performance reasons.")
       (error "no puzzle under point"))
     (if at-puzzle-filename
         (find-file at-puzzle-filename)
-      (gis-200--puzzle-selection-setup-buffer at-puzzle-id))))
+      (gis-200--puzzle-selection-setup-buffer at-puzzle-id))
+    ;; refresh the puzzle selection buffer so the user can see that their file was created.
+    (gis-200-puzzle-selection-prepare-buffer)))
 
 (defconst gis-200-puzzle-selection-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
       (define-key map "q" #'quit-window)
+      (define-key map "g" #'gis-200-puzzle-selection-refresh)
       (define-key map (kbd "RET") #'gis-200-select-puzzle))))
 
 (defun gis-200-puzzle-selection-prepare-buffer ()
@@ -1316,6 +1349,15 @@ This was added for performance reasons.")
                                   'gis-200-puzzle-selection-filename (gis-200--make-puzzle-idx-file-name name (1+ i))))
               (insert (propertize " " 'gis-200-puzzle-selection-id name)))))
         (insert "\n")))))
+
+(defun gis-200-puzzle-selection-refresh ()
+  (interactive)
+  (let ((line-num (line-number-at-pos))
+        (col-num (current-column)))
+    (gis-200-puzzle-selection-prepare-buffer)
+    (goto-char (point-min))
+    (forward-line (1- line-num))
+    (forward-char col-num)))
 
 (defun gis-200-puzzle-selection-mode ()
   (interactive)
