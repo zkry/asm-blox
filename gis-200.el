@@ -741,11 +741,15 @@ If the port does't have a value, set staging to nil."
             ('MUL (gis-200--binary-operation cell-runtime #'*))
             ('DIV (gis-200--binary-operation cell-runtime #'/))
             ('REM (gis-200--binary-operation cell-runtime #'%))
-            ('AND (gis-200--binary-operation cell-runtime(lambda (a b) (and a b))))
+            ('AND (gis-200--binary-operation cell-runtime(lambda (a b) (if (and (gis-200--true-p a)
+                                                                                (gis-200--true-p b))
+                                                                           1 0))))
             ('NOT (gis-200--unary-operation cell-runtime (lambda (x) (if (gis-200--true-p x) 0 1))))
             ('NEG (gis-200--unary-operation cell-runtime (lambda (x) (- x))))
             ('ABS (gis-200--unary-operation cell-runtime (lambda (x) (abs x))))
-            ('OR (gis-200--binary-operation cell-runtime (lambda (a b) (or a b))))
+            ('OR (gis-200--binary-operation cell-runtime (lambda (a b) (if (or (gis-200--true-p a)
+                                                                               (gis-200--true-p b))
+                                                                           1 0))))
             ('EQZ (gis-200--unary-operation cell-runtime (lambda (x) (if (= 0 x) 1 0))))
 
             ('LZ (gis-200--unary-operation cell-runtime (lambda (x) (if (< x 0) 1 0))))
@@ -942,6 +946,7 @@ cell-runtime but rather the in-between row/col."
                (:constructor gis-200--cell-sink-create)
                (:copier nil))
   row col expected-data idx name err-val
+  default-editor-text
   editor-text editor-point expected-text)
 
 (cl-defstruct (gis-200--problem-spec
@@ -958,7 +963,9 @@ cell-runtime but rather the in-between row/col."
       (setf (gis-200--cell-sink-idx sink) 0)
       (setf (gis-200--cell-sink-err-val sink) nil)
       (when (gis-200--cell-sink-expected-text sink)
-        (setf (gis-200--cell-sink-editor-text sink) "")
+        (if (gis-200--cell-sink-default-editor-text sink)
+            (setf (gis-200--cell-sink-editor-text sink) (gis-200--cell-sink-default-editor-text sink))
+          (setf (gis-200--cell-sink-editor-text sink) ""))
         (setf (gis-200--cell-sink-editor-point sink) 1)))))
 
 (defun gis-200--cell-sink-get (sink)
@@ -1004,13 +1011,18 @@ cell-runtime but rather the in-between row/col."
                     (substring text (1- point))))
       (setf (gis-200--cell-sink-editor-point sink)
             (1+ point)))
-     ((= char ?\b)
+     ((or (= char ?\b) (= char -1))
       (when (not (= 1 point))
         (setf (gis-200--cell-sink-editor-text sink)
               (concat (substring text 0 (- point 2))
                       (substring text (- point 1))))
         (setf (gis-200--cell-sink-editor-point sink)
-              (max (1- point) 1)))))))
+              (max (1- point) 1))))
+     ((or (= char -2))
+      (when (not (= 1 point))
+        (setf (gis-200--cell-sink-editor-text sink)
+              (concat (substring text 0 (- point 1))
+                      (substring text point))))))))
 
 (defun gis-200--cell-sink-move-point (sink point)
   (let* ((text (gis-200--cell-sink-editor-text sink))
@@ -1068,7 +1080,46 @@ cell-runtime but rather the in-between row/col."
                        a))
                    nums breaks)))
 
-(defun gis-200--problem-meeting-point ()
+(defun gis-200--problem--indentation ()
+  ""
+  (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 40 nil)))
+         (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
+    (gis-200--problem-spec-create
+     :name "Indentation I"
+     :sinks
+     (list (gis-200--cell-sink-create :row 2
+                                      :col 4
+                                      :expected-data expected-output
+                                      :idx 0
+                                      :name "O"
+                                      :default-editor-text "func main () {\nfmt.Println(\"hello world\")\nreturn\n}"
+                                      :editor-point 1
+                                      :expected-text "func main () {\n  fmt.Println(\"hello world\")\n  return\n}"))
+     :description "Edit text to match the target.")))
+
+(defun gis-200--problem--number-sum ()
+  ""
+  (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 40 nil)))
+         (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
+    (gis-200--problem-spec-create
+     :name "Number Sum"
+     :sources (list (gis-200--cell-source-create :row -1
+                                                 :col 3
+                                                 :data input
+                                                 :idx 0
+                                                 :name "I"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 2
+                                      :col 4
+                                      :expected-data expected-output
+                                      :idx 0
+                                      :name "O"
+                                      :editor-text nil
+                                      :editor-point nil
+                                      :expected-text nil))
+     :description "Read a number from I, send to O the sum of numbers from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
+
+(defun gis-200--problem--meeting-point ()
   ""
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
          (expected-output (list (cl-loop for i from 1 to 1000
@@ -1266,6 +1317,56 @@ cell-runtime but rather the in-between row/col."
                                       :name "O"))
      :description "Lists are 0 terminated. Read a list from I, calculate its length and send it to O.")))
 
+(defun gis-200--problem--turing ()
+  ""
+  (let* ((input-1 (list ?> ?> ?> ?+ ?+ ?. ?. ?< ?+ ?. ?> ?. ?+ ?. ?> ?> ?.))
+         (expected (list 2 2 1 2 3 0)))
+    (gis-200--problem-spec-create
+     :name "Turing"
+     :sources (list (gis-200--cell-source-create :row 0
+                                                 :col -1
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "X"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 1
+                                      :col 4
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "O"))
+     :description "Read a number from X. Implement a machine that moves a head on a tape with values of all zero.
+ - If X is the ASCII character '<' move the head one position to the left
+ - If X is the ASCII character '>' move the head one position to the right
+ - If X is the ASCII character '+' increment the value of the cell
+ - If X is the ASCII character '.' send the current value at the tape to O.
+NOTE: The head will go no more than +-10 spaces from where the head starts off.")))
+
+
+(defun gis-200--problem--merge-step ()
+  "Generate a simple addition problem."
+  (let* ((input-1 (seq-sort #'< (seq-map (lambda (_) (random 100)) (make-list 20 nil))))
+         (input-2 (seq-sort #'< (seq-map (lambda (_) (random 100)) (make-list 20 nil))))
+         (expected (seq-sort #'< (append input-1 input-2))))
+    (gis-200--problem-spec-create
+     :name "Merge Step"
+     :sources (list (gis-200--cell-source-create :row 0
+                                                 :col -1
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "A")
+                    (gis-200--cell-source-create :row 2
+                                                 :col -1
+                                                 :data input-2
+                                                 :idx 0
+                                                 :name "B"))
+     :sinks
+     (list (gis-200--cell-sink-create :row 1
+                                      :col 4
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "C"))
+     :description "Numbers in A and B are sorted. Read numbers from A and B, combine them sorted and send it them to C.")))
+
 (defun gis-200--problem--filter ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 100)) (make-list 40 nil)))
@@ -1410,10 +1511,12 @@ cell-runtime but rather the in-between row/col."
      :description "Take an input from the input X and send it to the output X.")))
 
 (defvar gis-200-puzzles (list
+                         #'gis-200--problem--indentation
                          #'gis-200--problem--constant
                          #'gis-200--problem--identity
                          #'gis-200--problem--add
                          #'gis-200--problem--filter
+                         #'gis-200--problem--number-sum
                          #'gis-200--problem--number-sorter
                          #'gis-200--problem--clock
                          #'gis-200--problem--tax
@@ -1421,9 +1524,11 @@ cell-runtime but rather the in-between row/col."
                          #'gis-200--problem--list-reverse
                          #'gis-200--problem--aoc1
                          #'gis-200--problem--upcase
+                         #'gis-200--problem--merge-step
                          #'gis-200--problem--hello-world
                          #'gis-200--problem--simple-graph
-                         #'gis-200--problem-meeting-point))
+                         #'gis-200--problem--meeting-point
+                         #'gis-200--problem--turing))
 
 (defun gis-200--get-puzzle-by-id (name)
   ;; TODO: fill this out with the remaining puzzles.
@@ -1630,6 +1735,7 @@ cell-runtime but rather the in-between row/col."
       ;; - offset, starting at 1
       ;; .readPort .writePort
       ;; .seekPort .offsetPort
+      ;; .setPort  .peekPort
       (when .readPort
         (when (not (gis-200--get-value-from-direction cell-runtime (intern (upcase .readPort))))
           (setq offset (1+ offset))))
@@ -1655,6 +1761,14 @@ cell-runtime but rather the in-between row/col."
             (gis-200--remove-value-from-direction from-cell opposite-port)
             (aset data offset recieve-val)
             (setq offset (1+ offset)))))
+      (when .setPort
+        (let* ((port-sym (intern (upcase .setPort)))
+               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
+               (opposite-port (gis-200--mirror-direction port-sym))
+               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+          (when recieve-val
+            (gis-200--remove-value-from-direction from-cell opposite-port)
+            (aset data offset recieve-val))))
       (when .offsetPort
         (let* ((port-sym (intern (upcase .offsetPort)))
                (val (gis-200--get-value-from-direction cell-runtime port-sym)))
@@ -1673,6 +1787,17 @@ cell-runtime but rather the in-between row/col."
           (gis-200--cell-runtime-set-staging-value-from-direction
            cell-runtime
            (intern (upcase .readPort))
+           datum)))
+      (when .peekPort
+        (when (= -1 offset) (setq offset 0)) ;; another hack related to the way readPort works
+        (let* ((port-sym (intern (upcase .peekPort)))
+               (val (gis-200--get-value-from-direction cell-runtime port-sym))
+               (datum (if (>= offset (length data)) -1 (aref data offset))))
+          (when val
+            (gis-200--remove-value-from-direction cell-runtime port-sym))
+          (gis-200--cell-runtime-set-staging-value-from-direction
+           cell-runtime
+           (intern (upcase .peekPort))
            datum)))
       (setf (gis-200--cell-runtime-run-state cell-runtime) (cons offset data)))))
 
