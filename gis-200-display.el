@@ -38,6 +38,11 @@
   "`gis-200-mode' face used for a matching paren pair."
   :group 'gis-200)
 
+(defface gis-200-region-face
+  '((t (:inherit region)))
+  "`gis-200-mode' face used for a matching paren pair."
+  :group 'gis-200)
+
 (defconst gis-200-column-ct 4)
 (defconst gis-200-box-width 20)
 (defconst gis-200-box-height 12)
@@ -200,6 +205,12 @@ This should normally be called when the point is at the end of the display."
   (dotimes (row 3)
     (dotimes (col gis-200-column-ct)
       (puthash (list row col) "" gis-200-box-contents))))
+
+(defun gis-200--swap-box-contents (row-1 col-1 row-2 col-2)
+  (let ((contents-1 (gis-200--get-box-content row-1 col-1))
+        (contents-2 (gis-200--get-box-content row-2 col-2)))
+    (gis-200--set-box-content row-2 col-2 contents-1)
+    (gis-200--set-box-content row-1 col-1 contents-2)))
 
 (defun gis-200--get-box-content (row col)
   (gethash (list row col) gis-200-box-contents))
@@ -560,12 +571,13 @@ This should normally be called when the point is at the end of the display."
 (defun gis-200-in-box-p ()
   (get-text-property (point) 'gis-200-box-id))
 
-(defun gis-200-get-line-col-num ()
+(defun gis-200-get-line-col-num (&optional point)
   "Return the line column number in the current box."
   (unless (gis-200-in-box-p)
     (error "not in text box"))
   (let ((i 0))
     (save-excursion
+      (when point (goto-char point))
       (while (get-text-property (point) 'gis-200-box-id)
         (forward-char -1)
         (setq i (1+ i))))
@@ -586,12 +598,15 @@ This should normally be called when the point is at the end of the display."
   "Move the point to the beginning of the box."
   (unless (gis-200-in-box-p)
     (error "not in box 1"))
-  (while (gis-200-in-box-p)
-    (next-line -1)) ;; TODO - is this command buggy?
-  (next-line 1)     ;; TODO - use forward line
-  (while (gis-200-in-box-p)
-    (forward-char -1))
-  (forward-char 1))
+  (let ((col (current-column)))
+    (while (gis-200-in-box-p)
+      (forward-line -1)
+      (move-to-column col)) ;; TODO - is this command buggy?
+    (forward-line 1)     ;; TODO - use forward line
+    (move-to-column col)
+    (while (gis-200-in-box-p)
+      (forward-char -1))
+    (forward-char 1)))
 
 (defvar gis-200--end-of-box-points nil
   "Contains a hashmap of the points where each box ends.
@@ -618,7 +633,7 @@ This was added for performance reasons.")
     (error "not in box 2"))
   (gis-200--beginning-of-box)
   (let ((start-col (current-column)))
-    (next-line row)
+    (forward-line row)
     (move-to-column start-col)
     (forward-char col)))
 
@@ -707,6 +722,13 @@ This was added for performance reasons.")
    (backward-delete-char 1))
   (gis-200--push-undo-stack-value))
 
+(defun gis-200--delete-char ()
+  ""
+  (interactive)
+  (gis-200--in-buffer
+   (delete-char 1))
+  (gis-200--push-undo-stack-value))
+
 (defun gis-200--kill-word ()
   ""
   (interactive)
@@ -765,6 +787,92 @@ This was added for performance reasons.")
   (interactive)
   (gis-200--in-buffer
    (forward-line)))
+
+(defun gis-200--shift-box (drow dcol)
+  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+         (row (car box-id))
+         (col (cadr box-id))
+         (next-col (mod (+ (+ col dcol)
+                           gis-200--gameboard-col-ct)
+                        gis-200--gameboard-col-ct))
+         (next-row (mod (+ (+ row drow) gis-200--gameboard-row-ct)
+                        gis-200--gameboard-row-ct))
+         (line (caddr box-id))
+         (line-col (gis-200-get-line-col-num)))
+    (setq gis-200-parse-errors nil)
+    (gis-200--swap-box-contents row col next-row next-col)
+    (gis-200--swap-undo-stacks row col next-row next-col)
+    (gis-200--move-to-box next-row next-col)
+    (gis-200--move-to-box-point line line-col)
+    (let ((inhibit-read-only t))
+      (gis-200-redraw-game-board))
+    (message "1> %d %d" next-row next-col)))
+
+(defun gis-200--shift-box-right ()
+  ""
+  (interactive)
+  (gis-200--shift-box 0 1))
+
+(defun gis-200--shift-box-left ()
+  ""
+  (interactive)
+  (gis-200--shift-box 0 -1))
+
+(defun gis-200--shift-box-up ()
+  ""
+  (interactive)
+  (gis-200--shift-box -1 0))
+
+(defun gis-200--shift-box-down ()
+  ""
+  (interactive)
+  (gis-200--shift-box 1 0))
+
+(defun gis-200--kill-region (beg end)
+  (interactive "r")
+  (let* ((box-id-1 (get-text-property beg 'gis-200-box-id))
+         (_ (when (not box-id-1) (error "can only kill region inside box.")))
+         (row-1 (car box-id-1))
+         (col-1 (cadr box-id-1))
+         (line-1 (caddr box-id-1))
+         (line-col-1 (gis-200-get-line-col-num beg))
+         (box-id-2 (get-text-property end 'gis-200-box-id))
+         (_ (when (not box-id-2) (error "can only kill region inside box.")))
+         (row-2 (car box-id-2))
+         (col-2 (cadr box-id-2))
+         (line-2 (caddr box-id-2))
+         (line-col-2 (gis-200-get-line-col-num end)))
+    (when (or (not (= row-1 row-2))
+              (not (= col-1 col-2)))
+      (error "can't kill region across boxes."))
+    (let* ((text (gis-200--get-box-content row-1 col-1))
+           (new-text "")
+           (line-no 0)
+           (lines (split-string text "\n")))
+      (cl-loop for i from 0
+               for line in lines
+               do (cond
+                   ((= line-1 i line-2)
+                    (let ((line-part (concat (substring line 0 (min (length line) line-col-1))
+                                             (substring line (min (length line) line-col-2)))))
+                      (setq new-text (concat new-text line-part "\n"))))
+                   ((= line-1 i)
+                    (let ((line-part (substring line 0 (min (length line) line-col-1))))
+                      (setq new-text (concat new-text line-part))))
+                   ((= line-2 i)
+                    (let ((line-part (substring line (min (length line) line-col-2))))
+                      (setq new-text (concat new-text line-part "\n"))))
+                   ((> line-2 i line-1) (ignore))
+                   (t (setq new-text (concat new-text line "\n")))))
+      (when (seq-find (lambda (l) (>= (length l) gis-200-box-width))
+                      (split-string new-text "\n"))
+        (error "killing region makes a line too long."))
+      (gis-200--set-box-content row-1 col-1 (string-trim-right new-text "\n"))
+      (goto-char beg)
+      (deactivate-mark)
+      (gis-200--push-undo-stack-value)
+      (let ((inhibit-read-only t))
+        (gis-200-redraw-game-board)))))
 
 (defun gis-200--refresh-contents ()
   ""
@@ -867,17 +975,21 @@ This was added for performance reasons.")
       (define-key map (kbd "M-d") #'gis-200--kill-word)
       (define-key map (kbd "C-k") #'gis-200--kill-line)
       (define-key map (kbd "C-a") #'gis-200--move-beginning-of-line)
+      (define-key map (kbd "C-d") #'gis-200--delete-char)
       (define-key map (kbd "C-e") #'gis-200--move-end-of-line)
       (define-key map (kbd "M-<") #'gis-200--beginning-of-buffer)
       (define-key map (kbd "M->") #'gis-200--end-of-buffer)
       (define-key map (kbd "<tab>") #'gis-200--next-cell)
       (define-key map (kbd "<backtab>") #'gis-200--prev-cell)
       (define-key map (kbd "<S-return>") #'gis-200--next-row-cell)
-      (define-key map [remap undo] #'gis-200--undo)
       (define-key map (kbd "s-z") #'gis-200--undo)
-      (define-key map (kbd "s-y") #'gis-200--redo))))
-
-
+      (define-key map (kbd "s-y") #'gis-200--redo)
+      (define-key map (kbd "<s-up>") #'gis-200--shift-box-up)
+      (define-key map (kbd "<s-down>") #'gis-200--shift-box-down)
+      (define-key map (kbd "<s-left>") #'gis-200--shift-box-left)
+      (define-key map (kbd "<s-right>") #'gis-200--shift-box-right)
+      (define-key map [remap undo] #'gis-200--undo)
+      (define-key map (kbd "C-w") #'gis-200--kill-region))))
 
 (defun gis-200--execution-next-command ()
   ""
@@ -1105,6 +1217,12 @@ This was added for performance reasons.")
                                                    :box-col 0
                                                    :redo-list '())) ;; TODO: better if this was at end not beginning
                  gis-200--undo-stacks)))))
+
+(defun gis-200--swap-undo-stacks (row-1 col-1 row-2 col-2)
+  (let ((stack-1 (gethash (list row-1 col-1) gis-200--undo-stacks))
+        (stack-2 (gethash (list row-2 col-2) gis-200--undo-stacks)))
+    (puthash (list row-1 col-1) stack-2 gis-200--undo-stacks)
+    (puthash (list row-2 col-2) stack-1 gis-200--undo-stacks)))
 
 (defun gis-200--push-undo-stack-value ()
   (unless gis-200--undo-stacks
