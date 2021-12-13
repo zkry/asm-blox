@@ -561,9 +561,15 @@ This should normally be called when the point is at the end of the display."
 
 (defun gis-200-redraw-game-board ()
   (let ((at-row (line-number-at-pos nil))
-        (at-col (current-column)))
+        (at-col (current-column))
+        (prev-text (buffer-string)))
     (erase-buffer)
-    (gis-200-display-game-board)
+    (condition-case err
+        (gis-200-display-game-board)
+      (error
+       (erase-buffer)
+       (insert prev-text)
+       (signal (car err) (cdr err))))
     (goto-char (point-min))
     (forward-line (1- at-row))
     (forward-char at-col)))
@@ -1102,14 +1108,16 @@ This was added for performance reasons.")
 
 (defun gis-200--create-execution-buffer ()
   "Create a new uneditable gamebuffer for displaing execution of puzzles."
-  (let ((buffer (get-buffer-create "*gis-200-execution*")))
+  (let ((buffer (get-buffer-create "*gis-200-execution*"))
+        (origin-file-buffer (current-buffer)))
     (with-current-buffer buffer
       (gis-200-execution-mode)
       (let ((inhibit-read-only t))
         (gis-200-redraw-game-board)
         (gis-200-execution-code-highlight)
         (gis-200-execution-draw-stack)))
-    (switch-to-buffer buffer)))
+    (switch-to-buffer buffer)
+    (setq gis-200-execution-origin-buffer origin-file-buffer)))
 
 (defun gis-200-execution-code-highlight ()
   "Adds highlight face to where runtime's pc is "
@@ -1205,6 +1213,7 @@ This was added for performance reasons.")
                (asm (cdr parse)))
           (assert (numberp col))
           (gis-200--set-cell-asm-at-row-col row col asm)))
+      (gis-200-backup-file-for-current-buffer)
       (gis-200--reset-extra-gameboard-cells-state)
       (gis-200--create-widges-from-gameboard)
       (gis-200--create-execution-buffer))))
@@ -1507,7 +1516,8 @@ This was added for performance reasons.")
         (let* ((puzzle (funcall puzzle-fn))
                (name (gis-200--problem-spec-name puzzle))
                (description (gis-200--problem-spec-description puzzle))
-               (line-str (format "%-25s %-60s   "
+               (line-str (format "%3s %-25s %-60s   "
+                                 (if (gis-200--puzzle-won-p name) "[x]" "[ ]")
                                  name
                                  (truncate-string-to-width description 60
                                                            nil nil t))))
@@ -1536,7 +1546,7 @@ This was added for performance reasons.")
   (setq mode-name "gis-200-puzzle-selection"
         buffer-read-only t)
   (setq header-line-format
-        (format " %-25s %-60s   %s" "PUZZLE NAME" "DESCRIPTION" "SAVED FILES"))
+        (format "     %-25s %-60s   %s" "PUZZLE NAME" "DESCRIPTION" "SAVED FILES"))
   (setq-local truncate-lines 0)
   (hl-line-mode t))
 

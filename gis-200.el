@@ -823,33 +823,35 @@ If the port does't have a value, set staging to nil."
 
 (defun gis-200-check-winning-conditions ()
   "Return non-nil if all sinks are full."
-  (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
-        (win-p t))
-    (while (and sinks win-p)
-      (let* ((sink (car sinks))
-             (expected-data (gis-200--cell-sink-expected-data sink))
-             (idx (gis-200--cell-sink-idx sink))
-             (err-val (gis-200--cell-sink-err-val sink)))
-        (if (gis-200--cell-sink-expected-text sink)
-            ;; If expected text exists we are dealing with an editor sink
-            (let* ((expected-text (string-trim-right (gis-200--cell-sink-expected-text sink)))
-                   (expected-lines (split-string expected-text "\n"))
-                   (text (string-trim-right (gis-200--cell-sink-editor-text sink)))
-                   (text-lines (split-string text "\n")))
-              (if (not (equal (length text-lines) (length expected-lines)))
-                  (setq win-p nil)
-                (unless (cl-loop for expected-line in expected-lines
-                                 for line in text-lines
-                                 always (equal (string-trim-right expected-line) (string-trim-right line)))
-                  (setq win-p nil))))
-          (when (or (< idx (length expected-data))
-                    err-val)
-            (setq win-p nil)))
-        (setq sinks (cdr sinks))))
-    (when win-p
-      (message "Congragulations, you won!")
-      ;; TODO: Do something else for the victory.
-      (setq gis-200--gameboard-state 'win))))
+  (when (not (gis-200--gameboard-in-final-state-p))
+    (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+          (win-p t))
+      (while (and sinks win-p)
+        (let* ((sink (car sinks))
+               (expected-data (gis-200--cell-sink-expected-data sink))
+               (idx (gis-200--cell-sink-idx sink))
+               (err-val (gis-200--cell-sink-err-val sink)))
+          (if (gis-200--cell-sink-expected-text sink)
+              ;; If expected text exists we are dealing with an editor sink
+              (let* ((expected-text (string-trim-right (gis-200--cell-sink-expected-text sink)))
+                     (expected-lines (split-string expected-text "\n"))
+                     (text (string-trim-right (gis-200--cell-sink-editor-text sink)))
+                     (text-lines (split-string text "\n")))
+                (if (not (equal (length text-lines) (length expected-lines)))
+                    (setq win-p nil)
+                  (unless (cl-loop for expected-line in expected-lines
+                                   for line in text-lines
+                                   always (equal (string-trim-right expected-line) (string-trim-right line)))
+                    (setq win-p nil))))
+            (when (or (< idx (length expected-data))
+                      err-val)
+              (setq win-p nil)))
+          (setq sinks (cdr sinks))))
+      (when win-p
+        (gis-200--win-file-name-for-current-buffer)
+        ;; TODO: Do something else for the victory.
+        (setq gis-200--gameboard-state 'win)
+        (message "Congragulations, you won!")))))
 
 ;;; Gameboard Display Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1595,6 +1597,45 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
 (defun gis-200--make-puzzle-idx-file-name (id idx)
   (expand-file-name (concat id "-" (number-to-string idx) ".gis")
                     gis-200-save-directory-name))
+
+(defvar-local gis-200-execution-origin-buffer nil)
+
+(defun gis-200--win-file-name-for-current-buffer ()
+  (unless (equal (buffer-name) "*gis-200-execution*")
+    (error "unable to win from non-execution buffer."))
+  (unless (bufferp gis-200-execution-origin-buffer)
+    (error "unable to find buffer with winning solution."))
+  (let* ((buffer-contents (with-current-buffer gis-200-execution-origin-buffer
+                            (buffer-string)))
+         (bfn (with-current-buffer gis-200-execution-origin-buffer
+                            (buffer-file-name)))
+         (name (file-name-nondirectory bfn))
+         (path (file-name-directory bfn))
+         (new-name (concat path "." name ".win.txt")))
+    (save-window-excursion
+      (let ((inhibit-read-only t))
+        (find-file new-name)
+        (insert buffer-contents)
+        (save-buffer)
+        (kill-buffer)))))
+
+(defun gis-200-backup-file-for-current-buffer ()
+  (let* ((buffer-contents (buffer-string))
+         (bfn (buffer-file-name))
+         (name (file-name-nondirectory bfn))
+         (path (file-name-directory bfn))
+         (new-name (concat path "." name ".backup.txt")))
+    (save-window-excursion
+      (let ((inhibit-read-only t))
+        (find-file new-name)
+        (insert buffer-contents)
+        (save-buffer)
+        (kill-buffer)))))
+
+(defun gis-200--puzzle-won-p (puzzle-name)
+  (seq-find (lambda (n) (and (string-match (regexp-quote puzzle-name) n)
+                             (string-match "\\.win" n)))
+            (directory-files gis-200-save-directory-name)))
 
 ;;; YAML Blocks
 
