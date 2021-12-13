@@ -1,6 +1,6 @@
 # asm-blox: a programming game inspired by WAT and YAML
 
-  ![screenshot](./doc/screenshot1.png)
+  ![screenshot](./doc/screenshot1.gif)
 
   Solve a variety of puzzles involving moving data using WAT and YAML.
   The game is played on a 3x4 grid where each grid can hold 11 lines
