@@ -578,8 +578,20 @@ of the board or very right.  TYPE will either be source or sink."
         (insert (format "\nERROR: %s at cell (%d, %d)\n"
                         (car gis-200-runtime-error)
                         (cadr gis-200-runtime-error)
-                        (caddr gis-200-runtime-error))))))
-  (gis-200--propertize-errors))
+                        (caddr gis-200-runtime-error))))
+      (gis-200--propertize-errors))))
+
+(defun gis-200--draw-win-message ()
+  (when (and (eql gis-200--display-mode 'execute)
+             (eql 'win gis-200--gameboard-state))
+    (let ((inhibit-read-only t))
+      (goto-char (point-min))
+      (dolist (l '("+=========================+"
+                   "|Congragulations, you won!|"
+                   "+=========================+"))
+        (end-of-line)
+        (insert "  " l)
+        (forward-line)))))
 
 (defun gis-200--box-point-forward (ct)
   "With the point in a text box, move forward a point in box-buffer by CT."
@@ -1133,7 +1145,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)
     (gis-200-execution-draw-stack))
-  (gis-200-check-winning-conditions))
+  (gis-200-check-winning-conditions)
+  (gis-200--draw-win-message))
 
 (defvar gis-200-multi-step-ct 10)
 
@@ -1148,7 +1161,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)
     (gis-200-execution-draw-stack))
-  (gis-200-check-winning-conditions))
+  (gis-200-check-winning-conditions)
+  (gis-200--draw-win-message))
 
 (defun gis-200--execution-run ()
   "Continuously run execution setps."
@@ -1160,7 +1174,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   (let ((inhibit-read-only t))
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)
-    (gis-200-execution-draw-stack)))
+    (gis-200-execution-draw-stack)
+    (gis-200--draw-win-message)))
 
 (defconst gis-200-execution-mode-map
   (let ((map (make-keymap)))
@@ -1598,17 +1613,49 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (define-key map (kbd "RET") #'gis-200-select-puzzle)))
   "Mode map for selecting a gis-200 puzzle.")
 
+(defun gis-200--font-for-difficulty (difficulty)
+  (pcase difficulty
+    ('tutorial "LavenderBlush2")
+    ('easy "forest green")
+    ('medium "goldenrod")
+    ('hard "orange red")))
+
+(defun gis-200--puzzles-by-difficulty ()
+  "Return the puzzles in order of difficulty."
+  (let* ((difficulty-to-num
+          (lambda (d)
+            (pcase d
+              ('tutorial 0)
+              ('easy 1)
+              ('medium 2)
+              ('hard 3))))
+         (compare-difficulty
+          (lambda (a b)
+            (< (funcall difficulty-to-num
+                        (gis-200--problem-spec-difficulty (funcall a)))
+               (funcall difficulty-to-num
+                        (gis-200--problem-spec-difficulty (funcall b)))))))
+    (seq-sort compare-difficulty gis-200-puzzles)))
+
 (defun gis-200-puzzle-selection-prepare-buffer ()
   "Prepare the puzzle selection buffer."
   (with-current-buffer (get-buffer-create "*gis-200-puzzle-selection*")
     (let ((inhibit-read-only t))
       (erase-buffer)
-      (dolist (puzzle-fn gis-200-puzzles)
+      (dolist (puzzle-fn (gis-200--puzzles-by-difficulty))
         (let* ((puzzle (funcall puzzle-fn))
                (name (gis-200--problem-spec-name puzzle))
-               (description (replace-regexp-in-string "\n" " " (gis-200--problem-spec-description puzzle)))
-               (line-str (format "%3s %-25s %-60s   "
+               (difficulty (gis-200--problem-spec-difficulty puzzle))
+               (difficulty-color (gis-200--font-for-difficulty difficulty))
+               (description (replace-regexp-in-string
+                             "\n"
+                             " "
+                             (gis-200--problem-spec-description puzzle)))
+               (line-str (format "%3s %-8s %-25s %-60s   "
                                  (if (gis-200--puzzle-won-p name) "[x]" "[ ]")
+                                 (propertize (symbol-name difficulty)
+                                             'font-lock-face
+                                             `(:foreground ,difficulty-color))
                                  name
                                  (truncate-string-to-width description 60
                                                            nil nil t))))
@@ -1641,7 +1688,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   (setq mode-name "gis-200-puzzle-selection"
         buffer-read-only t)
   (setq header-line-format
-        (format "     %-25s %-60s   %s" "PUZZLE NAME" "DESCRIPTION" "SAVED FILES"))
+        (format "     %-8s %-25s %-60s   %s" "STRAIN" "PUZZLE NAME" "DESCRIPTION" "SAVED FILES"))
   (setq-local truncate-lines 0)
   (hl-line-mode t))
 

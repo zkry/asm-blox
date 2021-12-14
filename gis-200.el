@@ -984,7 +984,7 @@ cell-runtime but rather the in-between row/col."
 (cl-defstruct (gis-200--problem-spec
                (:constructor gis-200--problem-spec-create)
                (:copier nil))
-  sources sinks name description)
+  sources sinks name description difficulty)
 
 (defun gis-200--reset-extra-gameboard-cells-state ()
   "Reset the state of all cells not in the grid (sources and sinks)."
@@ -1122,6 +1122,7 @@ cell-runtime but rather the in-between row/col."
          (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
     (gis-200--problem-spec-create
      :name "Indentation I"
+     :difficulty 'medium
      :sinks
      (list (gis-200--cell-sink-create :row 2
                                       :col 4
@@ -1131,7 +1132,7 @@ cell-runtime but rather the in-between row/col."
                                       :default-editor-text "func main () {\nfmt.Println(\"hello world\")\nreturn\n}"
                                       :editor-point 1
                                       :expected-text "func main () {\n  fmt.Println(\"hello world\")\n  return\n}"))
-     :description "Edit text to match the target.")))
+     :description "<editor> Edit text to match the target.")))
 
 (defun gis-200--problem--number-sum ()
   "Generate a problem of calculating y=x(x+1)/2."
@@ -1139,6 +1140,7 @@ cell-runtime but rather the in-between row/col."
          (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
     (gis-200--problem-spec-create
      :name "Number Sum"
+     :difficulty 'easy
      :sources (list (gis-200--cell-source-create :row -1
                                                  :col 3
                                                  :data input
@@ -1164,6 +1166,7 @@ from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
                                                            sum (abs (- i d)))))))
     (gis-200--problem-spec-create
      :name "Meeting point"
+     :difficulty 'hard
      :sources (list (gis-200--cell-source-create :row 1
                                                  :col -1
                                                  :data input
@@ -1190,6 +1193,7 @@ Send a number x which minimizes the equation
                          (seq-map (lambda (x) (make-string x ?#)) input) "\n")))
     (gis-200--problem-spec-create
      :name "Simple Graph"
+     :difficulty 'medium
      :sources (list (gis-200--cell-source-create :row 1
                                                  :col -1
                                                  :data input
@@ -1205,27 +1209,24 @@ Send a number x which minimizes the equation
                                       :editor-point 1
                                       :expected-text expected-text))
      :description
-     "Read a number from A, draw a line with that many '#' characters.")))
+     "<editor> Read a number from A, draw a line with that many '#' characters.")))
 
 (defun gis-200--problem--hello-world ()
   "Generate a problem involving writing Hello World to the srceen."
   (gis-200--problem-spec-create
-   :name "EDITOR DEMO"
-   :sources (list (gis-200--cell-source-create :row 1
-                                               :col -1
-                                               :data '(1 2 3)
-                                               :idx 0
-                                               :name "C"))
+   :name "Editor Basics"
+   :difficulty 'tutorial
+   :sources (list )
    :sinks
    (list (gis-200--cell-sink-create :row 1
                                     :col 5
-                                    :expected-data '(1 2 3)
+                                    :expected-data nil
                                     :idx 0
                                     :name "O"
-                                    :editor-text "0123456789"
-                                    :editor-point 4
+                                    :editor-text "01"
+                                    :editor-point 3
                                     :expected-text "Hello World"))
-   :description "EDITOR DEMO"))
+   :description "<editor> Write the string \"Hello World\" to the editor."))
 
 (defun gis-200--problem--upcase ()
   "generate a problem involving upcasing characters."
@@ -1234,7 +1235,8 @@ Send a number x which minimizes the equation
                            (make-list 40 nil)))
          (expected (string-to-list (upcase (apply #'string input-1)))))
     (gis-200--problem-spec-create
-     :name "AoC 2021-1"
+     :name "Upcase"
+     :difficulty 'easy
      :sources (list (gis-200--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
@@ -1249,7 +1251,7 @@ Send a number x which minimizes the equation
      :description "Read a character from C and send it to O,
 upcasing it if it is a lowercase letter.")))
 
-(defun gis-200--problem--aoc1 ()
+(defun gis-200--problem--inc-ct ()
   "Generate a simple addition problem."
   (let* ((input-1 (append (seq-map (lambda (_)
                                      (random 999))
@@ -1262,7 +1264,8 @@ upcasing it if it is a lowercase letter.")))
                                     (cdr input-1))
                           0))))
     (gis-200--problem-spec-create
-     :name "AoC 2021-1"
+     :name "Increment Cout"
+     :difficulty 'medium
      :sources (list (gis-200--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
@@ -1280,7 +1283,7 @@ ex. 1  2  0  5  6  4
      +  -  +  +  -     3 increses")))
 
 (defun gis-200--problem--tax ()
-  "Generate a simple addition problem."
+  "Generate a simple tax problem."
   (let* ((high-start-ct (random 20))
          (start-seq (seq-map (lambda (_) (random 999)) (make-list high-start-ct nil)))
          (high-seq (seq-map (lambda (_) (+ 500 (random 499))) (make-list 12 nil)))
@@ -1299,6 +1302,7 @@ ex. 1  2  0  5  6  4
                                     0))))
     (gis-200--problem-spec-create
      :name "Tax"
+     :difficulty 'hard
      :sources (list (gis-200--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
@@ -1311,7 +1315,7 @@ ex. 1  2  0  5  6  4
                                       :idx 0
                                       :name "O"))
      :description
-     "Read a value from I. If it is even send 0 to O, else send the value.")))
+     "Read values from I. After the 12th consecutive value is greater than or equal to 500, return that 12th value divided by 40.")))
 
 (defun gis-200--problem--list-reverse ()
   "Generate a simple addition problem."
@@ -1322,6 +1326,7 @@ ex. 1  2  0  5  6  4
                                      lists))))
     (gis-200--problem-spec-create
      :name "List Reverse"
+     :difficulty 'medium
      :sources (list (gis-200--cell-source-create :row -1
                                                  :col 2
                                                  :data input-1
@@ -1353,6 +1358,7 @@ Read a list from L, reverse it, and send it to R (terminating it with 0).")))
     lengths
     (gis-200--problem-spec-create
      :name "List Length"
+     :difficulty 'medium
      :sources (list (gis-200--cell-source-create :row 1
                                                  :col -1
                                                  :data nums
@@ -1372,6 +1378,7 @@ Read a list from L, reverse it, and send it to R (terminating it with 0).")))
          (expected (list 2 2 1 2 3 0)))
     (gis-200--problem-spec-create
      :name "Turing"
+     :difficulty 'hard
      :sources (list (gis-200--cell-source-create :row 0
                                                  :col -1
                                                  :data input-1
@@ -1404,6 +1411,7 @@ NOTE The head will go no more than +-10 spaces
          (expected (seq-sort #'< (append input-1 input-2))))
     (gis-200--problem-spec-create
      :name "Merge Step"
+     :difficulty 'hard
      :sources (list (gis-200--cell-source-create :row 0
                                                  :col -1
                                                  :data input-1
@@ -1433,6 +1441,7 @@ combine them sorted and send it them to C.")))
                                input-1)))
     (gis-200--problem-spec-create
      :name "Number Filter"
+     :difficulty 'easy
      :sources (list (gis-200--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
@@ -1459,6 +1468,7 @@ combine them sorted and send it them to C.")))
                                      '(0))))))
     (gis-200--problem-spec-create
      :name "Clock Hours"
+     :difficulty 'easy
      :sources (list (gis-200--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
@@ -1473,7 +1483,7 @@ combine them sorted and send it them to C.")))
      :description "On a clock with hours 0 to 23, read a value from H and add
 that value to the current time which starts at 0.
 
-Write the currenttime to T for every time you move the current time.")))
+Write the current time to T for every time you move the current time.")))
 
 (defun gis-200--problem--add ()
   "Generate a simple addition problem."
@@ -1483,6 +1493,7 @@ Write the currenttime to T for every time you move the current time.")))
          (expected (seq-mapn #'+ input-1 input-2 input-3)))
     (gis-200--problem-spec-create
      :name "Number Addition"
+     :difficulty 'easy
      :sources (list (gis-200--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
@@ -1515,6 +1526,7 @@ Write the currenttime to T for every time you move the current time.")))
          (expected-2 (seq-mapn (lambda (a b) (if (> b a) b 0)) input-1 input-2)))
     (gis-200--problem-spec-create
      :name "Number Chooser"
+     :difficulty 'easy
      :sources (list (gis-200--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
@@ -1544,6 +1556,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
   (let* ((expected (make-list 40 1)))
     (gis-200--problem-spec-create
      :name "Constant Generator"
+     :difficulty 'tutorial
      :sources (list )
      :sinks
      (list (gis-200--cell-sink-create :row 0
@@ -1559,6 +1572,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
          (expected input-1))
     (gis-200--problem-spec-create
      :name "Identity"
+     :difficulty 'tutorial
      :sources (list (gis-200--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
@@ -1584,7 +1598,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
                          #'gis-200--problem--tax
                          #'gis-200--problem--list-length
                          #'gis-200--problem--list-reverse
-                         #'gis-200--problem--aoc1
+                         #'gis-200--problem--inc-ct
                          #'gis-200--problem--upcase
                          #'gis-200--problem--merge-step
                          #'gis-200--problem--hello-world
