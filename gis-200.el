@@ -4,7 +4,7 @@
 ;; Maintainer: Zachary Romero
 ;; Version: 0.0.1
 ;; Package-Requires: ()
-;; Homepage:
+;; Homepage: ((emacs "25.1") (yaml "0.3.4"))
 ;; Keywords: game
 
 
@@ -32,30 +32,27 @@
 
 (require 'cl-lib)
 (require 'seq)
+(require 'yaml)
 
-;;;                  parse start location
-;;; ASM Parse       / parse end location
-;;                 / /
-;; ( ((CONST 100) 0 10) )
-;;           
-;; (IF (THEN (CONST 1) (CALL $LOG))
-;;     (ELSE (CONST 0) (CALL $LOG)))
-;;
-;; ((JEZ ELSE_CLAUSE) 0 64)
-;; ((CONST 1) 10 18)
-;; ((CALL $LOG) 20 30)
-;; ((JMP END_CLAUSE) 0 64) ;; skip this
-;; ((LABEL ELSE_CLAUSE))
-;; ((CONST 0) 42 50)
-;; ((CALL $LOG) 52 62)
-;; ((LABEL END_CLAUSE))
-;;
-;;
-;; (LOOP (CALL $LOG) (BR 0))
-;;
-;; ((LABEL LOOP_TOP))
-;; ((CALL $LOG) 6 15)
-;; ((JMP LOOP_TOP) 0 24)
+(defconst gis-200-box-height 12)
+(defconst gis-200-column-ct 4)
+(defconst gis-200-box-width 20)
+(defconst gis-200--gameboard-col-ct 4)
+(defconst gis-200--gameboard-row-ct 3)
+
+(defvar gis-200-box-contents nil)
+(defvar gis-200--gameboard nil)
+(defvar gis-200--extra-gameboard-cells nil)
+(defvar gis-200--gameboard-state nil
+  "Contains the state of the board whether it be victory or error.")
+(defvar gis-200--parse-depth nil)
+(defvar gis-200--branch-labels nil)
+
+(defvar gis-200-runtime-error nil
+  "If non-nil, contains the runtime error encountered.
+The format of the error is (list message row column).")
+
+(defvar-local gis-200-execution-origin-buffer nil)
 
 (cl-defstruct (gis-200-code-node
                (:constructor gis-200--code-node-create)
@@ -67,8 +64,10 @@
   (and (listp err) (eql 'error (car err))))
 
 (defun gis-200--parse-cell (coords code)
-  "Parse a the CODE of a text box.  This may be YAML or WAT."
-  (let* ((first-char (and (not (string-empty-p (string-trim code))) (substring-no-properties (string-trim-left code) 0 1)))
+  "Parse a the CODE of a text box at COORDS.  This may be YAML or WAT."
+  (let* ((first-char
+          (and (not (string-empty-p (string-trim code)))
+               (substring-no-properties (string-trim-left code) 0 1)))
          ;; There is currently no switch the user can use to indicate
          ;; filetype, thus the need of heuristic.
          (wat-p (or (not first-char)
@@ -85,88 +84,87 @@
     (erase-buffer)
     (insert code)
     (goto-char (point-min))
-    (let* ((top-body '()))
-      (cl-labels
-          ((whitespace-p (c)
-                         (or (eql c ?\s)
-                             (eql c ?\t)
-                             (eql c ?\n)))
-           (current-char ()
-                         (char-after (point)))
-           (consume-space ()
-                          (while (and (whitespace-p (current-char))
-                                      (not (eobp)))
-                            (forward-char)))
-           (symbol-char-p (c)
-                          (or (<= ?a c ?z)
-                              (<= ?A c ?Z)
-                              (= ?_ c)))
-           (digit-char-p (c) (<= ?0 c ?9))
-           (parse-element (&optional top-level)
-                          (let ((elements '()))
-                            (catch 'end
-                              (while t
-                                (consume-space)
-                                (if (eobp)
-                                    (throw 'end nil)
-                                  (let ((at-char (current-char)))
-                                    (cond
-                                     ;; Start of children list
-                                     ((eql at-char ?\()
-                                      (let ((start (point)))
-                                        (forward-char 1)
-                                        (let* ((children (parse-element))
-                                               (node (gis-200--code-node-create :children children
-                                                                                :start-pos start
-                                                                                :end-pos (point))))
-                                          (push node elements))))
-                                     ;; End of children list
-                                     ((eql at-char ?\) )
-                                      (if top-level
-                                          (throw 'error `(error ,(point) "SYNTAX ERROR"))
-                                        (forward-char 1)
-                                        (throw 'end nil)))
-                                     ((eql at-char ?\?)
+    (cl-labels
+        ((whitespace-p (c)
+                       (or (eql c ?\s)
+                           (eql c ?\t)
+                           (eql c ?\n)))
+         (current-char ()
+                       (char-after (point)))
+         (consume-space ()
+                        (while (and (whitespace-p (current-char))
+                                    (not (eobp)))
+                          (forward-char)))
+         (symbol-char-p (c)
+                        (or (<= ?a c ?z)
+                            (<= ?A c ?Z)
+                            (= ?_ c)))
+         (digit-char-p (c) (<= ?0 c ?9))
+         (parse-element (&optional top-level)
+                        (let ((elements '()))
+                          (catch 'end
+                            (while t
+                              (consume-space)
+                              (if (eobp)
+                                  (throw 'end nil)
+                                (let ((at-char (current-char)))
+                                  (cond
+                                   ;; Start of children list
+                                   ((eql at-char ?\()
+                                    (let ((start (point)))
                                       (forward-char 1)
-                                      (let ((c))
-                                        (if (looking-at "\\\\")
-                                            (progn
-                                              (forward-char 1)
-                                              (let ((escape-c (char-after (point))))
-                                                (pcase escape-c
-                                                  (?n (setq c ?\n))
-                                                  (?s (setq c ?\s))
-                                                  (?b (setq c ?\b))
-                                                  (_ (throw 'error `(error ,(point) "BAD ESCAPE CODE"))))))
-                                          (setq c (char-after (point)))
-                                          (when (or (= c ?\s) (= c ?\n))
-                                            (_ (throw 'error `(error ,(point) "INVALID CHAR")))))
-                                        (forward-char 1)
-                                        (push c elements)))
-                                     ;; Symbol
-                                     ((symbol-char-p at-char)
-                                      (let ((start (point)))
-                                        (forward-char 1)
-                                        (while (and (not (eobp))
-                                                    (symbol-char-p (current-char)))
-                                          (forward-char 1))
-                                        (let ((symbol (intern (upcase (buffer-substring-no-properties start (point))))))
-                                          (push symbol elements))))
+                                      (let* ((children (parse-element))
+                                             (node (gis-200--code-node-create :children children
+                                                                              :start-pos start
+                                                                              :end-pos (point))))
+                                        (push node elements))))
+                                   ;; End of children list
+                                   ((eql at-char ?\) )
+                                    (if top-level
+                                        (throw 'error `(error ,(point) "SYNTAX ERROR"))
+                                      (forward-char 1)
+                                      (throw 'end nil)))
+                                   ((eql at-char ?\?)
+                                    (forward-char 1)
+                                    (let ((c))
+                                      (if (looking-at "\\\\")
+                                          (progn
+                                            (forward-char 1)
+                                            (let ((escape-c (char-after (point))))
+                                              (pcase escape-c
+                                                (?n (setq c ?\n))
+                                                (?s (setq c ?\s))
+                                                (?b (setq c ?\b))
+                                                (_ (throw 'error `(error ,(point) "BAD ESCAPE CODE"))))))
+                                        (setq c (char-after (point)))
+                                        (when (or (= c ?\s) (= c ?\n))
+                                          (_ (throw 'error `(error ,(point) "INVALID CHAR")))))
+                                      (forward-char 1)
+                                      (push c elements)))
+                                   ;; Symbol
+                                   ((symbol-char-p at-char)
+                                    (let ((start (point)))
+                                      (forward-char 1)
+                                      (while (and (not (eobp))
+                                                  (symbol-char-p (current-char)))
+                                        (forward-char 1))
+                                      (let ((symbol (intern (upcase (buffer-substring-no-properties start (point))))))
+                                        (push symbol elements))))
 
-                                     ;; digit
-                                     ((or (digit-char-p at-char) (eql at-char ?-))
-                                      (let ((start (point)))
-                                        (forward-char 1)
-                                        (while (and (not (eobp))
-                                                    (digit-char-p (current-char)))
-                                          (forward-char 1))
-                                        (let ((number (string-to-number (buffer-substring-no-properties start (point)))))
-                                          (push number elements))))
+                                   ;; digit
+                                   ((or (digit-char-p at-char) (eql at-char ?-))
+                                    (let ((start (point)))
+                                      (forward-char 1)
+                                      (while (and (not (eobp))
+                                                  (digit-char-p (current-char)))
+                                        (forward-char 1))
+                                      (let ((number (string-to-number (buffer-substring-no-properties start (point)))))
+                                        (push number elements))))
 
-                                     ;; Unknown character
-                                     (t (throw 'error `(error ,(point) "unexpected character"))))))))
-                            (reverse elements))))
-        (catch 'error (parse-element t))))))
+                                   ;; Unknown character
+                                   (t (throw 'error `(error ,(point) "unexpected character"))))))))
+                          (reverse elements))))
+      (catch 'error (parse-element t)))))
 
 (defconst gis-200-base-operations
   '(GET SET TEE CONST NULL IS_NULL DROP
@@ -175,7 +173,7 @@
         CLR NOT DUP ABS))
 
 (defconst gis-200-command-specs
-  '((SET integerp gis-200--subexpressions) ;; TODO 
+  '((SET integerp gis-200--subexpressions)
     (CLR) 
     (CONST integerp)
     (DUP gis-200--subexpressions)
@@ -208,18 +206,20 @@
     (DROP gis-200--subexpressions)
     (SEND gis-200--portp gis-200--subexpressions)
     (GET (lambda (x) (or (gis-200--portp x) (integerp x))))
-    (LEFT)  ;; TODO
+    (LEFT)  ;; TODO: Should these be in final game?
     (RIGHT) ;; TODO
     (UP)    ;; TODO
     (DOWN)  ;; TODO
-    (FN t) ;; FN needs special verification code
-    ))
+    (FN t)  ;; FN needs special verification code
+    )
+  "List of commands and specifications for command arguments.")
 
 (defun gis-200--portp (x)
   "Return non-nil if X is a port direction."
   (memq x '(UP DOWN LEFT RIGHT)))
 
 (defun gis-200--code-node-validate (code-node)
+  "Determine if CODE-NODE adheres to the corresponding specification."
   (let* ((children (gis-200-code-node-children code-node))
          (start-pos (gis-200-code-node-start-pos code-node))
          (end-pos (gis-200-code-node-end-pos code-node))
@@ -250,18 +250,17 @@
                      (ok-p (funcall at-spec at-child)))
                 (if ok-p
                     (setq rest-children (cdr rest-children))
-                  (throw 'err `(error ,start-pos ,(format "bad arg to '%s'" first-child)))))))
-            
+                  (let ((msg (format "bad arg to '%s'" first-child)))
+                    (throw 'err `(error ,start-pos ,msg)))))))
             (setq specs (cdr specs))
             (setq at-spec (car specs)))))))))
 
-;; (gis-200--code-node-validate (gis-200--code-node-create :children '(DROP beep) :start-pos 0 :end-pos 1))
-
-(defvar gis-200--parse-depth nil)
-(defvar gis-200--branch-labels nil)
-
 (defun gis-200--make-label ()
-  (intern (concat "L_" (number-to-string (random 100000)) "_" (number-to-string gis-200--parse-depth))))
+  "Depending on the parse-depth create a label for the various goto statements."
+  (intern (concat "L_"
+                  (number-to-string (random 100000))
+                  "_"
+                  (number-to-string gis-200--parse-depth))))
 
 (defun gis-200--parse-tree-to-asm* (parse)
   "Convert PARSE into a list of ASM instructions recursively."
@@ -284,21 +283,27 @@
             (cond
              ((not first-child)
               (throw 'err `(error ,start-pos "No cmd found")))
-             
+
              ((eql first-child 'BLOCK)
               (let* ((label-symbol (gis-200--make-label))
-                     (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
-                     (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
+                     (gis-200--branch-labels
+                      (cons (cons gis-200--parse-depth label-symbol)
+                            gis-200--branch-labels))
+                     (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm*
+                                             rest-children)))
                 (append rest-asm-stmts
                         (list (gis-200--code-node-create
                                :children (list 'LABEL label-symbol)
                                :start-pos nil
                                :end-pos nil)))))
-             
+
              ((eql first-child 'LOOP)
               (let* ((label-symbol (gis-200--make-label))
-                     (gis-200--branch-labels (cons (cons gis-200--parse-depth label-symbol) gis-200--branch-labels))
-                     (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
+                     (gis-200--branch-labels
+                      (cons (cons gis-200--parse-depth label-symbol)
+                            gis-200--branch-labels))
+                     (rest-asm-stmts
+                      (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
                 (append (list (gis-200--code-node-create
                                :children (list 'LABEL label-symbol)
                                :start-pos nil
@@ -307,8 +312,15 @@
              ((eql first-child 'BR)
               (let* ((br-num (car rest-children))
                      (lbl-ref-level (- gis-200--parse-depth br-num 1))
-                     (label-symbol (or (cdr (assoc lbl-ref-level gis-200--branch-labels))
-                                       (concat "NOT_FOUND_" (number-to-string br-num) "_" (number-to-string gis-200--parse-depth) "_" (assoc br-num gis-200--branch-labels)))))
+                     (label-symbol
+                      (or (cdr (assoc lbl-ref-level
+                                      gis-200--branch-labels))
+                          (concat "NOT_FOUND_"
+                                  (number-to-string br-num)
+                                  "_"
+                                  (number-to-string gis-200--parse-depth)
+                                  "_"
+                                  (assoc br-num gis-200--branch-labels)))))
                 (gis-200--code-node-create
                  :children (list 'JMP label-symbol)
                  :start-pos start-pos
@@ -317,8 +329,14 @@
              ((eql first-child 'BR_IF)
               (let* ((br-num (car rest-children))
                      (lbl-ref-level (- gis-200--parse-depth br-num 1))
-                     (label-symbol (or (cdr (assoc lbl-ref-level gis-200--branch-labels))
-                                       (concat "NOT_FOUND_" (number-to-string br-num) "_" (number-to-string gis-200--parse-depth) "_" (assoc br-num gis-200--branch-labels)))))
+                     (label-symbol
+                      (or (cdr (assoc lbl-ref-level gis-200--branch-labels))
+                          (concat "NOT_FOUND_"
+                                  (number-to-string br-num)
+                                  "_"
+                                  (number-to-string gis-200--parse-depth)
+                                  "_"
+                                  (assoc br-num gis-200--branch-labels)))))
                 (gis-200--code-node-create
                  :children (list 'JMP_IF label-symbol)
                  :start-pos start-pos
@@ -334,7 +352,8 @@
                     :start-pos nil
                     :end-pos nil)
                   ,@(if then-case
-                        (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children then-case)))
+                        (seq-map #'gis-200--parse-tree-to-asm*
+                                 (cdr (gis-200-code-node-children then-case)))
                       nil)
                   ,(gis-200--code-node-create
                     :children (list 'JMP end-label)
@@ -345,7 +364,8 @@
                     :start-pos nil
                     :end-pos nil)
                   ,@(if else-case
-                        (seq-map #'gis-200--parse-tree-to-asm* (cdr (gis-200-code-node-children else-case)))
+                        (seq-map #'gis-200--parse-tree-to-asm*
+                                 (cdr (gis-200-code-node-children else-case)))
                       nil)
                   ,(gis-200--code-node-create
                     :children (list 'LABEL end-label)
@@ -361,7 +381,8 @@
                 ;; that run before the command we're at.
                 (while (and spec rest-children)
                   (when (eql (car spec) 'gis-200--subexpressions)
-                    (setq children-cmds (seq-map #'gis-200--parse-tree-to-asm* rest-children)))
+                    (setq children-cmds (seq-map #'gis-200--parse-tree-to-asm*
+                                                 rest-children)))
                   (setq spec (cdr spec))
                   (setq rest-children (cdr rest-children)))
                 (append children-cmds (list parse))))
@@ -397,33 +418,31 @@
                  (jmp-to-idx (cdr (assoc label-name idxs))))
             (setcdr code-data (list jmp-to-idx))))))))
 
-(defun gis-200--pprint-asm (instructions)
-  (message "%s" "======INSTRUCTIONS=======")
-  (let ((i 1))
-    (dolist (instr instructions nil)
-      (let ((instr (gis-200-code-node-children instr)))
-        (message "%d %s" i instr)
-        (setq i (1+ i)))))
-  (message "%s" "======INSTRUCTIONS_END=======")
-  nil)
-
 ;;; RUNTIME ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (cl-defstruct (gis-200--cell-runtime
                (:constructor gis-200--cell-runtime-create)
                (:copier nil))
-  instructions pc stack row col
+  "Structure that contains the runtime for a cell on the board.
+A cell can be either for ASM or YAML.  An ASM cell will have
+instructions, a PC, and a stack, while a YAML runtime will have
+run-function, run-spec, and run-state.
+
+Both have directional ports and staging ports.  The staging ports
+are a way to let all of the cells run without the cells that run
+previously change what values the later cells read.  After all
+cells have moved, the staging port becomes the current port."
+  instructions
+  pc
+  stack
+  row col
   staging-up staging-down staging-left staging-right
   up down left right
-  run-function run-spec run-state)
+  run-function
+  run-spec
+  run-state)
 
-(defconst gis-200--gameboard-col-ct 4)
-(defconst gis-200--gameboard-row-ct 3)
 
-(defvar gis-200--gameboard nil)
-(defvar gis-200--extra-gameboard-cells nil)
-(defvar gis-200--gameboard-state nil
-  "Contains the state of the board whether it be victory or error.")
 
 (defun gis-200--cell-runtime-current-instruction (cell-runtime)
   "Return the current instruction of CELL-RUNTIME based in pc."
@@ -436,6 +455,7 @@
       (car (nthcdr pc instrs)))))
 
 (defun gis-200--gameboard-in-final-state-p ()
+  "Return non-nil if the gameboard is in a finalized state."
   ;; If gis-200--gameboard-state is not nil then it is in finalized state.
   gis-200--gameboard-state)
 
@@ -449,8 +469,11 @@
 (defun gis-200--set-cell-at-row-col (row col cell-runtime)
   "Set board cell at ROW, COL to CELL-RUNTIME."
   (when (not gis-200--gameboard)
-    (setq gis-200--gameboard (make-vector (* gis-200--gameboard-col-ct gis-200--gameboard-row-ct) nil)))
-  (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-col-ct) col)) cell-runtime))
+    (setq gis-200--gameboard
+          (make-vector (* gis-200--gameboard-col-ct gis-200--gameboard-row-ct)
+                       nil)))
+  (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-col-ct) col))
+        cell-runtime))
 
 (defun gis-200--set-cell-asm-at-row-col (row col asm)
   "Create a runtime from ASM at set board cell at ROW, COL to it."
@@ -538,7 +561,8 @@ If the port does't have a value, set staging to nil."
   ;; This function is needed to prevent execution order from tampering with the
   ;; execution results.
   (dolist (direction '(UP DOWN LEFT RIGHT))
-    (let ((staging-value (gis-200--get-value-from-staging-direction cell-runtime direction))
+    (let ((staging-value
+           (gis-200--get-value-from-staging-direction cell-runtime direction))
           (value (gis-200--get-value-from-direction cell-runtime direction)))
       (when (and (eql staging-value 'sent) (not value))
         (gis-200--cell-runtime-set-staging-value-from-direction cell-runtime direction nil)
@@ -565,6 +589,7 @@ If the port does't have a value, set staging to nil."
 
 ;; TODO don't repeat this logic elsewhere
 (defun gis-200--cell-runtime-set-value-from-direction (cell-runtime direction value)
+  "Dynamically set the DIRECTION port of CELL-RUNTIME to VALUE."
   (pcase direction
     ('UP (setf (gis-200--cell-runtime-up cell-runtime) value))
     ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) value))
@@ -572,6 +597,7 @@ If the port does't have a value, set staging to nil."
     ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) value))))
 
 (defun gis-200--cell-runtime-set-staging-value-from-direction (cell-runtime direction value)
+  "Dynamically set the staging DIRECTION port of CELL-RUNTIME to VALUE."
   (pcase direction
     ('UP (setf (gis-200--cell-runtime-staging-up cell-runtime) value))
     ('RIGHT (setf (gis-200--cell-runtime-staging-right cell-runtime) value))
@@ -619,6 +645,9 @@ If the port does't have a value, set staging to nil."
     (gis-200--cell-runtime-push cell-runtime res)))
 
 (defun gis-200--cell-runtime-set-stack (cell-runtime offset &optional op)
+  "Set the stack at a given OFFSET of CELL-RUNTIME to top stack value.
+
+If OP is a symbol, perform special logic."
   (let* ((row (gis-200--cell-runtime-row cell-runtime))
          (col (gis-200--cell-runtime-col cell-runtime))
          (stack (gis-200--cell-runtime-stack cell-runtime))
@@ -669,7 +698,7 @@ If the port does't have a value, set staging to nil."
         (gis-200--cell-runtime-push cell-runtime v)))))
 
 (defun gis-200--cell-runtime-stack-get (cell-runtime loc)
-  "Perform a variant of the GET command, grabbing the LOC value from CELL-RUNTIME's stack. "
+  "Perform a variant of the GET command, grabbing the LOC value from CELL-RUNTIME's stack."
   (let ((row (gis-200--cell-runtime-row cell-runtime))
         (col (gis-200--cell-runtime-col cell-runtime))
         (stack (seq-reverse (gis-200--cell-runtime-stack cell-runtime)))
@@ -709,7 +738,8 @@ If the port does't have a value, set staging to nil."
   (not (= 0 v)))
 
 (defun gis-200--cell-runtime-skip-labels (cell-runtime)
-  "Skip PC over any label instructions. This is needed to display current command properly."
+  "Skip pc over any label instructions for CELL-RUNTIME.
+This logic  is needed to display current command properly."
   (while (let* ((current-instr (gis-200--cell-runtime-current-instruction cell-runtime))
                 (code-data (gis-200-code-node-children current-instr))
                 (cmd (car code-data)))
@@ -791,8 +821,9 @@ If the port does't have a value, set staging to nil."
     (gis-200--cell-runtime-skip-labels cell-runtime)))
 
 (defun gis-200--step ()
+  "Perform the operations needed to progress the game one step."
   (gis-200--gameboard-step)
-  (gis-200--resolve-port-values) 
+  (gis-200--resolve-port-values)
   (gis-200--extra-gameboard-step))
 
 (defun gis-200--extra-gameboard-step ()
@@ -848,7 +879,7 @@ If the port does't have a value, set staging to nil."
               (setq win-p nil)))
           (setq sinks (cdr sinks))))
       (when win-p
-        (gis-200--win-file-name-for-current-buffer)
+        (gis-200--win-file-for-current-buffer)
         ;; TODO: Do something else for the victory.
         (setq gis-200--gameboard-state 'win)
         (message "Congragulations, you won!")))))
@@ -916,10 +947,9 @@ cell-runtime but rather the in-between row/col."
           (setq sources (cdr sources)))))
     found))
 
-(defun gis-200--get-sink-idx-at-position (row col)
+(defun gis-200--get-sink-name-at-position (row col)
   "Return name of sink at position ROW, COL if exists."
   (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
-        (idx 0)
         (found))
     (while sinks
       (let ((sink (car sinks)))
@@ -957,6 +987,7 @@ cell-runtime but rather the in-between row/col."
   sources sinks name description)
 
 (defun gis-200--reset-extra-gameboard-cells-state ()
+  "Reset the state of all cells not in the grid (sources and sinks)."
   (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
         (sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells)))
     (dolist (source sources)
@@ -966,7 +997,8 @@ cell-runtime but rather the in-between row/col."
       (setf (gis-200--cell-sink-err-val sink) nil)
       (when (gis-200--cell-sink-expected-text sink)
         (if (gis-200--cell-sink-default-editor-text sink)
-            (setf (gis-200--cell-sink-editor-text sink) (gis-200--cell-sink-default-editor-text sink))
+            (setf (gis-200--cell-sink-editor-text sink)
+                  (gis-200--cell-sink-default-editor-text sink))
           (setf (gis-200--cell-sink-editor-text sink) ""))
         (setf (gis-200--cell-sink-editor-point sink) 1)))))
 
@@ -996,6 +1028,7 @@ cell-runtime but rather the in-between row/col."
       'blocked)))
 
 (defun gis-200--cell-sink-insert-character (sink char)
+  "For a textual SINK, insert CHAR."
   (let ((text (gis-200--cell-sink-editor-text sink))
         (point (gis-200--cell-sink-editor-point sink)))
     (cond
@@ -1027,6 +1060,7 @@ cell-runtime but rather the in-between row/col."
                       (substring text point))))))))
 
 (defun gis-200--cell-sink-move-point (sink point)
+  "For a textual SINK, move the point to POINT."
   (let* ((text (gis-200--cell-sink-editor-text sink))
          (bounded-pt (max (min point (1+ (length text))) 1)))
     (setf (gis-200--cell-sink-editor-point sink) bounded-pt)))
@@ -1051,7 +1085,7 @@ cell-runtime but rather the in-between row/col."
     top))
 
 (defun gis-200--problem-list-of-lists-to-lisp (lists)
-  "Return a list of lisp list objects from 0-terminated list of number lists."
+  "Return a list of LISTS from 0-terminated list of number lists."
   (thread-last (list '() '())
     (seq-reduce (lambda (acc x)
                   (let ((lol (car acc))
@@ -1083,7 +1117,7 @@ cell-runtime but rather the in-between row/col."
                    nums breaks)))
 
 (defun gis-200--problem--indentation ()
-  ""
+  "Generate a problem of indenting a code sequence properly."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 40 nil)))
          (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
     (gis-200--problem-spec-create
@@ -1100,7 +1134,7 @@ cell-runtime but rather the in-between row/col."
      :description "Edit text to match the target.")))
 
 (defun gis-200--problem--number-sum ()
-  ""
+  "Generate a problem of calculating y=x(x+1)/2."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 40 nil)))
          (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
     (gis-200--problem-spec-create
@@ -1119,10 +1153,11 @@ cell-runtime but rather the in-between row/col."
                                       :editor-text nil
                                       :editor-point nil
                                       :expected-text nil))
-     :description "Read a number from I, send to O the sum of numbers from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
+     :description "Read a number from I, send to O the sum of numbers
+from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
 
 (defun gis-200--problem--meeting-point ()
-  ""
+  "Generate a problem of finding the point that minimizes movement."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
          (expected-output (list (cl-loop for i from 1 to 1000
                                          minimize (cl-loop for d in input
@@ -1143,12 +1178,16 @@ cell-runtime but rather the in-between row/col."
                                       :editor-text nil
                                       :editor-point nil
                                       :expected-text nil))
-     :description "Read the 10 numbers from N (n1, n2, ..., n40). Send a number x which minimizes the equation (cl-loop for n in N sum (abs (- n x))).")))
+     :description "Read the 10 numbers from N (n1, n2, ..., n40).
+Send a number x which minimizes the equation
+(cl-loop for n in N
+         sum (abs (- n x)))")))
 
 (defun gis-200--problem--simple-graph ()
-  ""
+  "Generate a problem for the user to draw a simple graph."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
-         (expected-text (string-join (seq-map (lambda (x) (make-string x ?#)) input) "\n")))
+         (expected-text (string-join
+                         (seq-map (lambda (x) (make-string x ?#)) input) "\n")))
     (gis-200--problem-spec-create
      :name "Simple Graph"
      :sources (list (gis-200--cell-source-create :row 1
@@ -1165,10 +1204,11 @@ cell-runtime but rather the in-between row/col."
                                       :editor-text ""
                                       :editor-point 1
                                       :expected-text expected-text))
-     :description "Read a number from A, draw a line with that many '#' characters.")))
+     :description
+     "Read a number from A, draw a line with that many '#' characters.")))
 
 (defun gis-200--problem--hello-world ()
-  ""
+  "Generate a problem involving writing Hello World to the srceen."
   (gis-200--problem-spec-create
    :name "EDITOR DEMO"
    :sources (list (gis-200--cell-source-create :row 1
@@ -1188,7 +1228,7 @@ cell-runtime but rather the in-between row/col."
    :description "EDITOR DEMO"))
 
 (defun gis-200--problem--upcase ()
-  ""
+  "generate a problem involving upcasing characters."
   (let* ((input-1 (seq-map (lambda (_)
                              (+ (random 95) 32))
                            (make-list 40 nil)))
@@ -1206,7 +1246,8 @@ cell-runtime but rather the in-between row/col."
                                       :expected-data expected
                                       :idx 0
                                       :name "O"))
-     :description "Read a character from C and send it to O, upcasing it if it is a lowercase letter.")))
+     :description "Read a character from C and send it to O,
+upcasing it if it is a lowercase letter.")))
 
 (defun gis-200--problem--aoc1 ()
   "Generate a simple addition problem."
@@ -1233,7 +1274,10 @@ cell-runtime but rather the in-between row/col."
                                       :expected-data expected
                                       :idx 0
                                       :name "O"))
-     :description "Return the number of times sumsequent values of I increase.")))
+     :description
+     "Return the number of times subsequent values of I increase.
+ex. 1  2  0  5  6  4
+     +  -  +  +  -     3 increses")))
 
 (defun gis-200--problem--tax ()
   "Generate a simple addition problem."
@@ -1266,7 +1310,8 @@ cell-runtime but rather the in-between row/col."
                                       :expected-data expected
                                       :idx 0
                                       :name "O"))
-     :description "Read a value from I. If it is even send 0 to O, else send the value.")))
+     :description
+     "Read a value from I. If it is even send 0 to O, else send the value.")))
 
 (defun gis-200--problem--list-reverse ()
   "Generate a simple addition problem."
@@ -1288,7 +1333,9 @@ cell-runtime but rather the in-between row/col."
                                       :expected-data expected
                                       :idx 0
                                       :name "R"))
-     :description "Lists are 0 terminated. Read a list from L, reverse it, and send it to R (terminating it with 0).")))
+     :description
+     "Lists are 0 terminated.
+Read a list from L, reverse it, and send it to R (terminating it with 0).")))
 
 (defun gis-200--problem--list-length ()
   "Generate a simple addition problem."
@@ -1320,7 +1367,7 @@ cell-runtime but rather the in-between row/col."
      :description "Lists are 0 terminated. Read a list from I, calculate its length and send it to O.")))
 
 (defun gis-200--problem--turing ()
-  ""
+  "Generate a simple Brain****-like puzzle."
   (let* ((input-1 (list ?> ?> ?> ?+ ?+ ?. ?. ?< ?+ ?. ?> ?. ?+ ?. ?> ?> ?.))
          (expected (list 2 2 1 2 3 0)))
     (gis-200--problem-spec-create
@@ -1336,18 +1383,24 @@ cell-runtime but rather the in-between row/col."
                                       :expected-data expected
                                       :idx 0
                                       :name "O"))
-     :description "Read a number from X. Implement a machine that moves a head on a tape with values of all zero.
+     :description
+     "Read a number from X. Implement a machine that moves a head
+on a tape with values of all zero.
  - If X is the ASCII character '<' move the head one position to the left
  - If X is the ASCII character '>' move the head one position to the right
  - If X is the ASCII character '+' increment the value of the cell
  - If X is the ASCII character '.' send the current value at the tape to O.
-NOTE: The head will go no more than +-10 spaces from where the head starts off.")))
+
+NOTE The head will go no more than +-10 spaces
+     from where the head starts off.")))
 
 
 (defun gis-200--problem--merge-step ()
   "Generate a simple addition problem."
-  (let* ((input-1 (seq-sort #'< (seq-map (lambda (_) (random 100)) (make-list 20 nil))))
-         (input-2 (seq-sort #'< (seq-map (lambda (_) (random 100)) (make-list 20 nil))))
+  (let* ((input-1 (seq-sort #'< (seq-map (lambda (_) (random 100))
+                                         (make-list 20 nil))))
+         (input-2 (seq-sort #'< (seq-map (lambda (_) (random 100))
+                                         (make-list 20 nil))))
          (expected (seq-sort #'< (append input-1 input-2))))
     (gis-200--problem-spec-create
      :name "Merge Step"
@@ -1367,7 +1420,8 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
                                       :expected-data expected
                                       :idx 0
                                       :name "C"))
-     :description "Numbers in A and B are sorted. Read numbers from A and B, combine them sorted and send it them to C.")))
+     :description "Numbers in A and B are sorted. Read numbers from A and B,
+combine them sorted and send it them to C.")))
 
 (defun gis-200--problem--filter ()
   "Generate a simple addition problem."
@@ -1390,7 +1444,8 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
                                       :expected-data expected
                                       :idx 0
                                       :name "O"))
-     :description "Read a value from I. If it is even send 0 to O, else send the value.")))
+     :description
+     "Read a value from I. If it is even send 0 to O, else send the value.")))
 
 (defun gis-200--problem--clock ()
   "Generate a simple addition problem."
@@ -1415,7 +1470,10 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
                                       :expected-data expected
                                       :idx 0
                                       :name "T"))
-     :description "On a clock with hours 0 to 23, read a value from H and add that value to the current time which starts at 0. \nWrite the currenttime to T for every time you move the current time.")))
+     :description "On a clock with hours 0 to 23, read a value from H and add
+that value to the current time which starts at 0.
+
+Write the currenttime to T for every time you move the current time.")))
 
 (defun gis-200--problem--add ()
   "Generate a simple addition problem."
@@ -1446,7 +1504,8 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
                                       :expected-data expected
                                       :idx 0
                                       :name "S"))
-     :description "Take input from A, B, and C, add the three together, and send it to S.")))
+     :description
+     "Take input from A, B, and C, add the three together, and send it to S.")))
 
 (defun gis-200--problem--number-sorter ()
   "Generate problem for comparing two numbers and sending them in different places."
@@ -1477,7 +1536,8 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
                                       :expected-data expected-2
                                       :idx 0
                                       :name "R"))
-     :description "Take an input from A and B. If A>B then send A to L, 0 to R; If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
+     :description "Take an input from A and B. If A>B then send A to L, 0 to R;
+If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
 (defun gis-200--problem--constant ()
   "Generate a simple addition problem."
@@ -1533,18 +1593,20 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
                          #'gis-200--problem--turing))
 
 (defun gis-200--get-puzzle-by-id (name)
-  ;; TODO: fill this out with the remaining puzzles.
+  "Given a puzzle NAME, return tis puzzle generation function."
   (seq-find (lambda (puzzle-fn)
               (let ((n (gis-200--problem-spec-name (funcall puzzle-fn))))
                 (equal name n)))
             gis-200-puzzles))
 
-;;; File Saving
+;;; File Saving ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defconst gis-200-save-directory-name
   (expand-file-name ".gis-200" user-emacs-directory))
 
 (defun gis-200--generate-new-puzzle-filename (name)
+  "For puzzle NAME, determine the name for a new puzzle."
+  ;; TODO: This work when deleting puzzles.
   (ignore-errors
     (make-directory gis-200-save-directory-name))
   (let* ((dir-files (directory-files gis-200-save-directory-name))
@@ -1578,33 +1640,36 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
     (dotimes (row gis-200--gameboard-row-ct)
       (dotimes (col gis-200--gameboard-col-ct)
         (let ((prev-val (gethash (list row col) gis-200-box-contents)))
-          (puthash (list row col) (string-trim-right prev-val) gis-200-box-contents))))
+          (puthash (list row col)
+                   (string-trim-right prev-val)
+                   gis-200-box-contents))))
     ;; Find the name of the puzzle.
     (search-forward-regexp "^\\([[:alnum:] -]+\\):")
     (let ((match (match-string 1)))
       (unless match
-        (error "Bad file format, no puzzle name found."))
+        (error "Bad file format, no puzzle name found"))
       (let ((puzzle (gis-200--get-puzzle-by-id match)))
         (unless puzzle
-          (error "No puzzle with name %s found." puzzle))
+          (error "No puzzle with name %s found" puzzle))
         (setq gis-200--extra-gameboard-cells (funcall puzzle))))))
 
 (defun gis-200--saved-puzzle-ct-by-id (id)
+  "Return the number of saved puzzles that start with the puzzle ID."
   (length (seq-filter (lambda (file-name)
                         (string-prefix-p id file-name))
                       (directory-files gis-200-save-directory-name))))
 
 (defun gis-200--make-puzzle-idx-file-name (id idx)
+  "Create a file name for puzzle with ID and IDX."
   (expand-file-name (concat id "-" (number-to-string idx) ".gis")
                     gis-200-save-directory-name))
 
-(defvar-local gis-200-execution-origin-buffer nil)
-
-(defun gis-200--win-file-name-for-current-buffer ()
+(defun gis-200--win-file-for-current-buffer ()
+  "Return the name of the win-backup for the current execution buffer."
   (unless (equal (buffer-name) "*gis-200-execution*")
-    (error "unable to win from non-execution buffer."))
+    (error "Unable to win from non-execution buffer"))
   (unless (bufferp gis-200-execution-origin-buffer)
-    (error "unable to find buffer with winning solution."))
+    (error "Unable to find buffer with winning solution"))
   (let* ((buffer-contents (with-current-buffer gis-200-execution-origin-buffer
                             (buffer-string)))
          (bfn (with-current-buffer gis-200-execution-origin-buffer
@@ -1619,7 +1684,8 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
         (save-buffer)
         (kill-buffer)))))
 
-(defun gis-200-backup-file-for-current-buffer ()
+(defun gis-200--backup-file-for-current-buffer ()
+  "Create a backup file for the current buffer."
   (let* ((buffer-contents (buffer-string))
          (bfn (buffer-file-name))
          (name (file-name-nondirectory bfn))
@@ -1633,16 +1699,15 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
         (kill-buffer)))))
 
 (defun gis-200--puzzle-won-p (puzzle-name)
+  "Return non-nil if a win file exists for puzzle with name PUZZLE-NAME."
   (seq-find (lambda (n) (and (string-match (regexp-quote puzzle-name) n)
                              (string-match "\\.win" n)))
             (directory-files gis-200-save-directory-name)))
 
 ;;; YAML Blocks
 
-(require 'yaml)
-
 (defun gis-200--create-yaml-code-node (row col code)
-  "Create a runtime for the parsed DATA."
+  "Create a runtime for the parsed CODE, located at ROW COL."
   (let-alist (yaml-parse-string code :object-type 'alist)
     ;; .apiVersion .kind .metadata .spec
     (unless (equal "v1" .apiVersion)
@@ -1655,6 +1720,7 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
       ("Heap" (gis-200--yaml-create-heap row col .metadata .spec)))))
 
 (defun gis-200--yaml-step-stack (cell-runtime)
+  "Perform the step operation for the CELL-RUNTIME of kind Stack."
   (let ((row (gis-200--cell-runtime-row cell-runtime))
         (col (gis-200--cell-runtime-col cell-runtime))
         (spec (gis-200--cell-runtime-run-spec cell-runtime))
@@ -1670,7 +1736,7 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
           (setq state (cons val state)))
         (when .sizePort
           (gis-200--remove-value-from-direction cell-runtime size-port-sym)))
-      
+
       ;; Then add new values to stack
       (seq-do
        (lambda (port)
@@ -1704,12 +1770,12 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
       (setf (gis-200--cell-runtime-run-state cell-runtime) state))))
 
 (defun gis-200--yaml-get-editor-sink (cell-runtime)
-  "Return the sink corresponding to CELL-RUNTIME"
+  "Return the sink corresponding to CELL-RUNTIME."
   ;; For now there will only be one editor.
   (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells)))
 
 (defun gis-200--yaml-step-controller (cell-runtime)
-  "Perform runtime step for a Controller YAML."
+  "Perform runtime step for a CELL-RUNTIME of kind YAML Controller."
   (let ((row (gis-200--cell-runtime-row cell-runtime))
         (col (gis-200--cell-runtime-col cell-runtime))
         (spec (gis-200--cell-runtime-run-spec cell-runtime))
@@ -1763,7 +1829,7 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
            point))))))
 
 (defun gis-200--yaml-step-heap (cell-runtime)
-  "Perform runtime step for a Controller YAML."
+  "Perform runtime step for CELL-RUNTIME of type YAML HEAP."
   (let* ((row (gis-200--cell-runtime-row cell-runtime))
          (col (gis-200--cell-runtime-col cell-runtime))
          (spec (gis-200--cell-runtime-run-spec cell-runtime))
@@ -1843,7 +1909,7 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
       (setf (gis-200--cell-runtime-run-state cell-runtime) (cons offset data)))))
 
 (defun gis-200--yaml-create-stack (row col metadata spec)
-  "Return a Stack runtime according to SPEC with METADATA."
+  "Return a Stack runtime according to SPEC with METADATA at ROW COL."
   ;; .inputPorts .outputPort .sizePort .size .logLevel
   (gis-200--cell-runtime-create
    :instructions nil
@@ -1854,7 +1920,7 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
    :run-spec spec))
 
 (defun gis-200--yaml-create-controller (row col metadata spec)
-  "Return a Stack runtime according to SPEC with METADATA."
+  "Return a Controller runtime according to SPEC with METADATA at ROW COL."
   (gis-200--cell-runtime-create
    :instructions nil
    :pc nil
@@ -1864,7 +1930,7 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
    :run-spec spec))
 
 (defun gis-200--yaml-create-heap (row col metadata spec)
-  "Return a Stack runtime according to SPEC with METADATA."
+  "Return a Stack runtime according to SPEC with METADATA at ROW COL."
   ;; .size
   (let-alist spec
     (let ((data (make-vector (or .size 20) 0)))
@@ -1879,7 +1945,7 @@ NOTE: The head will go no more than +-10 spaces from where the head starts off."
        :run-function #'gis-200--yaml-step-heap
        ;; -1 because used hack to increment offset which will
        ;; run once at the start of the game.
-       :run-state (cons -1 data) 
+       :run-state (cons -1 data)
        :run-spec spec))))
 
 (provide 'gis-200)

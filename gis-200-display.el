@@ -27,6 +27,8 @@
 
 ;;; Code:
 
+(require 'gis-200)
+
 (defface gis-200-error-face
   '((((class color) (background light)) (:foreground "DarkGoldenrod4"))
     (((class color) (background dark))  (:foreground "DarkGoldenrod1")))
@@ -43,22 +45,22 @@
   "`gis-200-mode' face used for a matching paren pair."
   :group 'gis-200)
 
-(defconst gis-200-column-ct 4)
-(defconst gis-200-box-width 20)
-(defconst gis-200-box-height 12)
-
+(defvar gis-200--widget-row-idx nil)
+(defvar gis-200--current-widgets nil
+  "List of widgets to display on right of gameboard.")
 (defvar gis-200-parse-errors nil)
-(defvar gis-200-runtime-error nil
-  "If non-nil, contains the runtime error encountered. The format
-  of the error is (list message row column).")
+(defvar gis-200--disable-redraw nil
+  "If non-nil, commands should not opt-in to redrawing the gameboard.")
+(defvar gis-200--end-of-box-points nil
+  "Contains a hashmap of the points where each box ends.
+This was added for performance reasons.")
+
+(defconst gis-200--mirror-buffer-name "*gis-200-temp*")
 
 (defvar-local gis-200--display-mode 'edit)
 
-(defun gis-200--get-parse-error-at-cell (row col)
-  (let ((err (assoc (list row col) gis-200-parse-errors)))
-    (cdr err)))
-
 (defun gis-200--get-error-at-cell (row col)
+  "Return the error at position ROW COL."
   (if (and (eql gis-200--display-mode 'execute)
            gis-200-runtime-error
            (equal (list row col) (cdr gis-200-runtime-error)))
@@ -66,16 +68,10 @@
     (let ((err (assoc (list row col) gis-200-parse-errors)))
       (cdr err))))
 
-(defvar gis-200-box-contents nil)
-
 ;;; Widget display ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar gis-200--widget-row-idx nil)
-(defvar gis-200--current-widgets nil
-  "List of widgets to display on right of gameboard.")
-
 (defun gis-200--make-source-widget (source)
-  "Return a widget displaying a source."
+  "Return a widget displaying SOURCE."
   (let ((source-widget-offset-ct 2))
     (lambda (msg)
       (pcase msg
@@ -100,7 +96,7 @@
                 (format "│%s│" inner-str))))))))))
 
 (defun gis-200--make-sink-widget (sink)
-  "Return a widget displaying a source."
+  "Return a widget displaying SINK."
   (let ((sink-widget-offset-ct 2))
     (lambda (msg)
       (pcase msg
@@ -126,7 +122,7 @@
                 (format "│%s│" inner-str))))))))))
 
 (defun gis-200--make-editor-widget (sink)
-  "Return a widget displaying a source."
+  "Return a widget displaying a SINK as an editor."
   (let ((width 32)
         (sink-widget-offset-ct 2))
     (lambda (msg)
@@ -201,39 +197,34 @@ This should normally be called when the point is at the end of the display."
 ;;; Main grid display ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun gis-200--initialize-box-contents ()
+  "Set the contents of each cell to the empty string."
   (setq gis-200-box-contents (make-hash-table :test 'equal))
   (dotimes (row 3)
     (dotimes (col gis-200-column-ct)
       (puthash (list row col) "" gis-200-box-contents))))
 
 (defun gis-200--swap-box-contents (row-1 col-1 row-2 col-2)
+  "Swap the contents of the cells at positions (ROW-1,COL-1) and (ROW-2,COL-2)."
   (let ((contents-1 (gis-200--get-box-content row-1 col-1))
         (contents-2 (gis-200--get-box-content row-2 col-2)))
     (gis-200--set-box-content row-2 col-2 contents-1)
     (gis-200--set-box-content row-1 col-1 contents-2)))
 
 (defun gis-200--get-box-content (row col)
+  "Return the contens of the cell at position ROW COL."
   (gethash (list row col) gis-200-box-contents))
 
 (defun gis-200--set-box-content (row col text)
+  "Set the contents of the box at position ROW COL to TEXT."
   (puthash (list row col) text gis-200-box-contents))
 
-(defun gis-200--get-box-line-content (row col line)
+(defun gis-200--get-box-line-content (row col line-no)
+  "Get the contents of LINE-NO of cell located at ROW COL."
   (let ((text (gis-200--get-box-content row col)))
-    (or (nth line (split-string text "\n")) "")))
-
-(defun gis-200--insert-box-line-content (row col line line-col char)
-  (let* ((text gis-200-box-content)
-         (lines (split-string text "\n"))
-         (at-line (nth line lines))
-         (new-at-line (concat (substring at-line 0 line-col)
-                              (char-to-string char) 
-                              (substring at-line line-col))))
-    (setcar (nthcdr line lines) new-at-line)
-    (setq gis-200-box-content (string-join lines "\n"))))
+    (or (nth line-no (split-string text "\n")) "")))
 
 (defun gis-200--row-register-display (row col direction)
-  ""
+  "Return the display string for the up/down DIRECTION port of cell at ROW COL."
   (if (eql 'execute gis-200--display-mode)
       (let ((val (gis-200--get-direction-row-registers row col direction)))
         (cond
@@ -248,7 +239,7 @@ This should normally be called when the point is at the end of the display."
 
 ;; TODO: Dry this display logic up.
 (defun gis-200--col-register-display (row col direction)
-  ""
+  "Return the display string for left/right DIRECTION port of cell at ROW COL."
   ;; Note: the space between the cells is 5 splaces.
   (if (eql 'execute gis-200--display-mode)
       (let ((val (gis-200--get-direction-col-registers row col direction)))
@@ -262,25 +253,28 @@ This should normally be called when the point is at the end of the display."
           (format "%4s " (symbol-name val)))))
     "     "))
 
-(defun gis-200--source-sink-idx-to-name (type idx)
-  (let ((start-char (if (eql type 'source) ?A ?W)))
-    (format "%c" (+ start-char idx))))
-
 (defun gis-200--row-arrow-label-display (position type col)
+  "Return the up/down port info of TYPE source/sink at board POSITION for COL.
+POSITION will be either top or bottom, indicating the very top of
+the board or very bottom.  TYPE will either be source or sink."
   (let* ((row (if (eql position 'top) -1 3))
          (name (if (eql type 'source)
                    (gis-200--get-source-idx-at-position row col)
-                 (gis-200--get-sink-idx-at-position row col))))
+                 (gis-200--get-sink-name-at-position row col))))
     (or name " ")))
 
 (defun gis-200--col-arrow-label-display (position type row)
+  "Return the left/right port info of TYPE source/sink at POSITION for ROW.
+POSITION will be either left or right, indicating the very left
+of the board or very right.  TYPE will either be source or sink."
   (let* ((col (if (eql position 'left) -1 4))
          (name (if (eql type 'source)
                    (gis-200--get-source-idx-at-position row col)
-                 (gis-200--get-sink-idx-at-position row col))))
+                 (gis-200--get-sink-name-at-position row col))))
     (or name " ")))
 
 (defun gis-200-display-game-board ()
+  "Insert the characters of the board to the buffer."
   (setq gis-200--widget-row-idx 0)
   (when (not (hash-table-p gis-200--end-of-box-points))
     (setq gis-200--end-of-box-points (make-hash-table :test 'equal)))
@@ -310,9 +304,15 @@ This should normally be called when the point is at the end of the display."
                (let ((err (gis-200--get-error-at-cell row col)))
                  (if err
                      (progn
-                       (insert (propertize (char-to-string box-top-left) 'font-lock-face '(:foreground "red")))
-                       (insert (propertize box-line-top-bottom 'font-lock-face '(:foreground "red")))
-                       (insert (propertize (char-to-string box-top-right) 'font-lock-face '(:foreground "red")) ))
+                       (insert (propertize (char-to-string box-top-left)
+                                           'font-lock-face
+                                           '(:foreground "red")))
+                       (insert (propertize box-line-top-bottom
+                                           'font-lock-face
+                                           '(:foreground "red")))
+                       (insert (propertize (char-to-string box-top-right)
+                                           'font-lock-face
+                                           '(:foreground "red"))))
                    (insert box-top-left)
                    (insert box-line-top-bottom)
                    (insert box-top-right))
@@ -328,9 +328,15 @@ This should normally be called when the point is at the end of the display."
              (dotimes (col gis-200-column-ct)
                (let ((err (gis-200--get-error-at-cell row col)))
                  (if err
-                     (progn (insert (propertize (char-to-string box-bottom-left) 'font-lock-face '(:foreground "red")))
-                            (insert (propertize box-line-top-bottom 'font-lock-face '(:foreground "red")))
-                            (insert (propertize (char-to-string box-bottom-right) 'font-lock-face '(:foreground "red"))))
+                     (progn (insert (propertize (char-to-string box-bottom-left)
+                                                'font-lock-face
+                                                '(:foreground "red")))
+                            (insert (propertize box-line-top-bottom
+                                                'font-lock-face
+                                                '(:foreground "red")))
+                            (insert (propertize (char-to-string box-bottom-right)
+                                                'font-lock-face
+                                                '(:foreground "red"))))
                    (insert box-bottom-left)
                    (insert box-line-top-bottom)
                    (insert box-bottom-right))
@@ -341,14 +347,20 @@ This should normally be called when the point is at the end of the display."
           (insert-v-border
            (lambda (position)
              "Draw the very top and very bottom lines."
-             (let* ((left-of-arrows-len (1+ (- (/ (length box-line-top-bottom) 2) 1)))
-                    (right-of-arrows-len (1+ (- (length box-line-top-bottom) 2 left-of-arrows-len))))
+             (let* ((left-of-arrows-len
+                     (1+ (- (/ (length box-line-top-bottom) 2) 1)))
+                    (right-of-arrows-len
+                     (1+ (- (length box-line-top-bottom) 2 left-of-arrows-len))))
                (insert space-start)
                (insert space-between)
                (dotimes (col gis-200-column-ct)
                  (insert (make-string left-of-arrows-len ?\s))
-                 (let ((sink-char (gis-200--row-arrow-label-display position 'sink col))
-                       (source-char (gis-200--row-arrow-label-display position 'source col)))
+                 (let ((sink-char (gis-200--row-arrow-label-display position
+                                                                    'sink
+                                                                    col))
+                       (source-char (gis-200--row-arrow-label-display position
+                                                                      'source
+                                                                      col)))
                    (if (eql position 'top)
                        (insert (format "%s %s" sink-char source-char))
                      (insert (format "%s %s" source-char sink-char))))
@@ -363,18 +375,26 @@ This should normally be called when the point is at the end of the display."
              (insert space-start)
              (cond
               ((= 4 box-row)
-               (let ((display (gis-200--col-register-display row 0 'RIGHT))) ; NOTE: capital LEFT indicates arrow direction
-                 (insert display)))                                          ;       while lower-case represents board side.
+               ;; NOTE: capital LEFT indicates arrow direction
+               ;;       while lower-case represents board side.
+               (let ((display (gis-200--col-register-display row 0 'RIGHT)))
+                 (insert display)))
               ((= 5 box-row)
                (let ((label (gis-200--col-arrow-label-display 'left 'source row)))
                  (if (equal label " ")
                      (insert space-between)
-                   (progn (insert "  ") (insert label) (insert arrow-right) (insert ?\s)))))
+                   (progn (insert "  ")
+                          (insert label)
+                          (insert arrow-right)
+                          (insert ?\s)))))
               ((= 7 box-row)
                (let ((label (gis-200--col-arrow-label-display 'left 'sink row)))
                  (if (equal label " ")
                      (insert space-between)
-                   (progn (insert "  ") (insert label) (insert arrow-left) (insert ?\s)))))
+                   (progn (insert "  ")
+                          (insert label)
+                          (insert arrow-left)
+                          (insert ?\s)))))
               ((= 8 box-row)
                (let ((display (gis-200--col-register-display row 0 'LEFT)))
                  (insert display)))
@@ -383,17 +403,25 @@ This should normally be called when the point is at the end of the display."
              (dotimes (col gis-200-column-ct)
                (let ((err (gis-200--get-error-at-cell row col)))
                  (if err
-                     (insert (propertize (char-to-string box-vertical) 'font-lock-face '(:foreground "red")))
+                     (insert (propertize (char-to-string box-vertical)
+                                         'font-lock-face
+                                         '(:foreground "red")))
                    (insert box-vertical))
                  (when (= box-row 0)
-                   (puthash (list row col) (point) gis-200--beginning-of-box-points))
+                   (puthash (list row col)
+                            (point)
+                            gis-200--beginning-of-box-points))
                  ;; Draw the inner contents of the box
                  (let* ((text (gis-200--get-box-line-content row col box-row))
-                        (spacing (make-string (- (length box-inside) (length text)) ?\s)))
+                        (spacing (make-string (- (length box-inside)
+                                                 (length text))
+                                              ?\s)))
                    (if (and (= 11 box-row) err (eql gis-200--display-mode 'edit))
-                       (let ((err-text (nth 2 (gis-200--get-error-at-cell row col)))) 
+                       (let ((err-text (nth 2 (gis-200--get-error-at-cell row col))))
                          (insert err-text)
-                         (insert (make-string (- (length box-inside) (length err-text)) ?\s)))
+                         (insert (make-string (- (length box-inside)
+                                                 (length err-text))
+                                              ?\s)))
                      (insert (propertize text 'gis-200-box-id (list row col box-row)))
                      (insert (propertize spacing
                                          'gis-200-box-id (list row col box-row)
@@ -402,48 +430,68 @@ This should normally be called when the point is at the end of the display."
                    (puthash (list row col) (point) gis-200--end-of-box-points))
                  (let ((pipe-str (cond
                                   ((= box-row (1- gis-200-box-height))
-                                   (if err 
+                                   (if err
                                        (propertize (char-to-string box-vertical)
-                                                   'gis-200-text-type `(box-end ,row ,col)
-                                                   'font-lock-face '(:foreground "red"))
+                                                   'gis-200-text-type
+                                                   `(box-end ,row ,col)
+                                                   'font-lock-face
+                                                   '(:foreground "red"))
                                      (propertize (char-to-string box-vertical)
-                                                   'gis-200-text-type `(box-end ,row ,col))))
+                                                 'gis-200-text-type
+                                                 `(box-end ,row ,col))))
                                   (err
                                    (propertize (char-to-string box-vertical)
-                                               'font-lock-face '(:foreground "red")))
+                                               'font-lock-face
+                                               '(:foreground "red")))
                                   (t
                                    (char-to-string box-vertical)))))
                    (insert pipe-str)))
                (when (< col (1- gis-200-column-ct))
                  (cond
                   ((= 4 box-row)
-                   (let ((display (gis-200--col-register-display row (1+ col) 'RIGHT)))
+                   (let ((display (gis-200--col-register-display row
+                                                                 (1+ col)
+                                                                 'RIGHT)))
                      (insert display)))
                   ((= 5 box-row)
                    (progn (insert "  ") (insert arrow-right) (insert "  ")))
                   ((= 7 box-row)
                    (progn (insert "  ") (insert arrow-left) (insert "  ")))
                   ((= 8 box-row)
-                   (let ((display (gis-200--col-register-display row (1+ col) 'LEFT)))
+                   (let ((display (gis-200--col-register-display row
+                                                                 (1+ col)
+                                                                 'LEFT)))
                      (insert display)))
                   (t
                    (insert space-between)))))
              (cond
               ((= 4 box-row)
-               (let ((display (gis-200--col-register-display row gis-200-column-ct 'RIGHT)))
+               (let ((display (gis-200--col-register-display row
+                                                             gis-200-column-ct
+                                                             'RIGHT)))
                  (insert display)))
               ((= 5 box-row)
                (let ((label (gis-200--col-arrow-label-display 'right 'sink row)))
                  (if (equal label " ")
                      (insert space-between)
-                   (progn (insert ?\s) (insert arrow-right) (insert label) (insert "  ")))))
+                   (progn
+                     (insert ?\s)
+                     (insert arrow-right)
+                     (insert label)
+                     (insert "  ")))))
               ((= 7 box-row)
                (let ((label (gis-200--col-arrow-label-display 'right 'source row)))
                  (if (equal label " ")
                      (insert space-between)
-                   (progn (insert ?\s) (insert arrow-left) (insert label) (insert "  ")))))
+                   (progn
+                     (insert ?\s)
+                     (insert arrow-left)
+                     (insert label)
+                     (insert "  ")))))
               ((= 8 box-row)
-               (let ((display (gis-200--col-register-display row gis-200-column-ct 'LEFT)))
+               (let ((display (gis-200--col-register-display row
+                                                             gis-200-column-ct
+                                                             'LEFT)))
                  (insert display)))
               (t
                (insert space-between)))
@@ -453,37 +501,51 @@ This should normally be called when the point is at the end of the display."
           (insert-middle-row-space
            (lambda (row)
              "Draw the  ↑↓    ↑↓    ↑↓    ↑↓ part of the board."
-             (let* ((left-of-arrows-len (1+ (- (/ (length box-line-top-bottom) 2) 1)))
-                    (right-of-arrows-len (1+ (- (length box-line-top-bottom) 2 left-of-arrows-len)))
-                    (padding-space-left (make-string (- left-of-arrows-len 5) ?\s))
-                    (padding-space-right (make-string (- right-of-arrows-len 5) ?\s)))
+             (let* ((left-of-arrows-len (1+ (- (/ (length box-line-top-bottom)
+                                                  2)
+                                               1)))
+                    (right-of-arrows-len (1+ (- (length box-line-top-bottom)
+                                                2
+                                                left-of-arrows-len)))
+                    (padding-space-left (make-string (- left-of-arrows-len 5)
+                                                     ?\s))
+                    (padding-space-right (make-string (- right-of-arrows-len 5)
+                                                      ?\s)))
                (insert space-start)
                (insert space-between)
                (dotimes (col gis-200-column-ct)
                  (insert padding-space-left)
                  ;; logic to display arrow and contnents
-                 (let* ((up-arrow-display (gis-200--row-register-display row col 'UP))
-                        (down-arrow-display (gis-200--row-register-display row col 'DOWN))
-                        (label-position (cond ((= 0 row) 'top) ((= 3 row) 'bottom) (t nil)))
+                 (let* ((up-arrow-display
+                         (gis-200--row-register-display row col 'UP))
+                        (down-arrow-display
+                         (gis-200--row-register-display row col 'DOWN))
+                        (label-position (cond ((= 0 row) 'top)
+                                              ((= 3 row) 'bottom)
+                                              (t nil)))
                         (source-label
                          (and label-position
-                              (gis-200--row-arrow-label-display label-position
-                                                                (if (eql label-position 'top)
-                                                                    'source 'sink)
-                                                                col)))
+                              (gis-200--row-arrow-label-display
+                               label-position
+                               (if (eql label-position 'top)
+                                   'source 'sink)
+                               col)))
                         (sink-label
                          (and label-position
-                              (gis-200--row-arrow-label-display label-position
-                                                                (if (eql label-position 'top)
-                                                                    'sink 'source)
-                                                                col))))
+                              (gis-200--row-arrow-label-display
+                               label-position
+                               (if (eql label-position 'top)
+                                   'sink 'source)
+                               col))))
                    (insert up-arrow-display)
                    (insert " ")
-                   (if (and label-position (or (not sink-label) (equal sink-label " ")))
+                   (if (and label-position
+                            (or (not sink-label) (equal sink-label " ")))
                        (insert " ")
                      (insert arrow-up))
                    (insert ?\s)
-                   (if (and label-position (or (not source-label) (equal source-label " ")))
+                   (if (and label-position
+                            (or (not source-label) (equal source-label " ")))
                        (insert " ")
                      (insert arrow-down))
                    (insert " ")
@@ -506,8 +568,10 @@ This should normally be called when the point is at the end of the display."
       (funcall insert-v-border 'bottom)
 
       (insert "\n\n")
-      (let ((name (gis-200--problem-spec-name gis-200--extra-gameboard-cells))
-            (description (gis-200--problem-spec-description gis-200--extra-gameboard-cells)))
+      (let ((name
+             (gis-200--problem-spec-name gis-200--extra-gameboard-cells))
+            (description
+             (gis-200--problem-spec-description gis-200--extra-gameboard-cells)))
         (insert name ":\n")
         (insert description "\n"))
       (when (and (eql gis-200--display-mode 'execute) gis-200-runtime-error)
@@ -518,7 +582,7 @@ This should normally be called when the point is at the end of the display."
   (gis-200--propertize-errors))
 
 (defun gis-200--box-point-forward (ct)
-  "With the point in a text box, move forward a point in box-buffer."
+  "With the point in a text box, move forward a point in box-buffer by CT."
   (while (> ct 0)
     (cond
      ((eql (get-text-property (point) 'gis-200-text-type) 'spacing)
@@ -530,9 +594,6 @@ This should normally be called when the point is at the end of the display."
         (setq ct (1- ct))))
      (t (forward-char)
         (setq ct (1- ct))))))
-
-(defvar gis-200--disable-redraw nil
-  "If non-nil, commands should not opt-in to redrawing the gameboard.")
 
 (defun gis-200--propertize-errors ()
   "Add text properties to errors."
@@ -557,9 +618,13 @@ This should normally be called when the point is at the end of the display."
            (t (forward-char)
               (setq pt (1- pt)))))
         (let ((inhibit-read-only t))
-          (put-text-property (point) (1+ (point)) 'font-lock-face '(:underline (:color "red" :style wave))))))))
+          (put-text-property (point)
+                             (1+ (point))
+                             'font-lock-face
+                             '(:underline (:color "red" :style wave))))))))
 
 (defun gis-200-redraw-game-board ()
+  "Erase the buffer and redraw it."
   (let ((at-row (line-number-at-pos nil))
         (at-col (current-column))
         (prev-text (buffer-string)))
@@ -575,12 +640,13 @@ This should normally be called when the point is at the end of the display."
     (forward-char at-col)))
 
 (defun gis-200-in-box-p ()
+  "Return non-nil if the point is in an edit box."
   (get-text-property (point) 'gis-200-box-id))
 
 (defun gis-200-get-line-col-num (&optional point)
-  "Return the line column number in the current box."
+  "Return the line column number in the current box at POINT if provided."
   (unless (gis-200-in-box-p)
-    (error "not in text box"))
+    (error "Not in text box"))
   (let ((i 0))
     (save-excursion
       (when point (goto-char point))
@@ -589,21 +655,10 @@ This should normally be called when the point is at the end of the display."
         (setq i (1+ i))))
     (1- i)))
 
-(defun gis-200-insert-char (char)
-  "Insert a character inside a box."
-  (let ((box-id (get-text-property (point) 'gis-200-box-id)))
-    (when box-id
-      (let ((row (nth 0 box-id))
-            (col (nth 1 box-id))
-            (line-no (nth 2 box-id))
-            (line-col-no (gis-200-get-line-col-num)))
-        (gis-200--insert-box-line-content row col line-no line-col-no char)
-        (gis-200-redraw-game-board)))))
-
 (defun gis-200--beginning-of-box ()
   "Move the point to the beginning of the box."
   (unless (gis-200-in-box-p)
-    (error "not in box 1"))
+    (error "Not in box 1"))
   (let ((col (current-column)))
     (while (gis-200-in-box-p)
       (forward-line -1)
@@ -614,11 +669,8 @@ This should normally be called when the point is at the end of the display."
       (forward-char -1))
     (forward-char 1)))
 
-(defvar gis-200--end-of-box-points nil
-  "Contains a hashmap of the points where each box ends.
-This was added for performance reasons.")
-
 (defun gis-200--move-to-end-of-box (row col)
+  "Move poin to the end of the box at ROW COL."
   (let ((end-pos (gethash (list row col) gis-200--end-of-box-points)))
       (goto-char end-pos)))
 
@@ -627,6 +679,7 @@ This was added for performance reasons.")
 This was added for performance reasons.")
 
 (defun gis-200--move-to-box (row col)
+  "Move point to the point at ROW COL."
   (when (and (eql gis-200--display-mode 'edit)
              (not gis-200--disable-redraw))
     (let ((inhibit-read-only t))
@@ -635,8 +688,9 @@ This was added for performance reasons.")
     (goto-char begin-pos)))
 
 (defun gis-200--move-to-box-point (row col)
+  "Move point to ROW COL in current box."
   (unless (gis-200-in-box-p)
-    (error "not in box 2"))
+    (error "Not in box"))
   (gis-200--beginning-of-box)
   (let ((start-col (current-column)))
     (forward-line row)
@@ -644,11 +698,13 @@ This was added for performance reasons.")
     (forward-char col)))
 
 (defun gis-200--beginning-of-line ()
+  "Move to the beginning of the current edit box."
   (while (gis-200-in-box-p)
     (forward-char -1))
   (forward-char 1))
 
 (defun gis-200--replace-box-text (text)
+  "Replace the text in the current box with TEXT."
   (let* ((start-pos (point))
          (lines (split-string text "\n"))
          (box-id (get-text-property (point) 'gis-200-box-id))
@@ -672,11 +728,10 @@ This was added for performance reasons.")
         (setq at-line-no (1+ at-line-no))))
     (goto-char start-pos)))
 
-(defconst gis-200--mirror-buffer-name "*gis-200-temp*")
-
 (defun gis-200--func-in-buffer (func)
+  "Perform function FUNC as if in a buffer of the current box."
   (unless (gis-200-in-box-p)
-    (error "not in box 3"))
+    (error "Not in box"))
   (let* ((box-id (get-text-property (point) 'gis-200-box-id))
          (row (nth 0 box-id))
          (col (nth 1 box-id))
@@ -697,7 +752,7 @@ This was added for performance reasons.")
                       (line-beginning-position)
                       (line-end-position)))
              19) ;; TODO: 19 is magic number
-          (ding) 
+          (ding)
         (setq new-text (buffer-string))
         (setq new-line (1- (line-number-at-pos)))
         (setq new-col (current-column))))
@@ -708,12 +763,13 @@ This was added for performance reasons.")
         (gis-200--move-to-box-point new-line new-col)))))
 
 (defmacro gis-200--in-buffer (code)
+  "Perform CODE as if inside buffer of code box."
   `(gis-200--func-in-buffer
     (lambda ()
       ,code)))
 
-(defun gis-200--self-insert-command ()
-  ""
+(defun gis-200-self-insert-command ()
+  "Insert the character you type."
   (interactive)
   (if (not (gis-200-in-box-p))
       (ding)
@@ -721,36 +777,36 @@ This was added for performance reasons.")
      (insert (this-command-keys)))
     (gis-200--push-undo-stack-value)))
 
-(defun gis-200--backward-delete-char ()
-  ""
+(defun gis-200-backward-delete-char ()
+  "Delete the character to the left of the point."
   (interactive)
   (gis-200--in-buffer
    (backward-delete-char 1))
   (gis-200--push-undo-stack-value))
 
-(defun gis-200--delete-char ()
-  ""
+(defun gis-200-delete-char ()
+  "Delete the character at the point."
   (interactive)
   (gis-200--in-buffer
    (delete-char 1))
   (gis-200--push-undo-stack-value))
 
-(defun gis-200--kill-word ()
-  ""
+(defun gis-200-kill-word ()
+  "Kill characters forward until encountering the end of a word."
   (interactive)
   (gis-200--in-buffer
    (kill-word 1))
   (gis-200--push-undo-stack-value))
 
-(defun gis-200--kill-line ()
-  ""
+(defun gis-200-kill-line ()
+  "Kill until the end of the current line."
   (interactive)
   (gis-200--in-buffer
    (kill-line))
   (gis-200--push-undo-stack-value))
 
 (defun gis-200--move-beginning-of-line ()
-  ""
+  "Move the point to the beginning of the line."
   (interactive)
   (if (gis-200-in-box-p)
       (gis-200--in-buffer
@@ -758,7 +814,7 @@ This was added for performance reasons.")
     (beginning-of-line)))
 
 (defun gis-200--move-end-of-line ()
-  ""
+  "Move the point to the end of the line."
   (interactive)
   (if (gis-200-in-box-p)
       (gis-200--in-buffer
@@ -766,7 +822,7 @@ This was added for performance reasons.")
     (end-of-line)))
 
 (defun gis-200--beginning-of-buffer ()
-  ""
+  "Move the point to the beginning of the buffer."
   (interactive)
   (if (gis-200-in-box-p)
       (gis-200--in-buffer
@@ -774,7 +830,7 @@ This was added for performance reasons.")
     (beginning-of-buffer)))
 
 (defun gis-200--end-of-buffer ()
-  ""
+  "Move the point to the end of the buffer."
   (interactive)
   (if (gis-200-in-box-p)
       (gis-200--in-buffer
@@ -782,19 +838,20 @@ This was added for performance reasons.")
     (end-of-buffer)))
 
 (defun gis-200--newline ()
-  ""
+  "Insert a new line."
   (interactive)
   (gis-200--in-buffer
    (newline))
   (gis-200--push-undo-stack-value))
 
 (defun gis-200--forward-line ()
-  ""
+  "Move forward a line."
   (interactive)
   (gis-200--in-buffer
    (forward-line)))
 
 (defun gis-200--shift-box (drow dcol)
+  "Shift contents of current box with that of box in direction DROW DCOL."
   (let* ((box-id (get-text-property (point) 'gis-200-box-id))
          (row (car box-id))
          (col (cadr box-id))
@@ -811,46 +868,47 @@ This was added for performance reasons.")
     (gis-200--move-to-box next-row next-col)
     (gis-200--move-to-box-point line line-col)
     (let ((inhibit-read-only t))
-      (gis-200-redraw-game-board))
-    (message "1> %d %d" next-row next-col)))
+      (gis-200-redraw-game-board))))
 
-(defun gis-200--shift-box-right ()
-  ""
+(defun gis-200-shift-box-right ()
+  "Shift the current box with the one to the right."
   (interactive)
   (gis-200--shift-box 0 1))
 
-(defun gis-200--shift-box-left ()
-  ""
+(defun gis-200-shift-box-left ()
+  "Shift the current box with the one to the left."
   (interactive)
   (gis-200--shift-box 0 -1))
 
-(defun gis-200--shift-box-up ()
-  ""
+(defun gis-200-shift-box-up ()
+  "Shift the current box with the one to the top."
   (interactive)
   (gis-200--shift-box -1 0))
 
-(defun gis-200--shift-box-down ()
-  ""
+(defun gis-200-shift-box-down ()
+  "Shift the current box with the one to the bottom."
   (interactive)
   (gis-200--shift-box 1 0))
 
 
 (defun gis-200--kill (beg end &optional copy-only)
+  "Kill the text from BEG to END.
+If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   (let* ((box-id-1 (get-text-property beg 'gis-200-box-id))
-         (_ (when (not box-id-1) (error "can only kill region inside box.")))
+         (_ (when (not box-id-1) (error "Can only kill region inside box")))
          (row-1 (car box-id-1))
          (col-1 (cadr box-id-1))
          (line-1 (caddr box-id-1))
          (line-col-1 (gis-200-get-line-col-num beg))
          (box-id-2 (get-text-property end 'gis-200-box-id))
-         (_ (when (not box-id-2) (error "can only kill region inside box.")))
+         (_ (when (not box-id-2) (error "Can only kill region inside box")))
          (row-2 (car box-id-2))
          (col-2 (cadr box-id-2))
          (line-2 (caddr box-id-2))
          (line-col-2 (gis-200-get-line-col-num end)))
     (when (or (not (= row-1 row-2))
               (not (= col-1 col-2)))
-      (error "can't kill region across boxes."))
+      (error "Can't kill region across boxes"))
     (let* ((text (gis-200--get-box-content row-1 col-1))
            (new-text "")
            (kill-text "")
@@ -860,28 +918,35 @@ This was added for performance reasons.")
                for line in lines
                do (cond
                    ((= line-1 i line-2)
-                    (let ((line-part (concat (substring line 0 (min (length line) line-col-1))
-                                             (substring line (min (length line) line-col-2))))
-                          (kill-part (substring line
-                                                (min (length line) line-col-1)
-                                                (min (length line) line-col-2))))
+                    (let ((line-part
+                           (concat (substring line 0 (min (length line) line-col-1))
+                                   (substring line (min (length line) line-col-2))))
+                          (kill-part
+                           (substring line
+                                      (min (length line) line-col-1)
+                                      (min (length line) line-col-2))))
                       (setq new-text (concat new-text line-part "\n"))
                       (setq kill-text (concat kill-text kill-part))))
                    ((= line-1 i)
-                    (let ((line-part (substring line 0 (min (length line) line-col-1)))
-                          (kill-part (substring line (min (length line) line-col-1))))
+                    (let ((line-part
+                           (substring line 0 (min (length line) line-col-1)))
+                          (kill-part
+                           (substring line (min (length line) line-col-1))))
                       (setq new-text (concat new-text line-part))
                       (setq kill-text (concat kill-text kill-part "\n"))))
                    ((= line-2 i)
-                    (let ((line-part (substring line (min (length line) line-col-2)))
-                          (kill-part (substring line 0 (min (length line) line-col-2))))
+                    (let ((line-part
+                           (substring line (min (length line) line-col-2)))
+                          (kill-part
+                           (substring line 0 (min (length line) line-col-2))))
                       (setq new-text (concat new-text line-part "\n"))
                       (setq kill-text (concat kill-text kill-part))))
-                   ((> line-2 i line-1) (setq kill-text (concat kill-text line "\n")))
+                   ((> line-2 i line-1)
+                    (setq kill-text (concat kill-text line "\n")))
                    (t (setq new-text (concat new-text line "\n")))))
       (when (seq-find (lambda (l) (>= (length l) gis-200-box-width))
                       (split-string new-text "\n"))
-        (error "killing region makes a line too long."))
+        (error "Killing region makes a line too long"))
       (kill-new kill-text)
       (deactivate-mark)
       (when (not copy-only)
@@ -892,19 +957,22 @@ This was added for performance reasons.")
           (gis-200-redraw-game-board))))))
 
 (defun gis-200--kill-region (beg end)
+  "Kill the region from BEG to END."
   (interactive "r")
   (gis-200--kill beg end))
 
 (defun gis-200--copy-region (beg end)
+  "Copy the region from BEG to END."
   (interactive "r")
   (gis-200--kill beg end t))
 
 (defun gis-200--yank ()
+  "Yank text to current point."
   (interactive)
   (push-mark)
   (let* ((kill-text (current-kill 0))
          (box-id (get-text-property (point) 'gis-200-box-id))
-         (_ (when (not box-id) (error "can only kill region inside box.")))
+         (_ (when (not box-id) (error "Can only kill region inside box")))
          (row (car box-id))
          (col (cadr box-id))
          (line-row (caddr box-id))
@@ -916,33 +984,39 @@ This was added for performance reasons.")
              for i from 0
              do (cond
                  ((= i line-row)
-                  (let ((up-to-point (substring line 0 (min (length line) line-col)))
-                        (after-point (substring line (min (length line) line-col))))
-                    (setq new-text (concat new-text (concat up-to-point kill-text after-point "\n")))))
+                  (let ((up-to-point
+                         (substring line 0 (min (length line) line-col)))
+                        (after-point
+                         (substring line (min (length line) line-col))))
+                    (setq new-text (concat new-text
+                                           (concat up-to-point
+                                                   kill-text
+                                                   after-point
+                                                   "\n")))))
                  (t (setq new-text (concat new-text line "\n")))))
     (setq new-text (string-trim-right new-text "\n"))
     (when (or (seq-find (lambda (l) (>= (length l) gis-200-box-width))
                         (split-string new-text "\n"))
               (>= (length (split-string new-text "\n")) gis-200-box-height))
-      (error "yanked text doesn't fit in box."))
+      (error "Yanked text doesn't fit in box"))
     (gis-200--set-box-content row col new-text)
     (gis-200--push-undo-stack-value)
     (let ((inhibit-read-only t))
       (gis-200-redraw-game-board))))
 
 (defun gis-200--refresh-contents ()
-  ""
+  "Redraw the gameboard contents."
   (interactive)
   (let ((inhibit-read-only t))
     (if (gis-200-in-box-p)
         (gis-200--in-buffer
-         (forward-char 0))
+         (forward-char 0)) ;; noop to redraw cell
       (gis-200-redraw-game-board))))
 
 (defun gis-200--coords-to-end-of-box ()
   "Return (lines-down columns-right) to reach the end of the box."
   (unless (gis-200-in-box-p)
-    (error "not in box"))
+    (error "Not in box"))
   (let* ((box-id (get-text-property (point) 'gis-200-box-id))
          (row (car box-id))
          (col (cadr box-id))
@@ -966,7 +1040,7 @@ This was added for performance reasons.")
   "Move the point to the end of the box in the next row."
   (interactive)
   (unless (gis-200-in-box-p)
-    (error "not in box"))
+    (error "Not in box"))
   (let* ((box-id (get-text-property (point) 'gis-200-box-id))
          (row (car box-id))
          (col (cadr box-id))
@@ -1014,6 +1088,7 @@ This was added for performance reasons.")
     (gis-200--prev-cell)))
 
 (defun gis-200--printable-char-p (c)
+  "Retrun non-nil if C is a printable character."
   (<= 32 c 126))
 
 (defconst gis-200-mode-map
@@ -1022,16 +1097,16 @@ This was added for performance reasons.")
       ;;(suppress-keymap map)
       (dotimes (i 128)
         (when (gis-200--printable-char-p i)
-          (define-key map (char-to-string i) #'gis-200--self-insert-command)))
-      (define-key map (kbd "DEL") #'gis-200--backward-delete-char)
-      (define-key map (kbd "SPC") #'gis-200--self-insert-command)
+          (define-key map (char-to-string i) #'gis-200-self-insert-command)))
+      (define-key map (kbd "DEL") #'gis-200-backward-delete-char)
+      (define-key map (kbd "SPC") #'gis-200-self-insert-command)
       (define-key map (kbd "RET") #'gis-200--newline)
       (define-key map (kbd "C-c C-g") #'gis-200--refresh-contents)
       (define-key map (kbd "C-c C-c") #'gis-200-start-execution)
-      (define-key map (kbd "M-d") #'gis-200--kill-word)
-      (define-key map (kbd "C-k") #'gis-200--kill-line)
+      (define-key map (kbd "M-d") #'gis-200-kill-word)
+      (define-key map (kbd "C-k") #'gis-200-kill-line)
       (define-key map (kbd "C-a") #'gis-200--move-beginning-of-line)
-      (define-key map (kbd "C-d") #'gis-200--delete-char)
+      (define-key map (kbd "C-d") #'gis-200-delete-char)
       (define-key map (kbd "C-e") #'gis-200--move-end-of-line)
       (define-key map (kbd "M-<") #'gis-200--beginning-of-buffer)
       (define-key map (kbd "M->") #'gis-200--end-of-buffer)
@@ -1040,20 +1115,20 @@ This was added for performance reasons.")
       (define-key map (kbd "<S-return>") #'gis-200--next-row-cell)
       (define-key map (kbd "s-z") #'gis-200--undo)
       (define-key map (kbd "s-y") #'gis-200--redo)
-      (define-key map (kbd "<s-up>") #'gis-200--shift-box-up)
-      (define-key map (kbd "<s-down>") #'gis-200--shift-box-down)
-      (define-key map (kbd "<s-left>") #'gis-200--shift-box-left)
-      (define-key map (kbd "<s-right>") #'gis-200--shift-box-right)
+      (define-key map (kbd "<s-up>") #'gis-200-shift-box-up)
+      (define-key map (kbd "<s-down>") #'gis-200-shift-box-down)
+      (define-key map (kbd "<s-left>") #'gis-200-shift-box-left)
+      (define-key map (kbd "<s-right>") #'gis-200-shift-box-right)
       (define-key map [remap undo] #'gis-200--undo)
-      (define-key map (kbd "C-w") #'gis-200--kill-region)
+      (define-key map (kbd "C-w") #'gis-200-kill-region)
       (define-key map (kbd "M-w") #'gis-200--copy-region)
       (define-key map (kbd "C-y") #'gis-200--yank))))
 
-(defun gis-200--execution-next-command ()
-  ""
+(defun gis-200-execution-next-command ()
+  "Perform a single step of execution."
   (interactive)
   (when (not (gis-200--gameboard-in-final-state-p))
-    (gis-200--step)) 
+    (gis-200--step))
   (let ((inhibit-read-only t))
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)
@@ -1063,12 +1138,12 @@ This was added for performance reasons.")
 (defvar gis-200-multi-step-ct 10)
 
 (defun gis-200--execution-next-multiple-commands ()
-  ""
+  "Perform a multiple steps of execution according to `gis-200-multi-step-ct'."
   (interactive)
   (dotimes (_ gis-200-multi-step-ct)
     (when (not (gis-200--gameboard-in-final-state-p))
       (gis-200--step)
-      (gis-200-check-winning-conditions))) 
+      (gis-200-check-winning-conditions)))
   (let ((inhibit-read-only t))
     (gis-200-redraw-game-board)
     (gis-200-execution-code-highlight)
@@ -1076,7 +1151,7 @@ This was added for performance reasons.")
   (gis-200-check-winning-conditions))
 
 (defun gis-200--execution-run ()
-  ""
+  "Continuously run execution setps."
   (interactive)
   (while (and (not (gis-200--gameboard-in-final-state-p))
               (not (input-pending-p)))
@@ -1090,8 +1165,7 @@ This was added for performance reasons.")
 (defconst gis-200-execution-mode-map
   (let ((map (make-keymap)))
     (prog1 map
-      ;;(suppress-keymap map)
-      (define-key map "n" #'gis-200--execution-next-command)
+      (define-key map "n" #'gis-200-execution-next-command)
       (define-key map "N" #'gis-200--execution-next-multiple-commands)
       (define-key map "r" #'gis-200--execution-run)
       (define-key map "q" #'quit-window))))
@@ -1120,7 +1194,7 @@ This was added for performance reasons.")
     (setq gis-200-execution-origin-buffer origin-file-buffer)))
 
 (defun gis-200-execution-code-highlight ()
-  "Adds highlight face to where runtime's pc is "
+  "Add highlight face to where runtime's pc is."
   (let ((inhibit-read-only t))
     (dotimes (row gis-200--gameboard-row-ct)
       (dotimes (col gis-200--gameboard-col-ct)
@@ -1150,7 +1224,6 @@ This was added for performance reasons.")
     (dotimes (row gis-200--gameboard-row-ct)
       (dotimes (col gis-200--gameboard-col-ct)
         (let* ((at-runtime (gis-200--cell-at-row-col row col))
-               ;; makes more sense to reverse stack 
                (stack (reverse (gis-200--cell-runtime-stack at-runtime))))
           (gis-200--move-to-end-of-box row col)
           (while stack
@@ -1164,7 +1237,7 @@ This was added for performance reasons.")
             (setq stack (cdr stack))))))))
 
 (defun gis-200--create-widges-from-gameboard ()
-  ""
+  "Create widget objects from sources and sinks of gameboard."
   (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
         (sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
         (widgets))
@@ -1182,6 +1255,9 @@ This was added for performance reasons.")
 (defun gis-200-start-execution ()
   "Parse gameboard, displaying any errors, and display code execution buffer."
   (interactive)
+  ;; parse the current buffer to make sure that the text we are
+  ;; running is the actual text of the buffer.
+  (gis-200--parse-saved-buffer)
   (setq gis-200-parse-errors nil)
   (let ((parse-errors)
         (parses))
@@ -1199,7 +1275,7 @@ This was added for performance reasons.")
                (setq parses (cons (cons coords asm) parses)))))))
      gis-200-box-contents)
     (if parse-errors
-        (progn 
+        (progn
           (setq gis-200-parse-errors parse-errors)
           (let ((inhibit-read-only t))
             (gis-200-redraw-game-board)))
@@ -1213,12 +1289,13 @@ This was added for performance reasons.")
                (asm (cdr parse)))
           (assert (numberp col))
           (gis-200--set-cell-asm-at-row-col row col asm)))
-      (gis-200-backup-file-for-current-buffer)
+      (gis-200--backup-file-for-current-buffer)
       (gis-200--reset-extra-gameboard-cells-state)
       (gis-200--create-widges-from-gameboard)
       (gis-200--create-execution-buffer))))
 
 (defun gis-200-execution-mode ()
+  "Activate gis-200 execution mod."
   (kill-all-local-variables)
   (use-local-map gis-200-execution-mode-map)
   (setq mode-name "gis-200-execution"
@@ -1234,9 +1311,11 @@ This was added for performance reasons.")
 (defvar gis-200--skip-initial-parsing nil
   "When non-nil, don't parse the initial gameboard.")
 
-(defvar gis-200--show-pair-idle-timer nil)
+(defvar gis-200--show-pair-idle-timer nil
+  "Idle-timer for showing matching parenthesis.")
 
 (defun gis-200-mode ()
+  "Activate gis-200 editing mode."
   (interactive)
   (kill-all-local-variables)
   (use-local-map gis-200-mode-map)
@@ -1265,9 +1344,11 @@ This was added for performance reasons.")
 (cl-defstruct (gis-200--undo-state
                (:constructor gis-200--undo-state-create)
                (:copier nil))
+  "Struct representing a undo-state."
   text box-row box-col redo-list)
 
 (defun gis-200--initialize-undo-stacks ()
+  "Initialize all undo-stacks to be empty."
   (setq gis-200--undo-stacks (make-hash-table :test 'equal))
   (dotimes (row 3)
     (dotimes (col gis-200-column-ct)
@@ -1276,16 +1357,18 @@ This was added for performance reasons.")
                  (list (gis-200--undo-state-create :text current-value
                                                    :box-row 0
                                                    :box-col 0
-                                                   :redo-list '())) ;; TODO: better if this was at end not beginning
+                                                   :redo-list '()))
                  gis-200--undo-stacks)))))
 
 (defun gis-200--swap-undo-stacks (row-1 col-1 row-2 col-2)
+  "Swap the undo stacks of (ROW-1 COL-1) and (ROW-2 COL-2)."
   (let ((stack-1 (gethash (list row-1 col-1) gis-200--undo-stacks))
         (stack-2 (gethash (list row-2 col-2) gis-200--undo-stacks)))
     (puthash (list row-1 col-1) stack-2 gis-200--undo-stacks)
     (puthash (list row-2 col-2) stack-1 gis-200--undo-stacks)))
 
 (defun gis-200--push-undo-stack-value ()
+  "Push the contents of the current box as a new undo frame."
   (unless gis-200--undo-stacks
     (setq gis-200--undo-stacks (make-hash-table :test #'equal)))
   (let* ((box-id (get-text-property (point) 'gis-200-box-id))
@@ -1304,7 +1387,7 @@ This was added for performance reasons.")
         (puthash key (cons state states) gis-200--undo-stacks)))))
 
 (defun gis-200--undo ()
-  ""
+  "Perform an undo in the current box."
   (interactive)
   (if (not (gis-200-in-box-p))
       (ding)
@@ -1324,12 +1407,13 @@ This was added for performance reasons.")
                 (box-row (gis-200--undo-state-box-row prev-state))
                 (box-col (gis-200--undo-state-box-col prev-state)))
             (gis-200--set-box-content row col text)
-            (let ((inhibit-read-only t)) ;; code-smell: always inhibiting read only
+            ;; code-smell: always inhibiting read only
+            (let ((inhibit-read-only t))
               (gis-200-redraw-game-board))
             (gis-200--move-to-box-point box-row box-col)))))))
 
 (defun gis-200--redo ()
-  ""
+  "Perform a redo in the current box."
   (interactive)
   (if (not (gis-200-in-box-p))
       (ding)
@@ -1359,6 +1443,7 @@ This was added for performance reasons.")
 (defvar gis-200-pair-overlays nil "List of overlays used to highlight parenthesis pairs.")
 
 (defun gis-200--find-closing-match ()
+  "Find the closing paren match of point."
   (let* ((box-id (get-text-property (point) 'gis-200-box-id))
          (row (car box-id))
          (col (cadr box-id))
@@ -1386,6 +1471,7 @@ This was added for performance reasons.")
           (list drow dcol))))))
 
 (defun gis-200--find-opening-match ()
+  "Find the opening paren match of point."
   (let* ((box-id (get-text-property (point) 'gis-200-box-id))
          (row (car box-id))
          (col (cadr box-id))
@@ -1421,7 +1507,7 @@ This was added for performance reasons.")
     (setq gis-200-pair-overlays nil)))
 
 (defun gis-200--pair-create-overlays (start end)
-  "Create the show pair overlays."
+  "Create the show pair overlays for parens at point START and END."
   (when gis-200-pair-overlays
     (gis-200--pair-delete-overlays))
   (let ((oleft (make-overlay start (1+ start) nil t nil))
@@ -1432,11 +1518,12 @@ This was added for performance reasons.")
     (overlay-put oleft 'type 'show-pair)))
 
 (defun gis-200--highlight-pairs ()
+  "Highlight any relevant pairs at point."
   (when (equal mode-name "gis-200") ;; TODO: use eql to make this faster
     (if (gis-200-in-box-p)
         (save-excursion
           (save-match-data
-            (while-no-input 
+            (while-no-input
               (cond
                ((looking-back ")")
                 (let* ((start-point (1- (point)))
@@ -1474,7 +1561,7 @@ This was added for performance reasons.")
   "Setup the puzzle buffer for the puzzle at ID."
   (let ((puzzle (gis-200--get-puzzle-by-id id)))
     (unless puzzle
-      (error "no puzzle found with id %s" id))
+      (error "No puzzle found with id %s" id))
     (let ((buffer (get-buffer-create "*gis-200*"))  ;; TODO: allow for 1+ puzzles at once
           (file-name (gis-200--generate-new-puzzle-filename id)))
       (gis-200--initialize-box-contents)
@@ -1490,14 +1577,17 @@ This was added for performance reasons.")
 (defun gis-200-select-puzzle ()
   "Start the puzzle for the puzzle under the point."
   (interactive)
-  (let ((at-puzzle-id (get-text-property (point) 'gis-200-puzzle-selection-id))
-        (at-puzzle-filename (get-text-property (point) 'gis-200-puzzle-selection-filename)))
+  (let ((at-puzzle-id
+         (get-text-property (point) 'gis-200-puzzle-selection-id))
+        (at-puzzle-filename
+         (get-text-property (point) 'gis-200-puzzle-selection-filename)))
     (unless at-puzzle-id
-      (error "no puzzle under point"))
+      (error "No puzzle under point"))
     (if at-puzzle-filename
         (find-file at-puzzle-filename)
       (gis-200--puzzle-selection-setup-buffer at-puzzle-id))
-    ;; refresh the puzzle selection buffer so the user can see that their file was created.
+    ;; refresh the puzzle selection buffer so
+    ;; the user can see that their file was created.
     (gis-200-puzzle-selection-prepare-buffer)))
 
 (defconst gis-200-puzzle-selection-mode-map
@@ -1505,7 +1595,8 @@ This was added for performance reasons.")
     (prog1 map
       (define-key map "q" #'quit-window)
       (define-key map "g" #'gis-200-puzzle-selection-refresh)
-      (define-key map (kbd "RET") #'gis-200-select-puzzle))))
+      (define-key map (kbd "RET") #'gis-200-select-puzzle)))
+  "Mode map for selecting a gis-200 puzzle.")
 
 (defun gis-200-puzzle-selection-prepare-buffer ()
   "Prepare the puzzle selection buffer."
@@ -1515,7 +1606,7 @@ This was added for performance reasons.")
       (dolist (puzzle-fn gis-200-puzzles)
         (let* ((puzzle (funcall puzzle-fn))
                (name (gis-200--problem-spec-name puzzle))
-               (description (gis-200--problem-spec-description puzzle))
+               (description (replace-regexp-in-string "\n" " " (gis-200--problem-spec-description puzzle)))
                (line-str (format "%3s %-25s %-60s   "
                                  (if (gis-200--puzzle-won-p name) "[x]" "[ ]")
                                  name
@@ -1524,13 +1615,16 @@ This was added for performance reasons.")
           (insert (propertize line-str 'gis-200-puzzle-selection-id name))
           (let ((saved-file-ct (gis-200--saved-puzzle-ct-by-id name)))
             (dotimes (i saved-file-ct)
-              (insert (propertize (format "[%d]" (1+ i))
-                                  'gis-200-puzzle-selection-id name
-                                  'gis-200-puzzle-selection-filename (gis-200--make-puzzle-idx-file-name name (1+ i))))
+              (insert
+               (propertize (format "[%d]" (1+ i))
+                           'gis-200-puzzle-selection-id name
+                           'gis-200-puzzle-selection-filename
+                           (gis-200--make-puzzle-idx-file-name name (1+ i))))
               (insert (propertize " " 'gis-200-puzzle-selection-id name)))))
         (insert "\n")))))
 
 (defun gis-200-puzzle-selection-refresh ()
+  "Refresh the contents of the puzzle display buffer."
   (interactive)
   (let ((line-num (line-number-at-pos))
         (col-num (current-column)))
@@ -1540,6 +1634,7 @@ This was added for performance reasons.")
     (forward-char col-num)))
 
 (defun gis-200-puzzle-selection-mode ()
+  "Activate mode for selecting gis-200 puzzles."
   (interactive)
   (kill-all-local-variables)
   (use-local-map gis-200-puzzle-selection-mode-map)
@@ -1551,6 +1646,7 @@ This was added for performance reasons.")
   (hl-line-mode t))
 
 (defun gis-200 ()
+  "Open gis-200 puzzle selection screen."
   (interactive)
   (let ((buffer (get-buffer-create "*gis-200-puzzle-selection*")))
     (switch-to-buffer buffer)
