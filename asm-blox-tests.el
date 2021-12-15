@@ -1,4 +1,4 @@
-;;; gis-200-tests.el --- Tests for the application -*- lexical-binding: t -*-
+;;; asm-blox-tests.el --- Tests for the application -*- lexical-binding: t -*-
 
 ;; This file is not part of GNU Emacs
 

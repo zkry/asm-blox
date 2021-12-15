@@ -1714,6 +1714,8 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
 (defun asm-blox--puzzle-won-p (puzzle-name)
   "Return non-nil if a win file exists for puzzle with name PUZZLE-NAME."
+  (ignore-errors
+    (make-directory asm-blox-save-directory-name))
   (seq-find (lambda (n) (and (string-match (regexp-quote puzzle-name) n)
                              (string-match "\\.win" n)))
             (directory-files asm-blox-save-directory-name)))
