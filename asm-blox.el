@@ -1,4 +1,4 @@
-;;; gis-200.el --- Grided Intelligence System -*- lexical-binding: t -*-
+;;; asm-blox.el --- Grided Intelligence System -*- lexical-binding: t -*-
 
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
@@ -34,36 +34,36 @@
 (require 'seq)
 (require 'yaml)
 
-(defconst gis-200-box-height 12)
-(defconst gis-200-column-ct 4)
-(defconst gis-200-box-width 20)
-(defconst gis-200--gameboard-col-ct 4)
-(defconst gis-200--gameboard-row-ct 3)
+(defconst asm-blox-box-height 12)
+(defconst asm-blox-column-ct 4)
+(defconst asm-blox-box-width 20)
+(defconst asm-blox--gameboard-col-ct 4)
+(defconst asm-blox--gameboard-row-ct 3)
 
-(defvar gis-200-box-contents nil)
-(defvar gis-200--gameboard nil)
-(defvar gis-200--extra-gameboard-cells nil)
-(defvar gis-200--gameboard-state nil
+(defvar asm-blox-box-contents nil)
+(defvar asm-blox--gameboard nil)
+(defvar asm-blox--extra-gameboard-cells nil)
+(defvar asm-blox--gameboard-state nil
   "Contains the state of the board whether it be victory or error.")
-(defvar gis-200--parse-depth nil)
-(defvar gis-200--branch-labels nil)
+(defvar asm-blox--parse-depth nil)
+(defvar asm-blox--branch-labels nil)
 
-(defvar gis-200-runtime-error nil
+(defvar asm-blox-runtime-error nil
   "If non-nil, contains the runtime error encountered.
 The format of the error is (list message row column).")
 
-(defvar-local gis-200-execution-origin-buffer nil)
+(defvar-local asm-blox-execution-origin-buffer nil)
 
-(cl-defstruct (gis-200-code-node
-               (:constructor gis-200--code-node-create)
+(cl-defstruct (asm-blox-code-node
+               (:constructor asm-blox--code-node-create)
                (:copier nil))
   children start-pos end-pos)
 
-(defun gis-200--parse-error-p (err)
+(defun asm-blox--parse-error-p (err)
   "Return non-nil if ERR is a parse error."
   (and (listp err) (eql 'error (car err))))
 
-(defun gis-200--parse-cell (coords code)
+(defun asm-blox--parse-cell (coords code)
   "Parse a the CODE of a text box at COORDS.  This may be YAML or WAT."
   (let* ((first-char
           (and (not (string-empty-p (string-trim code)))
@@ -75,10 +75,10 @@ The format of the error is (list message row column).")
                     (string= first-char ")")
                     (string= first-char ";"))))
     (if wat-p
-        (gis-200--parse-assembly code)
-      (gis-200--create-yaml-code-node (car coords) (cadr coords) code))))
+        (asm-blox--parse-assembly code)
+      (asm-blox--create-yaml-code-node (car coords) (cadr coords) code))))
 
-(defun gis-200--parse-assembly (code)
+(defun asm-blox--parse-assembly (code)
   "Parse ASM CODE returning a list of instructions."
   (with-temp-buffer
     (erase-buffer)
@@ -114,7 +114,7 @@ The format of the error is (list message row column).")
                                     (let ((start (point)))
                                       (forward-char 1)
                                       (let* ((children (parse-element))
-                                             (node (gis-200--code-node-create :children children
+                                             (node (asm-blox--code-node-create :children children
                                                                               :start-pos start
                                                                               :end-pos (point))))
                                         (push node elements))))
@@ -166,46 +166,46 @@ The format of the error is (list message row column).")
                           (reverse elements))))
       (catch 'error (parse-element t)))))
 
-(defconst gis-200-base-operations
+(defconst asm-blox-base-operations
   '(GET SET TEE CONST NULL IS_NULL DROP
         NOP ADD INC DEC SUB MUL DIV REM AND OR EQZ GZ LZ
         EQ NE LT GT GE LE SEND PUSH POP
         CLR NOT DUP ABS))
 
-(defconst gis-200-command-specs
-  '((SET integerp gis-200--subexpressions)
+(defconst asm-blox-command-specs
+  '((SET integerp asm-blox--subexpressions)
     (CLR) 
     (CONST integerp)
-    (DUP gis-200--subexpressions)
-    (ABS gis-200--subexpressions)
-    (ADD gis-200--subexpressions)
-    (SUB gis-200--subexpressions)
-    (MUL gis-200--subexpressions)
-    (DIV gis-200--subexpressions)
-    (NEG gis-200--subexpressions)
-    (REM gis-200--subexpressions)
-    (AND gis-200--subexpressions)
-    (NOT gis-200--subexpressions)
-    (OR gis-200--subexpressions)
-    (EQ gis-200--subexpressions)
-    (NE gis-200--subexpressions)
-    (LT gis-200--subexpressions)
-    (LE gis-200--subexpressions)
-    (GT gis-200--subexpressions)
-    (GE gis-200--subexpressions)
-    (GZ gis-200--subexpressions)
-    (LZ gis-200--subexpressions)
-    (EQZ gis-200--subexpressions)
-    (BLOCK gis-200--subexpressions)
-    (LOOP gis-200--subexpressions)
+    (DUP asm-blox--subexpressions)
+    (ABS asm-blox--subexpressions)
+    (ADD asm-blox--subexpressions)
+    (SUB asm-blox--subexpressions)
+    (MUL asm-blox--subexpressions)
+    (DIV asm-blox--subexpressions)
+    (NEG asm-blox--subexpressions)
+    (REM asm-blox--subexpressions)
+    (AND asm-blox--subexpressions)
+    (NOT asm-blox--subexpressions)
+    (OR asm-blox--subexpressions)
+    (EQ asm-blox--subexpressions)
+    (NE asm-blox--subexpressions)
+    (LT asm-blox--subexpressions)
+    (LE asm-blox--subexpressions)
+    (GT asm-blox--subexpressions)
+    (GE asm-blox--subexpressions)
+    (GZ asm-blox--subexpressions)
+    (LZ asm-blox--subexpressions)
+    (EQZ asm-blox--subexpressions)
+    (BLOCK asm-blox--subexpressions)
+    (LOOP asm-blox--subexpressions)
     (INC integerp)
     (DEC integerp)
     (BR_IF integerp)
     (BR integerp)
     (NOP)
-    (DROP gis-200--subexpressions)
-    (SEND gis-200--portp gis-200--subexpressions)
-    (GET (lambda (x) (or (gis-200--portp x) (integerp x))))
+    (DROP asm-blox--subexpressions)
+    (SEND asm-blox--portp asm-blox--subexpressions)
+    (GET (lambda (x) (or (asm-blox--portp x) (integerp x))))
     (LEFT)  ;; TODO: Should these be in final game?
     (RIGHT) ;; TODO
     (UP)    ;; TODO
@@ -214,17 +214,17 @@ The format of the error is (list message row column).")
     )
   "List of commands and specifications for command arguments.")
 
-(defun gis-200--portp (x)
+(defun asm-blox--portp (x)
   "Return non-nil if X is a port direction."
   (memq x '(UP DOWN LEFT RIGHT)))
 
-(defun gis-200--code-node-validate (code-node)
+(defun asm-blox--code-node-validate (code-node)
   "Determine if CODE-NODE adheres to the corresponding specification."
-  (let* ((children (gis-200-code-node-children code-node))
-         (start-pos (gis-200-code-node-start-pos code-node))
-         (end-pos (gis-200-code-node-end-pos code-node))
+  (let* ((children (asm-blox-code-node-children code-node))
+         (start-pos (asm-blox-code-node-start-pos code-node))
+         (end-pos (asm-blox-code-node-end-pos code-node))
          (first-child (car children))
-         (cmd-spec (assoc first-child gis-200-command-specs)))
+         (cmd-spec (assoc first-child asm-blox-command-specs)))
     (cond
      ((not first-child)
       `(error ,start-pos "No command found"))
@@ -237,8 +237,8 @@ The format of the error is (list message row column).")
         (catch 'err
           (while (or specs rest-children)
             (cond
-             ((eql at-spec 'gis-200--subexpressions)
-              (if (seq-every-p #'gis-200-code-node-p rest-children)
+             ((eql at-spec 'asm-blox--subexpressions)
+              (if (seq-every-p #'asm-blox-code-node-p rest-children)
                   (setq rest-children nil)
                 (throw 'err `(error ,start-pos "bad end expressions"))))
              ((and rest-children (not specs))
@@ -255,29 +255,29 @@ The format of the error is (list message row column).")
             (setq specs (cdr specs))
             (setq at-spec (car specs)))))))))
 
-(defun gis-200--make-label ()
+(defun asm-blox--make-label ()
   "Depending on the parse-depth create a label for the various goto statements."
   (intern (concat "L_"
                   (number-to-string (random 100000))
                   "_"
-                  (number-to-string gis-200--parse-depth))))
+                  (number-to-string asm-blox--parse-depth))))
 
-(defun gis-200--parse-tree-to-asm* (parse)
+(defun asm-blox--parse-tree-to-asm* (parse)
   "Convert PARSE into a list of ASM instructions recursively."
-  (let ((gis-200--parse-depth (if gis-200--parse-depth
-                                  (1+ gis-200--parse-depth)
+  (let ((asm-blox--parse-depth (if asm-blox--parse-depth
+                                  (1+ asm-blox--parse-depth)
                                 0)))
     (cond
      ((listp parse)
-      (let ((asm-stmts (mapcar #'gis-200--parse-tree-to-asm* parse)))
+      (let ((asm-stmts (mapcar #'asm-blox--parse-tree-to-asm* parse)))
         (apply #'append asm-stmts)))
-     ((gis-200-code-node-p parse)
-      (let ((err (gis-200--code-node-validate parse)))
+     ((asm-blox-code-node-p parse)
+      (let ((err (asm-blox--code-node-validate parse)))
         (if err
             (throw 'err err)
-          (let* ((children (gis-200-code-node-children parse))
-                 (start-pos (gis-200-code-node-start-pos parse))
-                 (end-pos (gis-200-code-node-end-pos parse))
+          (let* ((children (asm-blox-code-node-children parse))
+                 (start-pos (asm-blox-code-node-start-pos parse))
+                 (end-pos (asm-blox-code-node-end-pos parse))
                  (first-child (car children))
                  (rest-children (cdr children)))
             (cond
@@ -285,59 +285,59 @@ The format of the error is (list message row column).")
               (throw 'err `(error ,start-pos "No cmd found")))
 
              ((eql first-child 'BLOCK)
-              (let* ((label-symbol (gis-200--make-label))
-                     (gis-200--branch-labels
-                      (cons (cons gis-200--parse-depth label-symbol)
-                            gis-200--branch-labels))
-                     (rest-asm-stmts (mapcar #'gis-200--parse-tree-to-asm*
+              (let* ((label-symbol (asm-blox--make-label))
+                     (asm-blox--branch-labels
+                      (cons (cons asm-blox--parse-depth label-symbol)
+                            asm-blox--branch-labels))
+                     (rest-asm-stmts (mapcar #'asm-blox--parse-tree-to-asm*
                                              rest-children)))
                 (append rest-asm-stmts
-                        (list (gis-200--code-node-create
+                        (list (asm-blox--code-node-create
                                :children (list 'LABEL label-symbol)
                                :start-pos nil
                                :end-pos nil)))))
 
              ((eql first-child 'LOOP)
-              (let* ((label-symbol (gis-200--make-label))
-                     (gis-200--branch-labels
-                      (cons (cons gis-200--parse-depth label-symbol)
-                            gis-200--branch-labels))
+              (let* ((label-symbol (asm-blox--make-label))
+                     (asm-blox--branch-labels
+                      (cons (cons asm-blox--parse-depth label-symbol)
+                            asm-blox--branch-labels))
                      (rest-asm-stmts
-                      (mapcar #'gis-200--parse-tree-to-asm* rest-children)))
-                (append (list (gis-200--code-node-create
+                      (mapcar #'asm-blox--parse-tree-to-asm* rest-children)))
+                (append (list (asm-blox--code-node-create
                                :children (list 'LABEL label-symbol)
                                :start-pos nil
                                :end-pos nil))
                         rest-asm-stmts)))
              ((eql first-child 'BR)
               (let* ((br-num (car rest-children))
-                     (lbl-ref-level (- gis-200--parse-depth br-num 1))
+                     (lbl-ref-level (- asm-blox--parse-depth br-num 1))
                      (label-symbol
                       (or (cdr (assoc lbl-ref-level
-                                      gis-200--branch-labels))
+                                      asm-blox--branch-labels))
                           (concat "NOT_FOUND_"
                                   (number-to-string br-num)
                                   "_"
-                                  (number-to-string gis-200--parse-depth)
+                                  (number-to-string asm-blox--parse-depth)
                                   "_"
-                                  (assoc br-num gis-200--branch-labels)))))
-                (gis-200--code-node-create
+                                  (assoc br-num asm-blox--branch-labels)))))
+                (asm-blox--code-node-create
                  :children (list 'JMP label-symbol)
                  :start-pos start-pos
                  :end-pos end-pos)))
 
              ((eql first-child 'BR_IF)
               (let* ((br-num (car rest-children))
-                     (lbl-ref-level (- gis-200--parse-depth br-num 1))
+                     (lbl-ref-level (- asm-blox--parse-depth br-num 1))
                      (label-symbol
-                      (or (cdr (assoc lbl-ref-level gis-200--branch-labels))
+                      (or (cdr (assoc lbl-ref-level asm-blox--branch-labels))
                           (concat "NOT_FOUND_"
                                   (number-to-string br-num)
                                   "_"
-                                  (number-to-string gis-200--parse-depth)
+                                  (number-to-string asm-blox--parse-depth)
                                   "_"
-                                  (assoc br-num gis-200--branch-labels)))))
-                (gis-200--code-node-create
+                                  (assoc br-num asm-blox--branch-labels)))))
+                (asm-blox--code-node-create
                  :children (list 'JMP_IF label-symbol)
                  :start-pos start-pos
                  :end-pos end-pos)))
@@ -345,43 +345,43 @@ The format of the error is (list message row column).")
              ((eql first-child 'IF)
               (let* ((then-case (car rest-children))
                      (else-case (cadr rest-children))
-                     (then-label (gis-200--make-label))
-                     (end-label (gis-200--make-label)))
-                `(,(gis-200--code-node-create
+                     (then-label (asm-blox--make-label))
+                     (end-label (asm-blox--make-label)))
+                `(,(asm-blox--code-node-create
                     :children (list 'JMP_IF_NOT then-label)
                     :start-pos nil
                     :end-pos nil)
                   ,@(if then-case
-                        (seq-map #'gis-200--parse-tree-to-asm*
-                                 (cdr (gis-200-code-node-children then-case)))
+                        (seq-map #'asm-blox--parse-tree-to-asm*
+                                 (cdr (asm-blox-code-node-children then-case)))
                       nil)
-                  ,(gis-200--code-node-create
+                  ,(asm-blox--code-node-create
                     :children (list 'JMP end-label)
                     :start-pos nil
                     :end-pos nil)
-                  ,(gis-200--code-node-create
+                  ,(asm-blox--code-node-create
                     :children (list 'LABEL then-label)
                     :start-pos nil
                     :end-pos nil)
                   ,@(if else-case
-                        (seq-map #'gis-200--parse-tree-to-asm*
-                                 (cdr (gis-200-code-node-children else-case)))
+                        (seq-map #'asm-blox--parse-tree-to-asm*
+                                 (cdr (asm-blox-code-node-children else-case)))
                       nil)
-                  ,(gis-200--code-node-create
+                  ,(asm-blox--code-node-create
                     :children (list 'LABEL end-label)
                     :start-pos nil
                     :end-pos nil))))
 
-             ((assoc first-child gis-200-command-specs)
-              (let* ((cmd-spec (assoc first-child gis-200-command-specs))
+             ((assoc first-child asm-blox-command-specs)
+              (let* ((cmd-spec (assoc first-child asm-blox-command-specs))
                      (spec (cdr cmd-spec))
                      (rest-children (cdr children))
                      (children-cmds '()))
                 ;; Determine which children are commands
                 ;; that run before the command we're at.
                 (while (and spec rest-children)
-                  (when (eql (car spec) 'gis-200--subexpressions)
-                    (setq children-cmds (seq-map #'gis-200--parse-tree-to-asm*
+                  (when (eql (car spec) 'asm-blox--subexpressions)
+                    (setq children-cmds (seq-map #'asm-blox--parse-tree-to-asm*
                                                  rest-children)))
                   (setq spec (cdr spec))
                   (setq rest-children (cdr rest-children)))
@@ -390,26 +390,26 @@ The format of the error is (list message row column).")
 
              (t `(error ,start-pos ,(format "Bad cmd: %s " first-child)))))))))))
 
-(defun gis-200--parse-tree-to-asm (parse)
+(defun asm-blox--parse-tree-to-asm (parse)
   "Generate game bytecode from tree of PARSE, resolving labels."
   (catch 'err
-    (let ((asm (flatten-list (gis-200--parse-tree-to-asm* parse))))
-      (gis-200--resolve-labels asm)
+    (let ((asm (flatten-list (asm-blox--parse-tree-to-asm* parse))))
+      (asm-blox--resolve-labels asm)
       asm)))
 
-(defun gis-200--resolve-labels (asm)
+(defun asm-blox--resolve-labels (asm)
   "Change each label reference in ASM to index in program."
   (let ((idxs '())
         (idx 0))
     (dolist (code-node asm)
-      (let* ((code-data (gis-200-code-node-children code-node))
+      (let* ((code-data (asm-blox-code-node-children code-node))
              (cmd (car code-data)))
         (when (eql cmd 'LABEL)
           (let ((label-name (cadr code-data)))
             (setq idxs (cons (cons label-name idx) idxs)))))
       (setq idx (1+ idx)))
     (dolist (code-node asm)
-      (let* ((code-data (gis-200-code-node-children code-node))
+      (let* ((code-data (asm-blox-code-node-children code-node))
              (cmd (car code-data)))
         (when (or (eql cmd 'JMP)
                   (eql cmd 'JMP_IF)
@@ -420,8 +420,8 @@ The format of the error is (list message row column).")
 
 ;;; RUNTIME ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cl-defstruct (gis-200--cell-runtime
-               (:constructor gis-200--cell-runtime-create)
+(cl-defstruct (asm-blox--cell-runtime
+               (:constructor asm-blox--cell-runtime-create)
                (:copier nil))
   "Structure that contains the runtime for a cell on the board.
 A cell can be either for ASM or YAML.  An ASM cell will have
@@ -444,41 +444,41 @@ cells have moved, the staging port becomes the current port."
 
 
 
-(defun gis-200--cell-runtime-current-instruction (cell-runtime)
+(defun asm-blox--cell-runtime-current-instruction (cell-runtime)
   "Return the current instruction of CELL-RUNTIME based in pc."
-  (let* ((pc (gis-200--cell-runtime-pc cell-runtime))
-         (instrs (gis-200--cell-runtime-instructions cell-runtime))
+  (let* ((pc (asm-blox--cell-runtime-pc cell-runtime))
+         (instrs (asm-blox--cell-runtime-instructions cell-runtime))
          (instrs (if (not (listp instrs)) (list instrs) instrs)))
     (if (not instrs)
-        (gis-200--code-node-create :children '(_EMPTY))
+        (asm-blox--code-node-create :children '(_EMPTY))
       (and (>= pc (length instrs)) (error "End of program error"))
       (car (nthcdr pc instrs)))))
 
-(defun gis-200--gameboard-in-final-state-p ()
+(defun asm-blox--gameboard-in-final-state-p ()
   "Return non-nil if the gameboard is in a finalized state."
-  ;; If gis-200--gameboard-state is not nil then it is in finalized state.
-  gis-200--gameboard-state)
+  ;; If asm-blox--gameboard-state is not nil then it is in finalized state.
+  asm-blox--gameboard-state)
 
-;; TODO - consolidate this function with gis-200--cell-at-moved-row-col
-(defun gis-200--cell-at-row-col (row col)
+;; TODO - consolidate this function with asm-blox--cell-at-moved-row-col
+(defun asm-blox--cell-at-row-col (row col)
   "Return the cell at index ROW COL from the gameboard."
-  (aref gis-200--gameboard
-        (+ (* row gis-200--gameboard-col-ct)
+  (aref asm-blox--gameboard
+        (+ (* row asm-blox--gameboard-col-ct)
            col)))
 
-(defun gis-200--set-cell-at-row-col (row col cell-runtime)
+(defun asm-blox--set-cell-at-row-col (row col cell-runtime)
   "Set board cell at ROW, COL to CELL-RUNTIME."
-  (when (not gis-200--gameboard)
-    (setq gis-200--gameboard
-          (make-vector (* gis-200--gameboard-col-ct gis-200--gameboard-row-ct)
+  (when (not asm-blox--gameboard)
+    (setq asm-blox--gameboard
+          (make-vector (* asm-blox--gameboard-col-ct asm-blox--gameboard-row-ct)
                        nil)))
-  (setf (aref gis-200--gameboard (+ (* row gis-200--gameboard-col-ct) col))
+  (setf (aref asm-blox--gameboard (+ (* row asm-blox--gameboard-col-ct) col))
         cell-runtime))
 
-(defun gis-200--set-cell-asm-at-row-col (row col asm)
+(defun asm-blox--set-cell-asm-at-row-col (row col asm)
   "Create a runtime from ASM at set board cell at ROW, COL to it."
   (let* ((asm (if (not (listp asm)) (list asm) asm))
-         (runtime (gis-200--cell-runtime-create
+         (runtime (asm-blox--cell-runtime-create
                    :instructions asm
                    :pc 0
                    :stack '()
@@ -488,9 +488,9 @@ cells have moved, the staging port becomes the current port."
                    :down nil
                    :left nil
                    :right nil)))
-    (gis-200--set-cell-at-row-col row col runtime)))
+    (asm-blox--set-cell-at-row-col row col runtime)))
 
-(defun gis-200--cell-at-moved-row-col (row col dir)
+(defun asm-blox--cell-at-moved-row-col (row col dir)
   "Return the item at the cell in the gameboard at position DIR from ROW,COL."
   (let* ((d-row (cond ((eql dir 'UP) -1)
                       ((eql dir 'DOWN) 1)
@@ -500,9 +500,9 @@ cells have moved, the staging port becomes the current port."
                       (t 0)))
          (row* (+ row d-row))
          (col* (+ col d-col)))
-    (gis-200--cell-at-row-col row* col*)))
+    (asm-blox--cell-at-row-col row* col*)))
 
-(defun gis-200--mirror-direction (direction)
+(defun asm-blox--mirror-direction (direction)
   "Retunr the opposite of DIRECTION."
   (pcase direction
     ('UP 'DOWN)
@@ -510,23 +510,23 @@ cells have moved, the staging port becomes the current port."
     ('LEFT 'RIGHT)
     ('RIGHT 'LEFT)))
 
-(defun gis-200--get-value-from-direction (cell-runtime direction)
+(defun asm-blox--get-value-from-direction (cell-runtime direction)
   "Dynamically look up and return value at DIRECTION on CELL-RUNTIME."
   (pcase direction
-    ('UP (gis-200--cell-runtime-up cell-runtime))
-    ('RIGHT (gis-200--cell-runtime-right cell-runtime))
-    ('DOWN (gis-200--cell-runtime-down cell-runtime))
-    ('LEFT (gis-200--cell-runtime-left cell-runtime))))
+    ('UP (asm-blox--cell-runtime-up cell-runtime))
+    ('RIGHT (asm-blox--cell-runtime-right cell-runtime))
+    ('DOWN (asm-blox--cell-runtime-down cell-runtime))
+    ('LEFT (asm-blox--cell-runtime-left cell-runtime))))
 
-(defun gis-200--get-value-from-staging-direction (cell-runtime direction)
+(defun asm-blox--get-value-from-staging-direction (cell-runtime direction)
   "Dynamically look up and return value at DIRECTION on CELL-RUNTIME."
   (pcase direction
-    ('UP (gis-200--cell-runtime-staging-up cell-runtime))
-    ('RIGHT (gis-200--cell-runtime-staging-right cell-runtime))
-    ('DOWN (gis-200--cell-runtime-staging-down cell-runtime))
-    ('LEFT (gis-200--cell-runtime-staging-left cell-runtime))))
+    ('UP (asm-blox--cell-runtime-staging-up cell-runtime))
+    ('RIGHT (asm-blox--cell-runtime-staging-right cell-runtime))
+    ('DOWN (asm-blox--cell-runtime-staging-down cell-runtime))
+    ('LEFT (asm-blox--cell-runtime-staging-left cell-runtime))))
 
-(defun gis-200--gameboard-source-at-pos (row col &optional dir)
+(defun asm-blox--gameboard-source-at-pos (row col &optional dir)
   "Return non-nil if a source exists at ROW, COL (at offset DIR)."
   (let* ((d-row (cond ((eql dir 'UP) -1)
                       ((eql dir 'DOWN) 1)
@@ -536,13 +536,13 @@ cells have moved, the staging port becomes the current port."
                       (t 0)))
          (row* (+ row d-row))
          (col* (+ col d-col))
-         (sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells)))
+         (sources (asm-blox--problem-spec-sources asm-blox--extra-gameboard-cells)))
     (seq-find (lambda (source)
-                (and (= (gis-200--cell-source-row source) row*)
-                     (= (gis-200--cell-source-col source) col*)))
+                (and (= (asm-blox--cell-source-row source) row*)
+                     (= (asm-blox--cell-source-col source) col*)))
               sources)))
 
-(defun gis-200--valid-position (row col &optional dir)
+(defun asm-blox--valid-position (row col &optional dir)
   "Return non-nil if cell exists at ROW, COL (plus optional DIR)."
   (let* ((d-row (cond ((eql dir 'UP) -1)
                       ((eql dir 'DOWN) 1)
@@ -552,321 +552,321 @@ cells have moved, the staging port becomes the current port."
                       (t 0)))
          (row* (+ row d-row))
          (col* (+ col d-col)))
-    (and (<= 0 row* (1- gis-200--gameboard-row-ct))
-         (<= 0 col* (1- gis-200--gameboard-col-ct)))))
+    (and (<= 0 row* (1- asm-blox--gameboard-row-ct))
+         (<= 0 col* (1- asm-blox--gameboard-col-ct)))))
 
-(defun gis-200--cell-runtime-merge-ports-with-staging (cell-runtime)
+(defun asm-blox--cell-runtime-merge-ports-with-staging (cell-runtime)
   "For CELL-RUNTIME, if the staging region has a value, move it to port.
 If the port does't have a value, set staging to nil."
   ;; This function is needed to prevent execution order from tampering with the
   ;; execution results.
   (dolist (direction '(UP DOWN LEFT RIGHT))
     (let ((staging-value
-           (gis-200--get-value-from-staging-direction cell-runtime direction))
-          (value (gis-200--get-value-from-direction cell-runtime direction)))
+           (asm-blox--get-value-from-staging-direction cell-runtime direction))
+          (value (asm-blox--get-value-from-direction cell-runtime direction)))
       (when (and (eql staging-value 'sent) (not value))
-        (gis-200--cell-runtime-set-staging-value-from-direction cell-runtime direction nil)
+        (asm-blox--cell-runtime-set-staging-value-from-direction cell-runtime direction nil)
         (setq staging-value nil))
       (when (and staging-value (not value))
-        (gis-200--cell-runtime-set-value-from-direction cell-runtime direction staging-value)
-        (gis-200--cell-runtime-set-staging-value-from-direction cell-runtime direction 'sent)))))
+        (asm-blox--cell-runtime-set-value-from-direction cell-runtime direction staging-value)
+        (asm-blox--cell-runtime-set-staging-value-from-direction cell-runtime direction 'sent)))))
 
-(defun gis-200--remove-value-from-staging-direction (cell-runtime direction)
+(defun asm-blox--remove-value-from-staging-direction (cell-runtime direction)
   "Dynamically look up and return value at staging DIRECTION on CELL-RUNTIME."
   (pcase direction
-    ('UP (setf (gis-200--cell-runtime-staging-up cell-runtime) nil))
-    ('RIGHT (setf (gis-200--cell-runtime-staging-right cell-runtime) nil))
-    ('DOWN (setf (gis-200--cell-runtime-staging-down cell-runtime) nil))
-    ('LEFT (setf (gis-200--cell-runtime-staging-left cell-runtime) nil))))
+    ('UP (setf (asm-blox--cell-runtime-staging-up cell-runtime) nil))
+    ('RIGHT (setf (asm-blox--cell-runtime-staging-right cell-runtime) nil))
+    ('DOWN (setf (asm-blox--cell-runtime-staging-down cell-runtime) nil))
+    ('LEFT (setf (asm-blox--cell-runtime-staging-left cell-runtime) nil))))
 
-(defun gis-200--remove-value-from-direction (cell-runtime direction)
+(defun asm-blox--remove-value-from-direction (cell-runtime direction)
   "Dynamically look up and return value at DIRECTION on CELL-RUNTIME."
   (pcase direction
-    ('UP (setf (gis-200--cell-runtime-up cell-runtime) nil))
-    ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) nil))
-    ('DOWN (setf (gis-200--cell-runtime-down cell-runtime) nil))
-    ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) nil))))
+    ('UP (setf (asm-blox--cell-runtime-up cell-runtime) nil))
+    ('RIGHT (setf (asm-blox--cell-runtime-right cell-runtime) nil))
+    ('DOWN (setf (asm-blox--cell-runtime-down cell-runtime) nil))
+    ('LEFT (setf (asm-blox--cell-runtime-left cell-runtime) nil))))
 
 ;; TODO don't repeat this logic elsewhere
-(defun gis-200--cell-runtime-set-value-from-direction (cell-runtime direction value)
+(defun asm-blox--cell-runtime-set-value-from-direction (cell-runtime direction value)
   "Dynamically set the DIRECTION port of CELL-RUNTIME to VALUE."
   (pcase direction
-    ('UP (setf (gis-200--cell-runtime-up cell-runtime) value))
-    ('RIGHT (setf (gis-200--cell-runtime-right cell-runtime) value))
-    ('DOWN (setf (gis-200--cell-runtime-down cell-runtime) value))
-    ('LEFT (setf (gis-200--cell-runtime-left cell-runtime) value))))
+    ('UP (setf (asm-blox--cell-runtime-up cell-runtime) value))
+    ('RIGHT (setf (asm-blox--cell-runtime-right cell-runtime) value))
+    ('DOWN (setf (asm-blox--cell-runtime-down cell-runtime) value))
+    ('LEFT (setf (asm-blox--cell-runtime-left cell-runtime) value))))
 
-(defun gis-200--cell-runtime-set-staging-value-from-direction (cell-runtime direction value)
+(defun asm-blox--cell-runtime-set-staging-value-from-direction (cell-runtime direction value)
   "Dynamically set the staging DIRECTION port of CELL-RUNTIME to VALUE."
   (pcase direction
-    ('UP (setf (gis-200--cell-runtime-staging-up cell-runtime) value))
-    ('RIGHT (setf (gis-200--cell-runtime-staging-right cell-runtime) value))
-    ('DOWN (setf (gis-200--cell-runtime-staging-down cell-runtime) value))
-    ('LEFT (setf (gis-200--cell-runtime-staging-left cell-runtime) value))))
+    ('UP (setf (asm-blox--cell-runtime-staging-up cell-runtime) value))
+    ('RIGHT (setf (asm-blox--cell-runtime-staging-right cell-runtime) value))
+    ('DOWN (setf (asm-blox--cell-runtime-staging-down cell-runtime) value))
+    ('LEFT (setf (asm-blox--cell-runtime-staging-left cell-runtime) value))))
 
-(defun gis-200--cell-runtime-instructions-length (cell-runtime)
+(defun asm-blox--cell-runtime-instructions-length (cell-runtime)
   "Return the length of CELL-RUNTIME."
-  (length (gis-200--cell-runtime-instructions cell-runtime)))
+  (length (asm-blox--cell-runtime-instructions cell-runtime)))
 
-(defun gis-200--cell-runtime-pc-inc (cell-runtime)
+(defun asm-blox--cell-runtime-pc-inc (cell-runtime)
   "Return the length of CELL-RUNTIME."
-  (let ((instr-ct (gis-200--cell-runtime-instructions-length cell-runtime))
-        (pc (gis-200--cell-runtime-pc cell-runtime)))
+  (let ((instr-ct (asm-blox--cell-runtime-instructions-length cell-runtime))
+        (pc (asm-blox--cell-runtime-pc cell-runtime)))
     (if (= (1+ pc) instr-ct)
-        (setf (gis-200--cell-runtime-pc cell-runtime) 0)
-      (setf (gis-200--cell-runtime-pc cell-runtime) (1+ pc)))))
+        (setf (asm-blox--cell-runtime-pc cell-runtime) 0)
+      (setf (asm-blox--cell-runtime-pc cell-runtime) (1+ pc)))))
 
-(defun gis-200--cell-runtime-push (cell-runtime value)
+(defun asm-blox--cell-runtime-push (cell-runtime value)
   "Add VALUE to the stack of CELL-RUNTIME."
   ;; TODO: Handle stack overflow error.
-  (let* ((stack (gis-200--cell-runtime-stack cell-runtime)))
+  (let* ((stack (asm-blox--cell-runtime-stack cell-runtime)))
     (when (>= (length stack) 4)
-      (let ((row (gis-200--cell-runtime-row cell-runtime))
-            (col (gis-200--cell-runtime-col cell-runtime)))
-        (setq gis-200-runtime-error ;; TODO: extract the logic here to separate function
+      (let ((row (asm-blox--cell-runtime-row cell-runtime))
+            (col (asm-blox--cell-runtime-col cell-runtime)))
+        (setq asm-blox-runtime-error ;; TODO: extract the logic here to separate function
               (list "Stack overflow" row col))
-        (setq gis-200--gameboard-state 'error)
+        (setq asm-blox--gameboard-state 'error)
         (message "Stack overflow error at (%d, %d)" row col))) ;; Stack size hardcoded.
-    (setf (gis-200--cell-runtime-stack cell-runtime) (cons value stack))))
+    (setf (asm-blox--cell-runtime-stack cell-runtime) (cons value stack))))
 
-(defun gis-200--cell-runtime-pop (cell-runtime)
+(defun asm-blox--cell-runtime-pop (cell-runtime)
   "Pop and return a value from the stack of CELL-RUNTIME."
-  (let* ((stack (gis-200--cell-runtime-stack cell-runtime))
+  (let* ((stack (asm-blox--cell-runtime-stack cell-runtime))
          (val (car stack)))
     ;; TODO: Handle stack underflow error.
     (prog1 val
-      (setf (gis-200--cell-runtime-stack cell-runtime) (cdr stack)))))
+      (setf (asm-blox--cell-runtime-stack cell-runtime) (cdr stack)))))
 
-(defun gis-200--binary-operation (cell-runtime function)
+(defun asm-blox--binary-operation (cell-runtime function)
   "Perform binary operation FUNCTION on the top two items of CELL-RUNTIME."
-  (let* ((v1 (gis-200--cell-runtime-pop cell-runtime))
-         (v2 (gis-200--cell-runtime-pop cell-runtime))
+  (let* ((v1 (asm-blox--cell-runtime-pop cell-runtime))
+         (v2 (asm-blox--cell-runtime-pop cell-runtime))
          (res (funcall function v2 v1)))
-    (gis-200--cell-runtime-push cell-runtime res)))
+    (asm-blox--cell-runtime-push cell-runtime res)))
 
-(defun gis-200--cell-runtime-set-stack (cell-runtime offset &optional op)
+(defun asm-blox--cell-runtime-set-stack (cell-runtime offset &optional op)
   "Set the stack at a given OFFSET of CELL-RUNTIME to top stack value.
 
 If OP is a symbol, perform special logic."
-  (let* ((row (gis-200--cell-runtime-row cell-runtime))
-         (col (gis-200--cell-runtime-col cell-runtime))
-         (stack (gis-200--cell-runtime-stack cell-runtime))
+  (let* ((row (asm-blox--cell-runtime-row cell-runtime))
+         (col (asm-blox--cell-runtime-col cell-runtime))
+         (stack (asm-blox--cell-runtime-stack cell-runtime))
          (offset (if (< offset 0) (+ offset (length stack)) offset))
          (curr-val (nth (- (length stack) offset 1) stack))
          (v (cond
              ((eql op 'INC) (1+ curr-val))
              ((eql op 'DEC) (1- curr-val))
-             (t (gis-200--cell-runtime-pop cell-runtime)))))
+             (t (asm-blox--cell-runtime-pop cell-runtime)))))
     (when (or (< offset 0) (>= offset (length stack)))
-      (setq gis-200-runtime-error  ;; TODO: extract this logic
+      (setq asm-blox-runtime-error  ;; TODO: extract this logic
             (list "Idx out of bounds" row col))
-      (setq gis-200--gameboard-state 'error))
+      (setq asm-blox--gameboard-state 'error))
     (setcar (nthcdr (- (length stack) offset 1) stack) v)))
 
-(defun gis-200--unary-operation (cell-runtime function)
+(defun asm-blox--unary-operation (cell-runtime function)
   "Perform binary operation FUNCTION on the top two items of CELL-RUNTIME."
-  (let* ((v (gis-200--cell-runtime-pop cell-runtime))
+  (let* ((v (asm-blox--cell-runtime-pop cell-runtime))
          (res (funcall function v)))
-    (gis-200--cell-runtime-push cell-runtime res)))
+    (asm-blox--cell-runtime-push cell-runtime res)))
 
-(defun gis-200--cell-runtime-send (cell-runtime direction)
+(defun asm-blox--cell-runtime-send (cell-runtime direction)
   "Put the top value of CELL-RUNTIME's stack on the DIRECTION register."
-  (let ((v (gis-200--cell-runtime-pop cell-runtime))
+  (let ((v (asm-blox--cell-runtime-pop cell-runtime))
         (current-val))
     (pcase direction
-      ('UP (setq current-val (gis-200--cell-runtime-staging-up cell-runtime)))
-      ('DOWN (setq current-val (gis-200--cell-runtime-staging-down cell-runtime)))
-      ('LEFT (setq current-val (gis-200--cell-runtime-staging-left cell-runtime)))
-      ('RIGHT (setq current-val (gis-200--cell-runtime-staging-right cell-runtime))))
+      ('UP (setq current-val (asm-blox--cell-runtime-staging-up cell-runtime)))
+      ('DOWN (setq current-val (asm-blox--cell-runtime-staging-down cell-runtime)))
+      ('LEFT (setq current-val (asm-blox--cell-runtime-staging-left cell-runtime)))
+      ('RIGHT (setq current-val (asm-blox--cell-runtime-staging-right cell-runtime))))
     (let ((result
            (if current-val
                ;; item is blocked
                'blocked
-             (gis-200--cell-runtime-set-staging-value-from-direction cell-runtime direction v))))
+             (asm-blox--cell-runtime-set-staging-value-from-direction cell-runtime direction v))))
       (when (eql result 'blocked)
-        (gis-200--cell-runtime-push cell-runtime v))
+        (asm-blox--cell-runtime-push cell-runtime v))
       result)))
 
-(defun gis-200--cell-runtime-get-extra (cell-runtime direction)
+(defun asm-blox--cell-runtime-get-extra (cell-runtime direction)
   "Perform the GET command on CELL-RUNTIME outside the gameboard at DIRECTION."
-  (let* ((at-row (gis-200--cell-runtime-row cell-runtime))
-         (at-col (gis-200--cell-runtime-col cell-runtime))
-         (source (gis-200--gameboard-source-at-pos at-row at-col direction)))
-    (if (or (not source) (not (gis-200--cell-source-current-value source)))
+  (let* ((at-row (asm-blox--cell-runtime-row cell-runtime))
+         (at-col (asm-blox--cell-runtime-col cell-runtime))
+         (source (asm-blox--gameboard-source-at-pos at-row at-col direction)))
+    (if (or (not source) (not (asm-blox--cell-source-current-value source)))
         'blocked
-      (let ((v (gis-200--cell-source-pop source)))
-        (gis-200--cell-runtime-push cell-runtime v)))))
+      (let ((v (asm-blox--cell-source-pop source)))
+        (asm-blox--cell-runtime-push cell-runtime v)))))
 
-(defun gis-200--cell-runtime-stack-get (cell-runtime loc)
+(defun asm-blox--cell-runtime-stack-get (cell-runtime loc)
   "Perform a variant of the GET command, grabbing the LOC value from CELL-RUNTIME's stack."
-  (let ((row (gis-200--cell-runtime-row cell-runtime))
-        (col (gis-200--cell-runtime-col cell-runtime))
-        (stack (seq-reverse (gis-200--cell-runtime-stack cell-runtime)))
+  (let ((row (asm-blox--cell-runtime-row cell-runtime))
+        (col (asm-blox--cell-runtime-col cell-runtime))
+        (stack (seq-reverse (asm-blox--cell-runtime-stack cell-runtime)))
         (val))
     ;; Error checking
     (if (>= loc 0)
         (progn
           (when (>= loc (length stack))
-            (setq gis-200-runtime-error ;; TODO: extract the logic here to separate function
+            (setq asm-blox-runtime-error ;; TODO: extract the logic here to separate function
                   (list (format "Bad idx %d/%d" loc (length stack)) row col)))
           (setq val (nth loc stack)))
       (when (> (- loc) (length stack))
-        (setq gis-200-runtime-error ;; TODO: extract the logic here to separate function
+        (setq asm-blox-runtime-error ;; TODO: extract the logic here to separate function
                   (list (format "Bad idx %d/%d" loc (length stack)) row col)))
       (setq val (nth (+ (length stack) loc) stack)))
-    (gis-200--cell-runtime-push cell-runtime val)))
+    (asm-blox--cell-runtime-push cell-runtime val)))
 
-(defun gis-200--cell-runtime-get (cell-runtime direction)
+(defun asm-blox--cell-runtime-get (cell-runtime direction)
   "Perform the GET command running from CELL-RUNTIME, recieving from DIRECTION."
   (if (integerp direction)
-      (gis-200--cell-runtime-stack-get cell-runtime direction)
-    (let* ((at-row (gis-200--cell-runtime-row cell-runtime))
-           (at-col (gis-200--cell-runtime-col cell-runtime)))
-      (if (not (gis-200--valid-position at-row at-col direction))
-          (gis-200--cell-runtime-get-extra cell-runtime direction)
-        (let* ((opposite-direction (gis-200--mirror-direction direction))
-               (from-cell (gis-200--cell-at-moved-row-col at-row at-col direction))
-               (recieve-val (gis-200--get-value-from-direction from-cell opposite-direction)))
+      (asm-blox--cell-runtime-stack-get cell-runtime direction)
+    (let* ((at-row (asm-blox--cell-runtime-row cell-runtime))
+           (at-col (asm-blox--cell-runtime-col cell-runtime)))
+      (if (not (asm-blox--valid-position at-row at-col direction))
+          (asm-blox--cell-runtime-get-extra cell-runtime direction)
+        (let* ((opposite-direction (asm-blox--mirror-direction direction))
+               (from-cell (asm-blox--cell-at-moved-row-col at-row at-col direction))
+               (recieve-val (asm-blox--get-value-from-direction from-cell opposite-direction)))
           (if recieve-val
               (progn
-                (gis-200--cell-runtime-push cell-runtime recieve-val)
-                (gis-200--remove-value-from-direction from-cell opposite-direction))
+                (asm-blox--cell-runtime-push cell-runtime recieve-val)
+                (asm-blox--remove-value-from-direction from-cell opposite-direction))
             'blocked))))))
 
-(defun gis-200--true-p (v)
+(defun asm-blox--true-p (v)
   "Return non-nil if V is truthy."
   (not (= 0 v)))
 
-(defun gis-200--cell-runtime-skip-labels (cell-runtime)
+(defun asm-blox--cell-runtime-skip-labels (cell-runtime)
   "Skip pc over any label instructions for CELL-RUNTIME.
 This logic  is needed to display current command properly."
-  (while (let* ((current-instr (gis-200--cell-runtime-current-instruction cell-runtime))
-                (code-data (gis-200-code-node-children current-instr))
+  (while (let* ((current-instr (asm-blox--cell-runtime-current-instruction cell-runtime))
+                (code-data (asm-blox-code-node-children current-instr))
                 (cmd (car code-data)))
            (eql cmd 'LABEL))
     ;; TODO: check case of all LABEL commands
-    (gis-200--cell-runtime-pc-inc cell-runtime)))
+    (asm-blox--cell-runtime-pc-inc cell-runtime)))
 
-(defun gis-200--cell-runtime-step (cell-runtime)
+(defun asm-blox--cell-runtime-step (cell-runtime)
   "Perform one step of CELL-RUNTIME."
-  (let* ((current-instr (gis-200--cell-runtime-current-instruction cell-runtime))
-         (code-data (gis-200-code-node-children current-instr))
+  (let* ((current-instr (asm-blox--cell-runtime-current-instruction cell-runtime))
+         (code-data (asm-blox-code-node-children current-instr))
          (cmd (car code-data))
          (status
           (pcase cmd
             ('_EMPTY 'blocked)
             ('CONST (let ((const (cadr code-data)))
-                      (gis-200--cell-runtime-push cell-runtime const)))
+                      (asm-blox--cell-runtime-push cell-runtime const)))
             ('SET (let ((stack-offset (cadr code-data)))
-                    (gis-200--cell-runtime-set-stack cell-runtime stack-offset)))
+                    (asm-blox--cell-runtime-set-stack cell-runtime stack-offset)))
             ('INC (let ((stack-offset (cadr code-data)))
-                    (gis-200--cell-runtime-set-stack cell-runtime stack-offset 'INC)))
+                    (asm-blox--cell-runtime-set-stack cell-runtime stack-offset 'INC)))
             ('DEC (let ((stack-offset (cadr code-data)))
-                    (gis-200--cell-runtime-set-stack cell-runtime stack-offset 'DEC)))
-            ('CLR (setf (gis-200--cell-runtime-stack cell-runtime) nil))
-            ('DUP (let ((stack (gis-200--cell-runtime-stack cell-runtime)))
-                     (setf (gis-200--cell-runtime-stack cell-runtime) (append stack stack))))
-            ('ADD (gis-200--binary-operation cell-runtime #'+))
-            ('SUB (gis-200--binary-operation cell-runtime #'-))
-            ('MUL (gis-200--binary-operation cell-runtime #'*))
-            ('DIV (gis-200--binary-operation cell-runtime #'/))
-            ('REM (gis-200--binary-operation cell-runtime #'%))
-            ('AND (gis-200--binary-operation cell-runtime(lambda (a b) (if (and (gis-200--true-p a)
-                                                                                (gis-200--true-p b))
+                    (asm-blox--cell-runtime-set-stack cell-runtime stack-offset 'DEC)))
+            ('CLR (setf (asm-blox--cell-runtime-stack cell-runtime) nil))
+            ('DUP (let ((stack (asm-blox--cell-runtime-stack cell-runtime)))
+                     (setf (asm-blox--cell-runtime-stack cell-runtime) (append stack stack))))
+            ('ADD (asm-blox--binary-operation cell-runtime #'+))
+            ('SUB (asm-blox--binary-operation cell-runtime #'-))
+            ('MUL (asm-blox--binary-operation cell-runtime #'*))
+            ('DIV (asm-blox--binary-operation cell-runtime #'/))
+            ('REM (asm-blox--binary-operation cell-runtime #'%))
+            ('AND (asm-blox--binary-operation cell-runtime(lambda (a b) (if (and (asm-blox--true-p a)
+                                                                                (asm-blox--true-p b))
                                                                            1 0))))
-            ('NOT (gis-200--unary-operation cell-runtime (lambda (x) (if (gis-200--true-p x) 0 1))))
-            ('NEG (gis-200--unary-operation cell-runtime (lambda (x) (- x))))
-            ('ABS (gis-200--unary-operation cell-runtime (lambda (x) (abs x))))
-            ('OR (gis-200--binary-operation cell-runtime (lambda (a b) (if (or (gis-200--true-p a)
-                                                                               (gis-200--true-p b))
+            ('NOT (asm-blox--unary-operation cell-runtime (lambda (x) (if (asm-blox--true-p x) 0 1))))
+            ('NEG (asm-blox--unary-operation cell-runtime (lambda (x) (- x))))
+            ('ABS (asm-blox--unary-operation cell-runtime (lambda (x) (abs x))))
+            ('OR (asm-blox--binary-operation cell-runtime (lambda (a b) (if (or (asm-blox--true-p a)
+                                                                               (asm-blox--true-p b))
                                                                            1 0))))
-            ('EQZ (gis-200--unary-operation cell-runtime (lambda (x) (if (= 0 x) 1 0))))
+            ('EQZ (asm-blox--unary-operation cell-runtime (lambda (x) (if (= 0 x) 1 0))))
 
-            ('LZ (gis-200--unary-operation cell-runtime (lambda (x) (if (< x 0) 1 0))))
-            ('GZ (gis-200--unary-operation cell-runtime (lambda (x) (if (> x 0) 1 0))))
+            ('LZ (asm-blox--unary-operation cell-runtime (lambda (x) (if (< x 0) 1 0))))
+            ('GZ (asm-blox--unary-operation cell-runtime (lambda (x) (if (> x 0) 1 0))))
 
-            ('EQ (gis-200--binary-operation cell-runtime (lambda (a b) (if (= a b) 1 0))))
-            ('NE (gis-200--binary-operation cell-runtime (lambda (a b) (if (not (= a b)) 1 0))))
-            ('LT (gis-200--binary-operation cell-runtime (lambda (a b) (if (< a b) 1 0))))
-            ('LE (gis-200--binary-operation cell-runtime (lambda (a b) (if (<= a b) 1 0))))
-            ('GT (gis-200--binary-operation cell-runtime (lambda (a b) (if (> a b) 1 0))))
-            ('GE (gis-200--binary-operation cell-runtime (lambda (a b) (if (>= a b) 1 0))))
+            ('EQ (asm-blox--binary-operation cell-runtime (lambda (a b) (if (= a b) 1 0))))
+            ('NE (asm-blox--binary-operation cell-runtime (lambda (a b) (if (not (= a b)) 1 0))))
+            ('LT (asm-blox--binary-operation cell-runtime (lambda (a b) (if (< a b) 1 0))))
+            ('LE (asm-blox--binary-operation cell-runtime (lambda (a b) (if (<= a b) 1 0))))
+            ('GT (asm-blox--binary-operation cell-runtime (lambda (a b) (if (> a b) 1 0))))
+            ('GE (asm-blox--binary-operation cell-runtime (lambda (a b) (if (>= a b) 1 0))))
             ('NOP (ignore))
-            ('DROP (gis-200--cell-runtime-pop cell-runtime))
-            ('SEND (gis-200--cell-runtime-send cell-runtime (cadr code-data)))
-            ('GET (gis-200--cell-runtime-get cell-runtime (cadr code-data)))
-            ('RIGHT (gis-200--cell-runtime-get cell-runtime 'RIGHT))
-            ('LEFT (gis-200--cell-runtime-get cell-runtime 'LEFT))
-            ('UP (gis-200--cell-runtime-get cell-runtime 'UP))
-            ('DOWN (gis-200--cell-runtime-get cell-runtime 'DOWN))
+            ('DROP (asm-blox--cell-runtime-pop cell-runtime))
+            ('SEND (asm-blox--cell-runtime-send cell-runtime (cadr code-data)))
+            ('GET (asm-blox--cell-runtime-get cell-runtime (cadr code-data)))
+            ('RIGHT (asm-blox--cell-runtime-get cell-runtime 'RIGHT))
+            ('LEFT (asm-blox--cell-runtime-get cell-runtime 'LEFT))
+            ('UP (asm-blox--cell-runtime-get cell-runtime 'UP))
+            ('DOWN (asm-blox--cell-runtime-get cell-runtime 'DOWN))
             ('JMP (let ((position (cadr code-data)))
-                    (setf (gis-200--cell-runtime-pc cell-runtime) position)))
+                    (setf (asm-blox--cell-runtime-pc cell-runtime) position)))
             ('LABEL 'label)
             ('JMP_IF (let ((position (cadr code-data))
-                           (top-value (gis-200--cell-runtime-pop cell-runtime)))
-                       (when (gis-200--true-p top-value)
-                         (setf (gis-200--cell-runtime-pc cell-runtime) position))))
+                           (top-value (asm-blox--cell-runtime-pop cell-runtime)))
+                       (when (asm-blox--true-p top-value)
+                         (setf (asm-blox--cell-runtime-pc cell-runtime) position))))
             ('JMP_IF_NOT (let ((position (cadr code-data))
-                               (top-value (gis-200--cell-runtime-pop cell-runtime)))
-                           (when (not (gis-200--true-p top-value))
-                             (setf (gis-200--cell-runtime-pc cell-runtime) position)))))))
+                               (top-value (asm-blox--cell-runtime-pop cell-runtime)))
+                           (when (not (asm-blox--true-p top-value))
+                             (setf (asm-blox--cell-runtime-pc cell-runtime) position)))))))
     ;; handle PC movement
     (pcase status
       ('blocked nil)
       ('jump nil)
       ('label (progn
-                (gis-200--cell-runtime-pc-inc cell-runtime)
-                (gis-200--cell-runtime-step cell-runtime)))
-      (_ (gis-200--cell-runtime-pc-inc cell-runtime)))
-    (gis-200--cell-runtime-skip-labels cell-runtime)))
+                (asm-blox--cell-runtime-pc-inc cell-runtime)
+                (asm-blox--cell-runtime-step cell-runtime)))
+      (_ (asm-blox--cell-runtime-pc-inc cell-runtime)))
+    (asm-blox--cell-runtime-skip-labels cell-runtime)))
 
-(defun gis-200--step ()
+(defun asm-blox--step ()
   "Perform the operations needed to progress the game one step."
-  (gis-200--gameboard-step)
-  (gis-200--resolve-port-values)
-  (gis-200--extra-gameboard-step))
+  (asm-blox--gameboard-step)
+  (asm-blox--resolve-port-values)
+  (asm-blox--extra-gameboard-step))
 
-(defun gis-200--extra-gameboard-step ()
+(defun asm-blox--extra-gameboard-step ()
   "Perform step on all things not on the gameboard."
-  (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells)))
+  (let ((sinks (asm-blox--problem-spec-sinks asm-blox--extra-gameboard-cells)))
     (dolist (sink sinks)
-      (gis-200--cell-sink-get sink))))
+      (asm-blox--cell-sink-get sink))))
 
-(defun gis-200--gameboard-step ()
+(defun asm-blox--gameboard-step ()
   "Perform step on all cells on the gameboard."
   (let ((last-cell-fns '()))
-    (dotimes (idx (length gis-200--gameboard))
-      (let ((cell (aref gis-200--gameboard idx)))
-        (let ((fn (gis-200--cell-runtime-run-function cell)))
+    (dotimes (idx (length asm-blox--gameboard))
+      (let ((cell (aref asm-blox--gameboard idx)))
+        (let ((fn (asm-blox--cell-runtime-run-function cell)))
           (if (functionp fn)
               (setq last-cell-fns (cons (cons fn cell) last-cell-fns))
-            (gis-200--cell-runtime-step cell)))))
+            (asm-blox--cell-runtime-step cell)))))
     ;; We need to run the non-code cells last because they directly
     ;; manipulate their ports.
     (dolist (fn+cell last-cell-fns)
       (funcall (car fn+cell) (cdr fn+cell)))))
 
-(defun gis-200--resolve-port-values ()
+(defun asm-blox--resolve-port-values ()
   "Move staging port values to main, propogate nils up to staging."
-  (dotimes (idx (length gis-200--gameboard))
-    (let ((cell (aref gis-200--gameboard idx)))
-      (gis-200--cell-runtime-merge-ports-with-staging cell))))
+  (dotimes (idx (length asm-blox--gameboard))
+    (let ((cell (aref asm-blox--gameboard idx)))
+      (asm-blox--cell-runtime-merge-ports-with-staging cell))))
 
-(defun gis-200-check-winning-conditions ()
+(defun asm-blox-check-winning-conditions ()
   "Return non-nil if all sinks are full."
-  (when (not (gis-200--gameboard-in-final-state-p))
-    (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+  (when (not (asm-blox--gameboard-in-final-state-p))
+    (let ((sinks (asm-blox--problem-spec-sinks asm-blox--extra-gameboard-cells))
           (win-p t))
       (while (and sinks win-p)
         (let* ((sink (car sinks))
-               (expected-data (gis-200--cell-sink-expected-data sink))
-               (idx (gis-200--cell-sink-idx sink))
-               (err-val (gis-200--cell-sink-err-val sink)))
-          (if (gis-200--cell-sink-expected-text sink)
+               (expected-data (asm-blox--cell-sink-expected-data sink))
+               (idx (asm-blox--cell-sink-idx sink))
+               (err-val (asm-blox--cell-sink-err-val sink)))
+          (if (asm-blox--cell-sink-expected-text sink)
               ;; If expected text exists we are dealing with an editor sink
-              (let* ((expected-text (string-trim-right (gis-200--cell-sink-expected-text sink)))
+              (let* ((expected-text (string-trim-right (asm-blox--cell-sink-expected-text sink)))
                      (expected-lines (split-string expected-text "\n"))
-                     (text (string-trim-right (gis-200--cell-sink-editor-text sink)))
+                     (text (string-trim-right (asm-blox--cell-sink-editor-text sink)))
                      (text-lines (split-string text "\n")))
                 (if (not (equal (length text-lines) (length expected-lines)))
                     (setq win-p nil)
@@ -879,9 +879,9 @@ This logic  is needed to display current command properly."
               (setq win-p nil)))
           (setq sinks (cdr sinks))))
       (when win-p
-        (gis-200--win-file-for-current-buffer)
+        (asm-blox--win-file-for-current-buffer)
         ;; TODO: Do something else for the victory.
-        (setq gis-200--gameboard-state 'win)
+        (setq asm-blox--gameboard-state 'win)
         (message "Congragulations, you won!")))))
 
 ;;; Gameboard Display Helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -889,74 +889,74 @@ This logic  is needed to display current command properly."
 ;; Functions that map the domain of the gameboard to that of the
 ;; display.
 
-(defun gis-200--get-direction-col-registers (row col direction)
+(defun asm-blox--get-direction-col-registers (row col direction)
   "Return the register value for the DIRECTION registers at ROW, COL.
 ROW and COL here do not refer to the coordinates of a
 cell-runtime but rather the in-between row/col."
   (assert (or (eql 'LEFT direction) (eql 'RIGHT direction)))
-  (assert (<= 0 row (1- gis-200--gameboard-row-ct)))
-  (assert (<= 0 col gis-200--gameboard-col-ct))
+  (assert (<= 0 row (1- asm-blox--gameboard-row-ct)))
+  (assert (<= 0 col asm-blox--gameboard-col-ct))
   (let ((cell-col (if (eql 'RIGHT direction) (1- col) col)))
     (cond
      ;; outputs are never displayed on the board
      ((or (and (= col 0) (eql direction 'LEFT))
-          (and (= row gis-200--gameboard-col-ct) (eql direction 'RIGHT)))
+          (and (= row asm-blox--gameboard-col-ct) (eql direction 'RIGHT)))
       nil)
      ((or (= col 0)
-          (= col gis-200--gameboard-col-ct))
-      (let* ((source (gis-200--gameboard-source-at-pos row cell-col)))
+          (= col asm-blox--gameboard-col-ct))
+      (let* ((source (asm-blox--gameboard-source-at-pos row cell-col)))
         (if (not source)
             nil
-          (gis-200--cell-source-current-value source))))
+          (asm-blox--cell-source-current-value source))))
      (t
-      (let* ((cell-runtime (gis-200--cell-at-row-col row cell-col)))
-        (gis-200--get-value-from-direction cell-runtime direction))))))
+      (let* ((cell-runtime (asm-blox--cell-at-row-col row cell-col)))
+        (asm-blox--get-value-from-direction cell-runtime direction))))))
 
-(defun gis-200--get-direction-row-registers (row col direction)
+(defun asm-blox--get-direction-row-registers (row col direction)
   "Return the register value for the DIRECTION registers at ROW, COL.
 ROW and COL here do not refer to the coordinates of a
 cell-runtime but rather the in-between row/col."
   (assert (or (eql 'UP direction) (eql 'DOWN direction)))
-  (assert (<= 0 row gis-200--gameboard-row-ct))
-  (assert (<= 0 col (1- gis-200--gameboard-col-ct)))
+  (assert (<= 0 row asm-blox--gameboard-row-ct))
+  (assert (<= 0 col (1- asm-blox--gameboard-col-ct)))
   (let ((cell-row (if (eql 'DOWN direction) (1- row) row)))
     (cond
      ((or (and (= row 0) (eql direction 'UP))
-          (and (= row gis-200--gameboard-row-ct) (eql direction 'DOWN)))
+          (and (= row asm-blox--gameboard-row-ct) (eql direction 'DOWN)))
       nil)
      ((or (= row 0)
-          (= row gis-200--gameboard-row-ct))
-      (let* ((source (gis-200--gameboard-source-at-pos cell-row col)))
+          (= row asm-blox--gameboard-row-ct))
+      (let* ((source (asm-blox--gameboard-source-at-pos cell-row col)))
         (if (not source)
             nil
-          (gis-200--cell-source-current-value source))))
+          (asm-blox--cell-source-current-value source))))
      (t
-      (let* ((cell-runtime (gis-200--cell-at-row-col cell-row col)))
-        (gis-200--get-value-from-direction cell-runtime direction))))))
+      (let* ((cell-runtime (asm-blox--cell-at-row-col cell-row col)))
+        (asm-blox--get-value-from-direction cell-runtime direction))))))
 
-(defun gis-200--get-source-idx-at-position (row col)
+(defun asm-blox--get-source-idx-at-position (row col)
   "Return name of source at position ROW, COL if exists."
-  (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
+  (let ((sources (asm-blox--problem-spec-sources asm-blox--extra-gameboard-cells))
         (found))
     (while sources
       (let ((source (car sources)))
-        (if (and (= (gis-200--cell-source-row source) row)
-                 (= (gis-200--cell-source-col source) col))
+        (if (and (= (asm-blox--cell-source-row source) row)
+                 (= (asm-blox--cell-source-col source) col))
             (progn (setq sources nil)
-                   (setq found (gis-200--cell-source-name source)))
+                   (setq found (asm-blox--cell-source-name source)))
           (setq sources (cdr sources)))))
     found))
 
-(defun gis-200--get-sink-name-at-position (row col)
+(defun asm-blox--get-sink-name-at-position (row col)
   "Return name of sink at position ROW, COL if exists."
-  (let ((sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+  (let ((sinks (asm-blox--problem-spec-sinks asm-blox--extra-gameboard-cells))
         (found))
     (while sinks
       (let ((sink (car sinks)))
-        (if (and (= (gis-200--cell-sink-row sink) row)
-                 (= (gis-200--cell-sink-col sink) col))
+        (if (and (= (asm-blox--cell-sink-row sink) row)
+                 (= (asm-blox--cell-sink-col sink) col))
             (progn (setq sinks nil)
-                   (setq found (gis-200--cell-sink-name sink)))
+                   (setq found (asm-blox--cell-sink-name sink)))
           (setq sinks (cdr sinks)))))
     found))
 
@@ -969,122 +969,122 @@ cell-runtime but rather the in-between row/col."
 ;; output be consumed.  The sink node should also have a list of the
 ;; expected output.
 
-(cl-defstruct (gis-200--cell-source
-               (:constructor gis-200--cell-source-create)
+(cl-defstruct (asm-blox--cell-source
+               (:constructor asm-blox--cell-source-create)
                (:copier nil))
   row col data idx name)
 
-(cl-defstruct (gis-200--cell-sink
-               (:constructor gis-200--cell-sink-create)
+(cl-defstruct (asm-blox--cell-sink
+               (:constructor asm-blox--cell-sink-create)
                (:copier nil))
   row col expected-data idx name err-val
   default-editor-text
   editor-text editor-point expected-text)
 
-(cl-defstruct (gis-200--problem-spec
-               (:constructor gis-200--problem-spec-create)
+(cl-defstruct (asm-blox--problem-spec
+               (:constructor asm-blox--problem-spec-create)
                (:copier nil))
   sources sinks name description difficulty)
 
-(defun gis-200--reset-extra-gameboard-cells-state ()
+(defun asm-blox--reset-extra-gameboard-cells-state ()
   "Reset the state of all cells not in the grid (sources and sinks)."
-  (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
-        (sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells)))
+  (let ((sources (asm-blox--problem-spec-sources asm-blox--extra-gameboard-cells))
+        (sinks (asm-blox--problem-spec-sinks asm-blox--extra-gameboard-cells)))
     (dolist (source sources)
-      (setf (gis-200--cell-source-idx source) 0))
+      (setf (asm-blox--cell-source-idx source) 0))
     (dolist (sink sinks)
-      (setf (gis-200--cell-sink-idx sink) 0)
-      (setf (gis-200--cell-sink-err-val sink) nil)
-      (when (gis-200--cell-sink-expected-text sink)
-        (if (gis-200--cell-sink-default-editor-text sink)
-            (setf (gis-200--cell-sink-editor-text sink)
-                  (gis-200--cell-sink-default-editor-text sink))
-          (setf (gis-200--cell-sink-editor-text sink) ""))
-        (setf (gis-200--cell-sink-editor-point sink) 1)))))
+      (setf (asm-blox--cell-sink-idx sink) 0)
+      (setf (asm-blox--cell-sink-err-val sink) nil)
+      (when (asm-blox--cell-sink-expected-text sink)
+        (if (asm-blox--cell-sink-default-editor-text sink)
+            (setf (asm-blox--cell-sink-editor-text sink)
+                  (asm-blox--cell-sink-default-editor-text sink))
+          (setf (asm-blox--cell-sink-editor-text sink) ""))
+        (setf (asm-blox--cell-sink-editor-point sink) 1)))))
 
-(defun gis-200--cell-sink-get (sink)
+(defun asm-blox--cell-sink-get (sink)
   "Grab a value and put it into SINK from the gameboard."
-  (let* ((row (gis-200--cell-sink-row sink))
-         (col (gis-200--cell-sink-col sink))
+  (let* ((row (asm-blox--cell-sink-row sink))
+         (col (asm-blox--cell-sink-col sink))
          (direction (cond
-                     ((>= col gis-200--gameboard-col-ct) 'LEFT)
+                     ((>= col asm-blox--gameboard-col-ct) 'LEFT)
                      ((> 0 col) 'RIGHT)
                      ((> 0 row) 'DOWN)
-                     ((>= row gis-200--gameboard-row-ct) 'UP)))
-         (opposite-direction (gis-200--mirror-direction direction))
-         (cell-runtime (gis-200--cell-at-moved-row-col row col direction))
-         (v (gis-200--get-value-from-direction cell-runtime opposite-direction)))
+                     ((>= row asm-blox--gameboard-row-ct) 'UP)))
+         (opposite-direction (asm-blox--mirror-direction direction))
+         (cell-runtime (asm-blox--cell-at-moved-row-col row col direction))
+         (v (asm-blox--get-value-from-direction cell-runtime opposite-direction)))
     (if v
-        (let* ((data (gis-200--cell-sink-expected-data sink))
-               (idx (gis-200--cell-sink-idx sink))
+        (let* ((data (asm-blox--cell-sink-expected-data sink))
+               (idx (asm-blox--cell-sink-idx sink))
                (expected-value (nth idx data)))
           (when (not (equal expected-value v))
             ;; TODO - do something here
-            (setq gis-200--gameboard-state 'error)
-            (setf (gis-200--cell-sink-err-val sink) v)
+            (setq asm-blox--gameboard-state 'error)
+            (setf (asm-blox--cell-sink-err-val sink) v)
             (message "Unexpected value"))
-          (setf (gis-200--cell-sink-idx sink) (1+ idx))
-          (gis-200--remove-value-from-direction cell-runtime opposite-direction))
+          (setf (asm-blox--cell-sink-idx sink) (1+ idx))
+          (asm-blox--remove-value-from-direction cell-runtime opposite-direction))
       'blocked)))
 
-(defun gis-200--cell-sink-insert-character (sink char)
+(defun asm-blox--cell-sink-insert-character (sink char)
   "For a textual SINK, insert CHAR."
-  (let ((text (gis-200--cell-sink-editor-text sink))
-        (point (gis-200--cell-sink-editor-point sink)))
+  (let ((text (asm-blox--cell-sink-editor-text sink))
+        (point (asm-blox--cell-sink-editor-point sink)))
     (cond
      ((<= 32 char 126)
-      (setf (gis-200--cell-sink-editor-text sink)
+      (setf (asm-blox--cell-sink-editor-text sink)
             (concat (substring text 0 (1- point))
                     (char-to-string char)
                     (substring text (1- point))))
-      (setf (gis-200--cell-sink-editor-point sink)
+      (setf (asm-blox--cell-sink-editor-point sink)
             (1+ point)))
      ((= char ?\n)
-      (setf (gis-200--cell-sink-editor-text sink)
+      (setf (asm-blox--cell-sink-editor-text sink)
             (concat (substring text 0 (1- point))
                     (char-to-string char)
                     (substring text (1- point))))
-      (setf (gis-200--cell-sink-editor-point sink)
+      (setf (asm-blox--cell-sink-editor-point sink)
             (1+ point)))
      ((or (= char ?\b) (= char -1))
       (when (not (= 1 point))
-        (setf (gis-200--cell-sink-editor-text sink)
+        (setf (asm-blox--cell-sink-editor-text sink)
               (concat (substring text 0 (- point 2))
                       (substring text (- point 1))))
-        (setf (gis-200--cell-sink-editor-point sink)
+        (setf (asm-blox--cell-sink-editor-point sink)
               (max (1- point) 1))))
      ((or (= char -2))
       (when (not (= 1 point))
-        (setf (gis-200--cell-sink-editor-text sink)
+        (setf (asm-blox--cell-sink-editor-text sink)
               (concat (substring text 0 (- point 1))
                       (substring text point))))))))
 
-(defun gis-200--cell-sink-move-point (sink point)
+(defun asm-blox--cell-sink-move-point (sink point)
   "For a textual SINK, move the point to POINT."
-  (let* ((text (gis-200--cell-sink-editor-text sink))
+  (let* ((text (asm-blox--cell-sink-editor-text sink))
          (bounded-pt (max (min point (1+ (length text))) 1)))
-    (setf (gis-200--cell-sink-editor-point sink) bounded-pt)))
+    (setf (asm-blox--cell-sink-editor-point sink) bounded-pt)))
 
-(defun gis-200--cell-source-current-value (source)
+(defun asm-blox--cell-source-current-value (source)
   "Return the value of SOURCE that will be taken next."
-  (unless (gis-200--cell-source-p source)
+  (unless (asm-blox--cell-source-p source)
     (error "Cell-source-pop type error"))
-  (let* ((data (gis-200--cell-source-data source))
-         (idx (gis-200--cell-source-idx source))
+  (let* ((data (asm-blox--cell-source-data source))
+         (idx (asm-blox--cell-source-idx source))
          (top (nth idx data)))
     top))
 
-(defun gis-200--cell-source-pop (source)
+(defun asm-blox--cell-source-pop (source)
   "Pop a value from the data of SOURCE."
-  (unless (gis-200--cell-source-p source)
+  (unless (asm-blox--cell-source-p source)
     (error "Cell-source-pop type error"))
-  (let* ((data (gis-200--cell-source-data source))
-         (idx (gis-200--cell-source-idx source))
+  (let* ((data (asm-blox--cell-source-data source))
+         (idx (asm-blox--cell-source-idx source))
          (top (nth idx data)))
-    (setf (gis-200--cell-source-idx source) (1+ idx))
+    (setf (asm-blox--cell-source-idx source) (1+ idx))
     top))
 
-(defun gis-200--problem-list-of-lists-to-lisp (lists)
+(defun asm-blox--problem-list-of-lists-to-lisp (lists)
   "Return a list of LISTS from 0-terminated list of number lists."
   (thread-last (list '() '())
     (seq-reduce (lambda (acc x)
@@ -1097,7 +1097,7 @@ cell-runtime but rather the in-between row/col."
     (car)
     (reverse)))
 
-(defun gis-200--problem-random-list-of-lists ()
+(defun asm-blox--problem-random-list-of-lists ()
   "Generate list of 0-terminated lists as helper."
   (let* ((nums (seq-map (lambda (_) (random 999)) (make-list 40 nil)))
          (breaks (seq-map (lambda (_) (random 5)) (make-list 40 nil)))
@@ -1116,15 +1116,15 @@ cell-runtime but rather the in-between row/col."
                        a))
                    nums breaks)))
 
-(defun gis-200--problem--indentation ()
+(defun asm-blox--problem--indentation ()
   "Generate a problem of indenting a code sequence properly."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 40 nil)))
          (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Indentation I"
      :difficulty 'medium
      :sinks
-     (list (gis-200--cell-sink-create :row 2
+     (list (asm-blox--cell-sink-create :row 2
                                       :col 4
                                       :expected-data expected-output
                                       :idx 0
@@ -1134,20 +1134,20 @@ cell-runtime but rather the in-between row/col."
                                       :expected-text "func main () {\n  fmt.Println(\"hello world\")\n  return\n}"))
      :description "<editor> Edit text to match the target.")))
 
-(defun gis-200--problem--number-sum ()
+(defun asm-blox--problem--number-sum ()
   "Generate a problem of calculating y=x(x+1)/2."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 40 nil)))
          (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Number Sum"
      :difficulty 'easy
-     :sources (list (gis-200--cell-source-create :row -1
+     :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 3
                                                  :data input
                                                  :idx 0
                                                  :name "I"))
      :sinks
-     (list (gis-200--cell-sink-create :row 2
+     (list (asm-blox--cell-sink-create :row 2
                                       :col 4
                                       :expected-data expected-output
                                       :idx 0
@@ -1158,22 +1158,22 @@ cell-runtime but rather the in-between row/col."
      :description "Read a number from I, send to O the sum of numbers
 from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
 
-(defun gis-200--problem--meeting-point ()
+(defun asm-blox--problem--meeting-point ()
   "Generate a problem of finding the point that minimizes movement."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
          (expected-output (list (cl-loop for i from 1 to 1000
                                          minimize (cl-loop for d in input
                                                            sum (abs (- i d)))))))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Meeting point"
      :difficulty 'hard
-     :sources (list (gis-200--cell-source-create :row 1
+     :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input
                                                  :idx 0
                                                  :name "N"))
      :sinks
-     (list (gis-200--cell-sink-create :row 2
+     (list (asm-blox--cell-sink-create :row 2
                                       :col 4
                                       :expected-data expected-output
                                       :idx 0
@@ -1186,21 +1186,21 @@ Send a number x which minimizes the equation
 (cl-loop for n in N
          sum (abs (- n x)))")))
 
-(defun gis-200--problem--simple-graph ()
+(defun asm-blox--problem--simple-graph ()
   "Generate a problem for the user to draw a simple graph."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
          (expected-text (string-join
                          (seq-map (lambda (x) (make-string x ?#)) input) "\n")))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Simple Graph"
      :difficulty 'medium
-     :sources (list (gis-200--cell-source-create :row 1
+     :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input
                                                  :idx 0
                                                  :name "A"))
      :sinks
-     (list (gis-200--cell-sink-create :row 1
+     (list (asm-blox--cell-sink-create :row 1
                                       :col 5
                                       :expected-data nil
                                       :idx 0
@@ -1211,14 +1211,14 @@ Send a number x which minimizes the equation
      :description
      "<editor> Read a number from A, draw a line with that many '#' characters.")))
 
-(defun gis-200--problem--hello-world ()
+(defun asm-blox--problem--hello-world ()
   "Generate a problem involving writing Hello World to the srceen."
-  (gis-200--problem-spec-create
+  (asm-blox--problem-spec-create
    :name "Editor Basics"
    :difficulty 'tutorial
    :sources (list )
    :sinks
-   (list (gis-200--cell-sink-create :row 1
+   (list (asm-blox--cell-sink-create :row 1
                                     :col 5
                                     :expected-data nil
                                     :idx 0
@@ -1228,22 +1228,22 @@ Send a number x which minimizes the equation
                                     :expected-text "Hello World"))
    :description "<editor> Write the string \"Hello World\" to the editor."))
 
-(defun gis-200--problem--upcase ()
+(defun asm-blox--problem--upcase ()
   "generate a problem involving upcasing characters."
   (let* ((input-1 (seq-map (lambda (_)
                              (+ (random 95) 32))
                            (make-list 40 nil)))
          (expected (string-to-list (upcase (apply #'string input-1)))))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Upcase"
      :difficulty 'easy
-     :sources (list (gis-200--cell-source-create :row 1
+     :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
                                                  :idx 0
                                                  :name "C"))
      :sinks
-     (list (gis-200--cell-sink-create :row 1
+     (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
                                       :idx 0
@@ -1251,7 +1251,7 @@ Send a number x which minimizes the equation
      :description "Read a character from C and send it to O,
 upcasing it if it is a lowercase letter.")))
 
-(defun gis-200--problem--inc-ct ()
+(defun asm-blox--problem--inc-ct ()
   "Generate a simple addition problem."
   (let* ((input-1 (append (seq-map (lambda (_)
                                      (random 999))
@@ -1263,16 +1263,16 @@ upcasing it if it is a lowercase letter.")))
                                     input-1
                                     (cdr input-1))
                           0))))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Increment Cout"
      :difficulty 'medium
-     :sources (list (gis-200--cell-source-create :row 1
+     :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
                                                  :idx 0
                                                  :name "I"))
      :sinks
-     (list (gis-200--cell-sink-create :row 1
+     (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
                                       :idx 0
@@ -1282,7 +1282,7 @@ upcasing it if it is a lowercase letter.")))
 ex. 1  2  0  5  6  4
      +  -  +  +  -     3 increses")))
 
-(defun gis-200--problem--tax ()
+(defun asm-blox--problem--tax ()
   "Generate a simple tax problem."
   (let* ((high-start-ct (random 20))
          (start-seq (seq-map (lambda (_) (random 999)) (make-list high-start-ct nil)))
@@ -1300,16 +1300,16 @@ ex. 1  2  0  5  6  4
                                             at-ct))))
                                     input-1
                                     0))))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Tax"
      :difficulty 'hard
-     :sources (list (gis-200--cell-source-create :row 1
+     :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
                                                  :idx 0
                                                  :name "I"))
      :sinks
-     (list (gis-200--cell-sink-create :row 1
+     (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
                                       :idx 0
@@ -1317,23 +1317,23 @@ ex. 1  2  0  5  6  4
      :description
      "Read values from I. After the 12th consecutive value is greater than or equal to 500, return that 12th value divided by 40.")))
 
-(defun gis-200--problem--list-reverse ()
+(defun asm-blox--problem--list-reverse ()
   "Generate a simple addition problem."
-  (let* ((input-1 (gis-200--problem-random-list-of-lists))
-         (lists (gis-200--problem-list-of-lists-to-lisp input-1))
+  (let* ((input-1 (asm-blox--problem-random-list-of-lists))
+         (lists (asm-blox--problem-list-of-lists-to-lisp input-1))
          (expected (flatten-list (seq-map (lambda (l)
                                        (append (reverse l) (list 0)))
                                      lists))))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "List Reverse"
      :difficulty 'medium
-     :sources (list (gis-200--cell-source-create :row -1
+     :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 2
                                                  :data input-1
                                                  :idx 0
                                                  :name "L"))
      :sinks
-     (list (gis-200--cell-sink-create :row 3
+     (list (asm-blox--cell-sink-create :row 3
                                       :col 1
                                       :expected-data expected
                                       :idx 0
@@ -1342,7 +1342,7 @@ ex. 1  2  0  5  6  4
      "Lists are 0 terminated.
 Read a list from L, reverse it, and send it to R (terminating it with 0).")))
 
-(defun gis-200--problem--list-length ()
+(defun asm-blox--problem--list-length ()
   "Generate a simple addition problem."
   (let* ((nums)
          (lengths))
@@ -1356,36 +1356,36 @@ Read a list from L, reverse it, and send it to R (terminating it with 0).")))
                            (list 0)))))
     (setq lengths (reverse lengths))
     lengths
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "List Length"
      :difficulty 'medium
-     :sources (list (gis-200--cell-source-create :row 1
+     :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data nums
                                                  :idx 0
                                                  :name "I"))
      :sinks
-     (list (gis-200--cell-sink-create :row 1
+     (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data lengths
                                       :idx 0
                                       :name "O"))
      :description "Lists are 0 terminated. Read a list from I, calculate its length and send it to O.")))
 
-(defun gis-200--problem--turing ()
+(defun asm-blox--problem--turing ()
   "Generate a simple Brain****-like puzzle."
   (let* ((input-1 (list ?> ?> ?> ?+ ?+ ?. ?. ?< ?+ ?. ?> ?. ?+ ?. ?> ?> ?.))
          (expected (list 2 2 1 2 3 0)))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Turing"
      :difficulty 'hard
-     :sources (list (gis-200--cell-source-create :row 0
+     :sources (list (asm-blox--cell-source-create :row 0
                                                  :col -1
                                                  :data input-1
                                                  :idx 0
                                                  :name "X"))
      :sinks
-     (list (gis-200--cell-sink-create :row 1
+     (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
                                       :idx 0
@@ -1402,28 +1402,28 @@ NOTE The head will go no more than +-10 spaces
      from where the head starts off.")))
 
 
-(defun gis-200--problem--merge-step ()
+(defun asm-blox--problem--merge-step ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-sort #'< (seq-map (lambda (_) (random 100))
                                          (make-list 20 nil))))
          (input-2 (seq-sort #'< (seq-map (lambda (_) (random 100))
                                          (make-list 20 nil))))
          (expected (seq-sort #'< (append input-1 input-2))))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Merge Step"
      :difficulty 'hard
-     :sources (list (gis-200--cell-source-create :row 0
+     :sources (list (asm-blox--cell-source-create :row 0
                                                  :col -1
                                                  :data input-1
                                                  :idx 0
                                                  :name "A")
-                    (gis-200--cell-source-create :row 2
+                    (asm-blox--cell-source-create :row 2
                                                  :col -1
                                                  :data input-2
                                                  :idx 0
                                                  :name "B"))
      :sinks
-     (list (gis-200--cell-sink-create :row 1
+     (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
                                       :idx 0
@@ -1431,7 +1431,7 @@ NOTE The head will go no more than +-10 spaces
      :description "Numbers in A and B are sorted. Read numbers from A and B,
 combine them sorted and send it them to C.")))
 
-(defun gis-200--problem--filter ()
+(defun asm-blox--problem--filter ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 100)) (make-list 40 nil)))
          (expected (seq-map (lambda (x)
@@ -1439,16 +1439,16 @@ combine them sorted and send it them to C.")))
                                   0
                                 x))
                                input-1)))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Number Filter"
      :difficulty 'easy
-     :sources (list (gis-200--cell-source-create :row 1
+     :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
                                                  :idx 0
                                                  :name "I"))
      :sinks
-     (list (gis-200--cell-sink-create :row 1
+     (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
                                       :idx 0
@@ -1456,7 +1456,7 @@ combine them sorted and send it them to C.")))
      :description
      "Read a value from I. If it is even send 0 to O, else send the value.")))
 
-(defun gis-200--problem--clock ()
+(defun asm-blox--problem--clock ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 24)) (make-list 40 nil)))
          (expected (cdr (seq-reverse
@@ -1466,16 +1466,16 @@ combine them sorted and send it them to C.")))
                                                acc)))
                                      input-1
                                      '(0))))))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Clock Hours"
      :difficulty 'easy
-     :sources (list (gis-200--cell-source-create :row 1
+     :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
                                                  :idx 0
                                                  :name "H"))
      :sinks
-     (list (gis-200--cell-sink-create :row 3
+     (list (asm-blox--cell-sink-create :row 3
                                       :col 1
                                       :expected-data expected
                                       :idx 0
@@ -1485,32 +1485,32 @@ that value to the current time which starts at 0.
 
 Write the current time to T for every time you move the current time.")))
 
-(defun gis-200--problem--add ()
+(defun asm-blox--problem--add ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (input-3 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (expected (seq-mapn #'+ input-1 input-2 input-3)))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Number Addition"
      :difficulty 'easy
-     :sources (list (gis-200--cell-source-create :row -1
+     :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
                                                  :idx 0
                                                  :name "A")
-                    (gis-200--cell-source-create :row -1
+                    (asm-blox--cell-source-create :row -1
                                                  :col 1
                                                  :data input-2
                                                  :idx 0
                                                  :name "B")
-                    (gis-200--cell-source-create :row -1
+                    (asm-blox--cell-source-create :row -1
                                                  :col 2
                                                  :data input-3
                                                  :idx 0
                                                  :name "C"))
      :sinks
-     (list (gis-200--cell-sink-create :row 3
+     (list (asm-blox--cell-sink-create :row 3
                                       :col 1
                                       :expected-data expected
                                       :idx 0
@@ -1518,32 +1518,32 @@ Write the current time to T for every time you move the current time.")))
      :description
      "Take input from A, B, and C, add the three together, and send it to S.")))
 
-(defun gis-200--problem--number-sorter ()
+(defun asm-blox--problem--number-sorter ()
   "Generate problem for comparing two numbers and sending them in different places."
   (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (expected-1 (seq-mapn (lambda (a b) (if (> a b) a 0)) input-1 input-2))
          (expected-2 (seq-mapn (lambda (a b) (if (> b a) b 0)) input-1 input-2)))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Number Chooser"
      :difficulty 'easy
-     :sources (list (gis-200--cell-source-create :row -1
+     :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
                                                  :idx 0
                                                  :name "A")
-                    (gis-200--cell-source-create :row -1
+                    (asm-blox--cell-source-create :row -1
                                                  :col 1
                                                  :data input-2
                                                  :idx 0
                                                  :name "B"))
      :sinks
-     (list (gis-200--cell-sink-create :row 0
+     (list (asm-blox--cell-sink-create :row 0
                                       :col 4
                                       :expected-data expected-1
                                       :idx 0
                                       :name "L")
-           (gis-200--cell-sink-create :row 2
+           (asm-blox--cell-sink-create :row 2
                                       :col 4
                                       :expected-data expected-2
                                       :idx 0
@@ -1551,142 +1551,142 @@ Write the current time to T for every time you move the current time.")))
      :description "Take an input from A and B. If A>B then send A to L, 0 to R;
 If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
-(defun gis-200--problem--constant ()
+(defun asm-blox--problem--constant ()
   "Generate a simple addition problem."
   (let* ((expected (make-list 40 1)))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Constant Generator"
      :difficulty 'tutorial
      :sources (list )
      :sinks
-     (list (gis-200--cell-sink-create :row 0
+     (list (asm-blox--cell-sink-create :row 0
                                       :col 4
                                       :expected-data expected
                                       :idx 0
                                       :name "N"))
      :description "Repeatedly send the number 1 to N. There are no inputs.")))
 
-(defun gis-200--problem--identity ()
+(defun asm-blox--problem--identity ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (expected input-1))
-    (gis-200--problem-spec-create
+    (asm-blox--problem-spec-create
      :name "Identity"
      :difficulty 'tutorial
-     :sources (list (gis-200--cell-source-create :row -1
+     :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
                                                  :idx 0
                                                  :name "X"))
      :sinks
-     (list (gis-200--cell-sink-create :row 3
+     (list (asm-blox--cell-sink-create :row 3
                                       :col 3
                                       :expected-data expected
                                       :idx 0
                                       :name "X"))
      :description "Take an input from the input X and send it to the output X.")))
 
-(defvar gis-200-puzzles (list
-                         #'gis-200--problem--indentation
-                         #'gis-200--problem--constant
-                         #'gis-200--problem--identity
-                         #'gis-200--problem--add
-                         #'gis-200--problem--filter
-                         #'gis-200--problem--number-sum
-                         #'gis-200--problem--number-sorter
-                         #'gis-200--problem--clock
-                         #'gis-200--problem--tax
-                         #'gis-200--problem--list-length
-                         #'gis-200--problem--list-reverse
-                         #'gis-200--problem--inc-ct
-                         #'gis-200--problem--upcase
-                         #'gis-200--problem--merge-step
-                         #'gis-200--problem--hello-world
-                         #'gis-200--problem--simple-graph
-                         #'gis-200--problem--meeting-point
-                         #'gis-200--problem--turing))
+(defvar asm-blox-puzzles (list
+                         #'asm-blox--problem--indentation
+                         #'asm-blox--problem--constant
+                         #'asm-blox--problem--identity
+                         #'asm-blox--problem--add
+                         #'asm-blox--problem--filter
+                         #'asm-blox--problem--number-sum
+                         #'asm-blox--problem--number-sorter
+                         #'asm-blox--problem--clock
+                         #'asm-blox--problem--tax
+                         #'asm-blox--problem--list-length
+                         #'asm-blox--problem--list-reverse
+                         #'asm-blox--problem--inc-ct
+                         #'asm-blox--problem--upcase
+                         #'asm-blox--problem--merge-step
+                         #'asm-blox--problem--hello-world
+                         #'asm-blox--problem--simple-graph
+                         #'asm-blox--problem--meeting-point
+                         #'asm-blox--problem--turing))
 
-(defun gis-200--get-puzzle-by-id (name)
+(defun asm-blox--get-puzzle-by-id (name)
   "Given a puzzle NAME, return tis puzzle generation function."
   (seq-find (lambda (puzzle-fn)
-              (let ((n (gis-200--problem-spec-name (funcall puzzle-fn))))
+              (let ((n (asm-blox--problem-spec-name (funcall puzzle-fn))))
                 (equal name n)))
-            gis-200-puzzles))
+            asm-blox-puzzles))
 
 ;;; File Saving ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defconst gis-200-save-directory-name
-  (expand-file-name ".gis-200" user-emacs-directory))
+(defconst asm-blox-save-directory-name
+  (expand-file-name ".asm-blox" user-emacs-directory))
 
-(defun gis-200--generate-new-puzzle-filename (name)
+(defun asm-blox--generate-new-puzzle-filename (name)
   "For puzzle NAME, determine the name for a new puzzle."
   ;; TODO: This work when deleting puzzles.
   (ignore-errors
-    (make-directory gis-200-save-directory-name))
-  (let* ((dir-files (directory-files gis-200-save-directory-name))
+    (make-directory asm-blox-save-directory-name))
+  (let* ((dir-files (directory-files asm-blox-save-directory-name))
          (puzzle-files (seq-filter (lambda (file-name)
                                      (string-prefix-p name file-name))
                                    dir-files))
          (new-idx (number-to-string (1+ (length puzzle-files)))))
     (expand-file-name (concat name "-" new-idx ".gis")
-                      gis-200-save-directory-name)))
+                      asm-blox-save-directory-name)))
 
-(defun gis-200--parse-saved-buffer ()
+(defun asm-blox--parse-saved-buffer ()
   "Extract the puzzle contents from the saved buffer setting up state."
   (save-excursion
     (goto-char (point-min))
-    (setq gis-200-box-contents (make-hash-table :test 'equal))
+    (setq asm-blox-box-contents (make-hash-table :test 'equal))
     ;; Get the literal contents of each box.
-    (let ((match-regexp (format "│\\(.\\{%d\\}\\)│" gis-200-box-width)))
-     (dotimes (i (* gis-200--gameboard-row-ct
-                    gis-200--gameboard-col-ct
-                    gis-200-box-height))
+    (let ((match-regexp (format "│\\(.\\{%d\\}\\)│" asm-blox-box-width)))
+     (dotimes (i (* asm-blox--gameboard-row-ct
+                    asm-blox--gameboard-col-ct
+                    asm-blox-box-height))
        (search-forward-regexp match-regexp)
-       (let* ((col (mod i gis-200--gameboard-col-ct))
-              (row (/ (/ i gis-200--gameboard-col-ct) gis-200-box-height))
+       (let* ((col (mod i asm-blox--gameboard-col-ct))
+              (row (/ (/ i asm-blox--gameboard-col-ct) asm-blox-box-height))
               (match (string-trim-right (match-string-no-properties 1)))
-              (current-text (gethash (list row col) gis-200-box-contents))
+              (current-text (gethash (list row col) asm-blox-box-contents))
               (next-text (if current-text
                              (concat current-text "\n" match)
                            match)))
-         (puthash (list row col) next-text gis-200-box-contents))))
+         (puthash (list row col) next-text asm-blox-box-contents))))
     ;; Trim the ends of the boxes, assume user doesn't want it.
-    (dotimes (row gis-200--gameboard-row-ct)
-      (dotimes (col gis-200--gameboard-col-ct)
-        (let ((prev-val (gethash (list row col) gis-200-box-contents)))
+    (dotimes (row asm-blox--gameboard-row-ct)
+      (dotimes (col asm-blox--gameboard-col-ct)
+        (let ((prev-val (gethash (list row col) asm-blox-box-contents)))
           (puthash (list row col)
                    (string-trim-right prev-val)
-                   gis-200-box-contents))))
+                   asm-blox-box-contents))))
     ;; Find the name of the puzzle.
     (search-forward-regexp "^\\([[:alnum:] -]+\\):")
     (let ((match (match-string 1)))
       (unless match
         (error "Bad file format, no puzzle name found"))
-      (let ((puzzle (gis-200--get-puzzle-by-id match)))
+      (let ((puzzle (asm-blox--get-puzzle-by-id match)))
         (unless puzzle
           (error "No puzzle with name %s found" puzzle))
-        (setq gis-200--extra-gameboard-cells (funcall puzzle))))))
+        (setq asm-blox--extra-gameboard-cells (funcall puzzle))))))
 
-(defun gis-200--saved-puzzle-ct-by-id (id)
+(defun asm-blox--saved-puzzle-ct-by-id (id)
   "Return the number of saved puzzles that start with the puzzle ID."
   (length (seq-filter (lambda (file-name)
                         (string-prefix-p id file-name))
-                      (directory-files gis-200-save-directory-name))))
+                      (directory-files asm-blox-save-directory-name))))
 
-(defun gis-200--make-puzzle-idx-file-name (id idx)
+(defun asm-blox--make-puzzle-idx-file-name (id idx)
   "Create a file name for puzzle with ID and IDX."
   (expand-file-name (concat id "-" (number-to-string idx) ".gis")
-                    gis-200-save-directory-name))
+                    asm-blox-save-directory-name))
 
-(defun gis-200--win-file-for-current-buffer ()
+(defun asm-blox--win-file-for-current-buffer ()
   "Return the name of the win-backup for the current execution buffer."
-  (unless (equal (buffer-name) "*gis-200-execution*")
+  (unless (equal (buffer-name) "*asm-blox-execution*")
     (error "Unable to win from non-execution buffer"))
-  (unless (bufferp gis-200-execution-origin-buffer)
+  (unless (bufferp asm-blox-execution-origin-buffer)
     (error "Unable to find buffer with winning solution"))
-  (let* ((buffer-contents (with-current-buffer gis-200-execution-origin-buffer
+  (let* ((buffer-contents (with-current-buffer asm-blox-execution-origin-buffer
                             (buffer-string)))
-         (bfn (with-current-buffer gis-200-execution-origin-buffer
+         (bfn (with-current-buffer asm-blox-execution-origin-buffer
                             (buffer-file-name)))
          (name (file-name-nondirectory bfn))
          (path (file-name-directory bfn))
@@ -1698,7 +1698,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
         (save-buffer)
         (kill-buffer)))))
 
-(defun gis-200--backup-file-for-current-buffer ()
+(defun asm-blox--backup-file-for-current-buffer ()
   "Create a backup file for the current buffer."
   (let* ((buffer-contents (buffer-string))
          (bfn (buffer-file-name))
@@ -1712,54 +1712,54 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
         (save-buffer)
         (kill-buffer)))))
 
-(defun gis-200--puzzle-won-p (puzzle-name)
+(defun asm-blox--puzzle-won-p (puzzle-name)
   "Return non-nil if a win file exists for puzzle with name PUZZLE-NAME."
   (seq-find (lambda (n) (and (string-match (regexp-quote puzzle-name) n)
                              (string-match "\\.win" n)))
-            (directory-files gis-200-save-directory-name)))
+            (directory-files asm-blox-save-directory-name)))
 
 ;;; YAML Blocks
 
-(defun gis-200--create-yaml-code-node (row col code)
+(defun asm-blox--create-yaml-code-node (row col code)
   "Create a runtime for the parsed CODE, located at ROW COL."
   (let-alist (yaml-parse-string code :object-type 'alist)
     ;; .apiVersion .kind .metadata .spec
     (unless (equal "v1" .apiVersion)
       (error "Unknown api version: %s" .apiVersion))
     (pcase .kind
-      ("Stack" (gis-200--yaml-create-stack row col .metadata .spec))
-      ("Controller" (gis-200--yaml-create-controller row col .metadata .spec))
+      ("Stack" (asm-blox--yaml-create-stack row col .metadata .spec))
+      ("Controller" (asm-blox--yaml-create-controller row col .metadata .spec))
       ("Container" (error "Container not implemented"))
       ("Network" (error "Network not implemented"))
-      ("Heap" (gis-200--yaml-create-heap row col .metadata .spec)))))
+      ("Heap" (asm-blox--yaml-create-heap row col .metadata .spec)))))
 
-(defun gis-200--yaml-step-stack (cell-runtime)
+(defun asm-blox--yaml-step-stack (cell-runtime)
   "Perform the step operation for the CELL-RUNTIME of kind Stack."
-  (let ((row (gis-200--cell-runtime-row cell-runtime))
-        (col (gis-200--cell-runtime-col cell-runtime))
-        (spec (gis-200--cell-runtime-run-spec cell-runtime))
-        (state (gis-200--cell-runtime-run-state cell-runtime)))
+  (let ((row (asm-blox--cell-runtime-row cell-runtime))
+        (col (asm-blox--cell-runtime-col cell-runtime))
+        (spec (asm-blox--cell-runtime-run-spec cell-runtime))
+        (state (asm-blox--cell-runtime-run-state cell-runtime)))
     (let-alist spec
       ;; .inputPorts .outputPort .sizePort .size .logLevel
       ;; First put port back on the stack
       (let* ((port-sym (intern (upcase .outputPort)))
              (size-port-sym (and .sizePort (intern (upcase .sizePort))))
-             (val (gis-200--get-value-from-direction cell-runtime port-sym)))
+             (val (asm-blox--get-value-from-direction cell-runtime port-sym)))
         (when val
-          (gis-200--remove-value-from-direction cell-runtime port-sym)
+          (asm-blox--remove-value-from-direction cell-runtime port-sym)
           (setq state (cons val state)))
         (when .sizePort
-          (gis-200--remove-value-from-direction cell-runtime size-port-sym)))
+          (asm-blox--remove-value-from-direction cell-runtime size-port-sym)))
 
       ;; Then add new values to stack
       (seq-do
        (lambda (port)
          (let* ((port-sym (intern (upcase port)))
-                (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
-                (opposite-port (gis-200--mirror-direction port-sym))
-                (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+                (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
+                (opposite-port (asm-blox--mirror-direction port-sym))
+                (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
            (when recieve-val
-             (gis-200--remove-value-from-direction from-cell opposite-port)
+             (asm-blox--remove-value-from-direction from-cell opposite-port)
              (setq state (cons recieve-val state))
              (when (> (length state) (or .size 20)) ;; TODO: find a good way of setting defualts.
                (error "Stack overflow %d/%d" (length state) (or .size 20))))))
@@ -1767,87 +1767,87 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
       ;; Add size to sizePort
       (when .sizePort
-        (gis-200--cell-runtime-set-staging-value-from-direction
+        (asm-blox--cell-runtime-set-staging-value-from-direction
          cell-runtime
          (intern (upcase .sizePort))
          (length state)))
 
       ;; Add top value of stack to port
       (when state
-        (gis-200--cell-runtime-set-staging-value-from-direction
+        (asm-blox--cell-runtime-set-staging-value-from-direction
          cell-runtime
          (intern (upcase .outputPort))
          (car state))
         (setq state (cdr state)))
 
       ;; Persist state for next rount
-      (setf (gis-200--cell-runtime-run-state cell-runtime) state))))
+      (setf (asm-blox--cell-runtime-run-state cell-runtime) state))))
 
-(defun gis-200--yaml-get-editor-sink (cell-runtime)
+(defun asm-blox--yaml-get-editor-sink (cell-runtime)
   "Return the sink corresponding to CELL-RUNTIME."
   ;; For now there will only be one editor.
-  (car (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells)))
+  (car (asm-blox--problem-spec-sinks asm-blox--extra-gameboard-cells)))
 
-(defun gis-200--yaml-step-controller (cell-runtime)
+(defun asm-blox--yaml-step-controller (cell-runtime)
   "Perform runtime step for a CELL-RUNTIME of kind YAML Controller."
-  (let ((row (gis-200--cell-runtime-row cell-runtime))
-        (col (gis-200--cell-runtime-col cell-runtime))
-        (spec (gis-200--cell-runtime-run-spec cell-runtime))
-        (state (gis-200--cell-runtime-run-state cell-runtime))
-        (sink (gis-200--yaml-get-editor-sink cell-runtime)))
+  (let ((row (asm-blox--cell-runtime-row cell-runtime))
+        (col (asm-blox--cell-runtime-col cell-runtime))
+        (spec (asm-blox--cell-runtime-run-spec cell-runtime))
+        (state (asm-blox--cell-runtime-run-state cell-runtime))
+        (sink (asm-blox--yaml-get-editor-sink cell-runtime)))
     (let-alist spec
       ;; .inputPort  .setPointPort
       ;; .charAtPort .pointPort
       ;; First consume setPoint port
       (when .setPointPort
         (let* ((port-sym (intern (upcase .setPointPort)))
-               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
-               (opposite-port (gis-200--mirror-direction port-sym))
-               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+               (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
+               (opposite-port (asm-blox--mirror-direction port-sym))
+               (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
           (when recieve-val
-            (gis-200--remove-value-from-direction from-cell opposite-port)
-            (gis-200--cell-sink-move-point sink recieve-val))))
+            (asm-blox--remove-value-from-direction from-cell opposite-port)
+            (asm-blox--cell-sink-move-point sink recieve-val))))
       
       ;; Next consume inputPort
       (when .inputPort
         (let* ((port-sym (intern (upcase .inputPort)))
-               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
-               (opposite-port (gis-200--mirror-direction port-sym))
-               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+               (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
+               (opposite-port (asm-blox--mirror-direction port-sym))
+               (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
           (when recieve-val
-            (gis-200--remove-value-from-direction from-cell opposite-port)
-            (gis-200--cell-sink-insert-character sink recieve-val))))
+            (asm-blox--remove-value-from-direction from-cell opposite-port)
+            (asm-blox--cell-sink-insert-character sink recieve-val))))
 
       ;; Get the point and atChar and send them to respective ports
       (when .charAtPort
         (let* ((port-sym (intern (upcase .charAtPort)))
-               (val (gis-200--get-value-from-direction cell-runtime port-sym))
-               (point (gis-200--cell-sink-editor-point sink))
-               (text (gis-200--cell-sink-editor-text sink)))
+               (val (asm-blox--get-value-from-direction cell-runtime port-sym))
+               (point (asm-blox--cell-sink-editor-point sink))
+               (text (asm-blox--cell-sink-editor-text sink)))
           (when val
-            (gis-200--remove-value-from-direction cell-runtime port-sym))
-          (gis-200--cell-runtime-set-staging-value-from-direction
+            (asm-blox--remove-value-from-direction cell-runtime port-sym))
+          (asm-blox--cell-runtime-set-staging-value-from-direction
            cell-runtime
            (intern (upcase .charAtPort))
            (aref text (1- point)))))
       
       (when .pointPort
         (let* ((port-sym (intern (upcase .pointPort)))
-               (val (gis-200--get-value-from-direction cell-runtime port-sym))
-               (point (gis-200--cell-sink-editor-point sink)))
+               (val (asm-blox--get-value-from-direction cell-runtime port-sym))
+               (point (asm-blox--cell-sink-editor-point sink)))
           (when val
-            (gis-200--remove-value-from-direction cell-runtime port-sym))
-          (gis-200--cell-runtime-set-staging-value-from-direction
+            (asm-blox--remove-value-from-direction cell-runtime port-sym))
+          (asm-blox--cell-runtime-set-staging-value-from-direction
            cell-runtime
            (intern (upcase .pointPort))
            point))))))
 
-(defun gis-200--yaml-step-heap (cell-runtime)
+(defun asm-blox--yaml-step-heap (cell-runtime)
   "Perform runtime step for CELL-RUNTIME of type YAML HEAP."
-  (let* ((row (gis-200--cell-runtime-row cell-runtime))
-         (col (gis-200--cell-runtime-col cell-runtime))
-         (spec (gis-200--cell-runtime-run-spec cell-runtime))
-         (state (gis-200--cell-runtime-run-state cell-runtime))
+  (let* ((row (asm-blox--cell-runtime-row cell-runtime))
+         (col (asm-blox--cell-runtime-col cell-runtime))
+         (spec (asm-blox--cell-runtime-run-spec cell-runtime))
+         (state (asm-blox--cell-runtime-run-state cell-runtime))
          (offset (car state))
          (data (cdr state)))
     (let-alist spec
@@ -1858,92 +1858,92 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
       ;; .seekPort .offsetPort
       ;; .setPort  .peekPort
       (when .readPort
-        (when (not (gis-200--get-value-from-direction cell-runtime (intern (upcase .readPort))))
+        (when (not (asm-blox--get-value-from-direction cell-runtime (intern (upcase .readPort))))
           (setq offset (1+ offset))))
       (when .seekPort
         (let* ((port-sym (intern (upcase .seekPort)))
-               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
-               (opposite-port (gis-200--mirror-direction port-sym))
-               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port))
-               (stage-recieve-val (gis-200--get-value-from-staging-direction from-cell opposite-port)))
+               (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
+               (opposite-port (asm-blox--mirror-direction port-sym))
+               (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port))
+               (stage-recieve-val (asm-blox--get-value-from-staging-direction from-cell opposite-port)))
           (cond
            (recieve-val
-            (gis-200--remove-value-from-direction from-cell opposite-port)
+            (asm-blox--remove-value-from-direction from-cell opposite-port)
             (setq offset recieve-val))
            (stage-recieve-val
-            (gis-200--remove-value-from-staging-direction from-cell opposite-port)
+            (asm-blox--remove-value-from-staging-direction from-cell opposite-port)
             (setq offset stage-recieve-val)))))
       (when .writePort
         (let* ((port-sym (intern (upcase .writePort)))
-               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
-               (opposite-port (gis-200--mirror-direction port-sym))
-               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+               (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
+               (opposite-port (asm-blox--mirror-direction port-sym))
+               (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
           (when recieve-val
-            (gis-200--remove-value-from-direction from-cell opposite-port)
+            (asm-blox--remove-value-from-direction from-cell opposite-port)
             (aset data offset recieve-val)
             (setq offset (1+ offset)))))
       (when .setPort
         (let* ((port-sym (intern (upcase .setPort)))
-               (from-cell (gis-200--cell-at-moved-row-col row col port-sym))
-               (opposite-port (gis-200--mirror-direction port-sym))
-               (recieve-val (gis-200--get-value-from-direction from-cell opposite-port)))
+               (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
+               (opposite-port (asm-blox--mirror-direction port-sym))
+               (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
           (when recieve-val
-            (gis-200--remove-value-from-direction from-cell opposite-port)
+            (asm-blox--remove-value-from-direction from-cell opposite-port)
             (aset data offset recieve-val))))
       (when .offsetPort
         (let* ((port-sym (intern (upcase .offsetPort)))
-               (val (gis-200--get-value-from-direction cell-runtime port-sym)))
+               (val (asm-blox--get-value-from-direction cell-runtime port-sym)))
           (when val
-            (gis-200--remove-value-from-direction cell-runtime port-sym))
-          (gis-200--cell-runtime-set-staging-value-from-direction
+            (asm-blox--remove-value-from-direction cell-runtime port-sym))
+          (asm-blox--cell-runtime-set-staging-value-from-direction
            cell-runtime
            (intern (upcase .offsetPort))
            offset)))
       (when .readPort
         (let* ((port-sym (intern (upcase .readPort)))
-               (val (gis-200--get-value-from-direction cell-runtime port-sym))
+               (val (asm-blox--get-value-from-direction cell-runtime port-sym))
                (datum (if (>= offset (length data)) -1 (aref data offset))))
           (when val
-            (gis-200--remove-value-from-direction cell-runtime port-sym))
-          (gis-200--cell-runtime-set-staging-value-from-direction
+            (asm-blox--remove-value-from-direction cell-runtime port-sym))
+          (asm-blox--cell-runtime-set-staging-value-from-direction
            cell-runtime
            (intern (upcase .readPort))
            datum)))
       (when .peekPort
         (when (= -1 offset) (setq offset 0)) ;; another hack related to the way readPort works
         (let* ((port-sym (intern (upcase .peekPort)))
-               (val (gis-200--get-value-from-direction cell-runtime port-sym))
+               (val (asm-blox--get-value-from-direction cell-runtime port-sym))
                (datum (if (>= offset (length data)) -1 (aref data offset))))
           (when val
-            (gis-200--remove-value-from-direction cell-runtime port-sym))
-          (gis-200--cell-runtime-set-staging-value-from-direction
+            (asm-blox--remove-value-from-direction cell-runtime port-sym))
+          (asm-blox--cell-runtime-set-staging-value-from-direction
            cell-runtime
            (intern (upcase .peekPort))
            datum)))
-      (setf (gis-200--cell-runtime-run-state cell-runtime) (cons offset data)))))
+      (setf (asm-blox--cell-runtime-run-state cell-runtime) (cons offset data)))))
 
-(defun gis-200--yaml-create-stack (row col metadata spec)
+(defun asm-blox--yaml-create-stack (row col metadata spec)
   "Return a Stack runtime according to SPEC with METADATA at ROW COL."
   ;; .inputPorts .outputPort .sizePort .size .logLevel
-  (gis-200--cell-runtime-create
+  (asm-blox--cell-runtime-create
    :instructions nil
    :pc nil
    :row row
    :col col
-   :run-function #'gis-200--yaml-step-stack
+   :run-function #'asm-blox--yaml-step-stack
    :run-spec spec))
 
-(defun gis-200--yaml-create-controller (row col metadata spec)
+(defun asm-blox--yaml-create-controller (row col metadata spec)
   "Return a Controller runtime according to SPEC with METADATA at ROW COL."
-  (gis-200--cell-runtime-create
+  (asm-blox--cell-runtime-create
    :instructions nil
    :pc nil
    :row row
    :col col
-   :run-function #'gis-200--yaml-step-controller
+   :run-function #'asm-blox--yaml-step-controller
    :run-spec spec))
 
-(defun gis-200--yaml-create-heap (row col metadata spec)
+(defun asm-blox--yaml-create-heap (row col metadata spec)
   "Return a Stack runtime according to SPEC with METADATA at ROW COL."
   ;; .size
   (let-alist spec
@@ -1951,17 +1951,17 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
       (cl-loop for elt across .data
                for i from 0
                do (aset data i elt))
-      (gis-200--cell-runtime-create
+      (asm-blox--cell-runtime-create
        :instructions nil
        :pc nil
        :row row
        :col col
-       :run-function #'gis-200--yaml-step-heap
+       :run-function #'asm-blox--yaml-step-heap
        ;; -1 because used hack to increment offset which will
        ;; run once at the start of the game.
        :run-state (cons -1 data)
        :run-spec spec))))
 
-(provide 'gis-200)
+(provide 'asm-blox)
 
-;;; gis-200.el ends here
+;;; asm-blox.el ends here

@@ -1,4 +1,4 @@
-;;; gis-200-display.el --- Display code for GIS-200 Game -*- lexical-binding: t -*-
+;;; asm-blox-display.el --- Display code for asm-blox Game -*- lexical-binding: t -*-
 
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
@@ -21,65 +21,65 @@
 
 ;;; Commentary:
 
-;; This packages contains display code for GIS-200 game.
+;; This packages contains display code for asm-blox game.
 
 ;; commentary
 
 ;;; Code:
 
-(require 'gis-200)
+(require 'asm-blox)
 
-(defface gis-200-error-face
+(defface asm-blox-error-face
   '((((class color) (background light)) (:foreground "DarkGoldenrod4"))
     (((class color) (background dark))  (:foreground "DarkGoldenrod1")))
   "?"
-  :group 'gis-200)
+  :group 'asm-blox)
 
-(defface gis-200-show-paren-match-face
+(defface asm-blox-show-paren-match-face
   '((t (:inherit show-paren-match)))
-  "`gis-200-mode' face used for a matching paren pair."
-  :group 'gis-200)
+  "`asm-blox-mode' face used for a matching paren pair."
+  :group 'asm-blox)
 
-(defface gis-200-region-face
+(defface asm-blox-region-face
   '((t (:inherit region)))
-  "`gis-200-mode' face used for a matching paren pair."
-  :group 'gis-200)
+  "`asm-blox-mode' face used for a matching paren pair."
+  :group 'asm-blox)
 
-(defvar gis-200--widget-row-idx nil)
-(defvar gis-200--current-widgets nil
+(defvar asm-blox--widget-row-idx nil)
+(defvar asm-blox--current-widgets nil
   "List of widgets to display on right of gameboard.")
-(defvar gis-200-parse-errors nil)
-(defvar gis-200--disable-redraw nil
+(defvar asm-blox-parse-errors nil)
+(defvar asm-blox--disable-redraw nil
   "If non-nil, commands should not opt-in to redrawing the gameboard.")
-(defvar gis-200--end-of-box-points nil
+(defvar asm-blox--end-of-box-points nil
   "Contains a hashmap of the points where each box ends.
 This was added for performance reasons.")
 
-(defconst gis-200--mirror-buffer-name "*gis-200-temp*")
+(defconst asm-blox--mirror-buffer-name "*asm-blox-temp*")
 
-(defvar-local gis-200--display-mode 'edit)
+(defvar-local asm-blox--display-mode 'edit)
 
-(defun gis-200--get-error-at-cell (row col)
+(defun asm-blox--get-error-at-cell (row col)
   "Return the error at position ROW COL."
-  (if (and (eql gis-200--display-mode 'execute)
-           gis-200-runtime-error
-           (equal (list row col) (cdr gis-200-runtime-error)))
-      (car gis-200-runtime-error)
-    (let ((err (assoc (list row col) gis-200-parse-errors)))
+  (if (and (eql asm-blox--display-mode 'execute)
+           asm-blox-runtime-error
+           (equal (list row col) (cdr asm-blox-runtime-error)))
+      (car asm-blox-runtime-error)
+    (let ((err (assoc (list row col) asm-blox-parse-errors)))
       (cdr err))))
 
 ;;; Widget display ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun gis-200--make-source-widget (source)
+(defun asm-blox--make-source-widget (source)
   "Return a widget displaying SOURCE."
   (let ((source-widget-offset-ct 2))
     (lambda (msg)
       (pcase msg
         ('width 6)
         (`(display ,n)
-         (let ((data (gis-200--cell-source-data source))
-               (idx (gis-200--cell-source-idx source))
-               (name (gis-200--cell-source-name source)))
+         (let ((data (asm-blox--cell-source-data source))
+               (idx (asm-blox--cell-source-idx source))
+               (name (asm-blox--cell-source-name source)))
            (pcase n
              (0 (format "IN: %s " name))
              (1 "┌────┐")
@@ -95,18 +95,18 @@ This was added for performance reasons.")
                                   inner-str)))
                 (format "│%s│" inner-str))))))))))
 
-(defun gis-200--make-sink-widget (sink)
+(defun asm-blox--make-sink-widget (sink)
   "Return a widget displaying SINK."
   (let ((sink-widget-offset-ct 2))
     (lambda (msg)
       (pcase msg
         ('width 6)
         (`(display ,n)
-         (let* ((data (gis-200--cell-sink-expected-data sink))
-                (err-val (gis-200--cell-sink-err-val sink))
-                (idx (gis-200--cell-sink-idx sink))
+         (let* ((data (asm-blox--cell-sink-expected-data sink))
+                (err-val (asm-blox--cell-sink-err-val sink))
+                (idx (asm-blox--cell-sink-idx sink))
                 (last-idx-p (= (1- idx) (- n sink-widget-offset-ct)))
-                (name (gis-200--cell-sink-name sink)))
+                (name (asm-blox--cell-sink-name sink)))
            (pcase n
              (0 (format "OUT: %s" name))
              (1 "┌────┐")
@@ -121,7 +121,7 @@ This was added for performance reasons.")
                                   inner-str)))
                 (format "│%s│" inner-str))))))))))
 
-(defun gis-200--make-editor-widget (sink)
+(defun asm-blox--make-editor-widget (sink)
   "Return a widget displaying a SINK as an editor."
   (let ((width 32)
         (sink-widget-offset-ct 2))
@@ -132,10 +132,10 @@ This was added for performance reasons.")
          (let* ((box-top (concat "┌" (make-string 30 ?─) "┐"))
                 (box-bottom (concat "└" (make-string 30 ?─) "┘"))
                 (spacing (make-string 32 ?\s))
-                (data (gis-200--cell-sink-expected-data sink))
-                (text (gis-200--cell-sink-editor-text sink))
-                (expected-text (gis-200--cell-sink-expected-text sink))
-                (point (1- (gis-200--cell-sink-editor-point sink))))
+                (data (asm-blox--cell-sink-expected-data sink))
+                (text (asm-blox--cell-sink-editor-text sink))
+                (expected-text (asm-blox--cell-sink-expected-text sink))
+                (point (1- (asm-blox--cell-sink-editor-point sink))))
            (cl-labels ((text-line (n) (or (nth n (split-string text "\n")) ""))
                        (expected-text-line (n) (or (nth n (split-string expected-text "\n")) ""))
                        (line-pt-idx (line-no)
@@ -184,49 +184,49 @@ This was added for performance reasons.")
                ((pred (lambda (x) (> x 42))) (format "%32s" " "))
                (_ (format "│%-30s│" (expected-text-line (- n 24))))))))))))
 
-(defun gis-200--display-widget ()
+(defun asm-blox--display-widget ()
   "Display the current line of the active widget.
 This should normally be called when the point is at the end of the display."
-  (dolist (widget gis-200--current-widgets)
-    (let ((widget-text (funcall widget (list 'display gis-200--widget-row-idx))))
+  (dolist (widget asm-blox--current-widgets)
+    (let ((widget-text (funcall widget (list 'display asm-blox--widget-row-idx))))
       (insert widget-text)
       (insert "  ")))
-  (setq gis-200--widget-row-idx (1+ gis-200--widget-row-idx)))
+  (setq asm-blox--widget-row-idx (1+ asm-blox--widget-row-idx)))
 
 
 ;;; Main grid display ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun gis-200--initialize-box-contents ()
+(defun asm-blox--initialize-box-contents ()
   "Set the contents of each cell to the empty string."
-  (setq gis-200-box-contents (make-hash-table :test 'equal))
+  (setq asm-blox-box-contents (make-hash-table :test 'equal))
   (dotimes (row 3)
-    (dotimes (col gis-200-column-ct)
-      (puthash (list row col) "" gis-200-box-contents))))
+    (dotimes (col asm-blox-column-ct)
+      (puthash (list row col) "" asm-blox-box-contents))))
 
-(defun gis-200--swap-box-contents (row-1 col-1 row-2 col-2)
+(defun asm-blox--swap-box-contents (row-1 col-1 row-2 col-2)
   "Swap the contents of the cells at positions (ROW-1,COL-1) and (ROW-2,COL-2)."
-  (let ((contents-1 (gis-200--get-box-content row-1 col-1))
-        (contents-2 (gis-200--get-box-content row-2 col-2)))
-    (gis-200--set-box-content row-2 col-2 contents-1)
-    (gis-200--set-box-content row-1 col-1 contents-2)))
+  (let ((contents-1 (asm-blox--get-box-content row-1 col-1))
+        (contents-2 (asm-blox--get-box-content row-2 col-2)))
+    (asm-blox--set-box-content row-2 col-2 contents-1)
+    (asm-blox--set-box-content row-1 col-1 contents-2)))
 
-(defun gis-200--get-box-content (row col)
+(defun asm-blox--get-box-content (row col)
   "Return the contens of the cell at position ROW COL."
-  (gethash (list row col) gis-200-box-contents))
+  (gethash (list row col) asm-blox-box-contents))
 
-(defun gis-200--set-box-content (row col text)
+(defun asm-blox--set-box-content (row col text)
   "Set the contents of the box at position ROW COL to TEXT."
-  (puthash (list row col) text gis-200-box-contents))
+  (puthash (list row col) text asm-blox-box-contents))
 
-(defun gis-200--get-box-line-content (row col line-no)
+(defun asm-blox--get-box-line-content (row col line-no)
   "Get the contents of LINE-NO of cell located at ROW COL."
-  (let ((text (gis-200--get-box-content row col)))
+  (let ((text (asm-blox--get-box-content row col)))
     (or (nth line-no (split-string text "\n")) "")))
 
-(defun gis-200--row-register-display (row col direction)
+(defun asm-blox--row-register-display (row col direction)
   "Return the display string for the up/down DIRECTION port of cell at ROW COL."
-  (if (eql 'execute gis-200--display-mode)
-      (let ((val (gis-200--get-direction-row-registers row col direction)))
+  (if (eql 'execute asm-blox--display-mode)
+      (let ((val (asm-blox--get-direction-row-registers row col direction)))
         (cond
          ((not val) "    ")
          ((numberp val)
@@ -238,11 +238,11 @@ This should normally be called when the point is at the end of the display."
     "    "))
 
 ;; TODO: Dry this display logic up.
-(defun gis-200--col-register-display (row col direction)
+(defun asm-blox--col-register-display (row col direction)
   "Return the display string for left/right DIRECTION port of cell at ROW COL."
   ;; Note: the space between the cells is 5 splaces.
-  (if (eql 'execute gis-200--display-mode)
-      (let ((val (gis-200--get-direction-col-registers row col direction)))
+  (if (eql 'execute asm-blox--display-mode)
+      (let ((val (asm-blox--get-direction-col-registers row col direction)))
         (cond
          ((not val) "     ")
          ((numberp val)
@@ -253,33 +253,33 @@ This should normally be called when the point is at the end of the display."
           (format "%4s " (symbol-name val)))))
     "     "))
 
-(defun gis-200--row-arrow-label-display (position type col)
+(defun asm-blox--row-arrow-label-display (position type col)
   "Return the up/down port info of TYPE source/sink at board POSITION for COL.
 POSITION will be either top or bottom, indicating the very top of
 the board or very bottom.  TYPE will either be source or sink."
   (let* ((row (if (eql position 'top) -1 3))
          (name (if (eql type 'source)
-                   (gis-200--get-source-idx-at-position row col)
-                 (gis-200--get-sink-name-at-position row col))))
+                   (asm-blox--get-source-idx-at-position row col)
+                 (asm-blox--get-sink-name-at-position row col))))
     (or name " ")))
 
-(defun gis-200--col-arrow-label-display (position type row)
+(defun asm-blox--col-arrow-label-display (position type row)
   "Return the left/right port info of TYPE source/sink at POSITION for ROW.
 POSITION will be either left or right, indicating the very left
 of the board or very right.  TYPE will either be source or sink."
   (let* ((col (if (eql position 'left) -1 4))
          (name (if (eql type 'source)
-                   (gis-200--get-source-idx-at-position row col)
-                 (gis-200--get-sink-name-at-position row col))))
+                   (asm-blox--get-source-idx-at-position row col)
+                 (asm-blox--get-sink-name-at-position row col))))
     (or name " ")))
 
-(defun gis-200-display-game-board ()
+(defun asm-blox-display-game-board ()
   "Insert the characters of the board to the buffer."
-  (setq gis-200--widget-row-idx 0)
-  (when (not (hash-table-p gis-200--end-of-box-points))
-    (setq gis-200--end-of-box-points (make-hash-table :test 'equal)))
-  (when (not (hash-table-p gis-200--beginning-of-box-points))
-    (setq gis-200--beginning-of-box-points (make-hash-table :test 'equal)))
+  (setq asm-blox--widget-row-idx 0)
+  (when (not (hash-table-p asm-blox--end-of-box-points))
+    (setq asm-blox--end-of-box-points (make-hash-table :test 'equal)))
+  (when (not (hash-table-p asm-blox--beginning-of-box-points))
+    (setq asm-blox--beginning-of-box-points (make-hash-table :test 'equal)))
   (let* ((display-mode 'edit) ;; TODO - finalize where this comes from. can be 'edit or 'execute
          (arrow-up "↑")
          (arrow-down "↓")
@@ -293,15 +293,15 @@ of the board or very right.  TYPE will either be source or sink."
          (box-bottom-left ?└)
          (space-start (make-string 6 ?\s))
          (space-between (make-string 5 ?\s))
-         (box-line-top-bottom (make-string gis-200-box-width box-horizontal))
-         (box-inside (make-string gis-200-box-width ?\s)))
+         (box-line-top-bottom (make-string asm-blox-box-width box-horizontal))
+         (box-inside (make-string asm-blox-box-width ?\s)))
     (let ((insert-row-top
            (lambda (row)
              "Draw the  ┌───┐┌───┐┌───┐┌───┐ part of the board."
              (insert space-start)
              (insert space-between)
-             (dotimes (col gis-200-column-ct)
-               (let ((err (gis-200--get-error-at-cell row col)))
+             (dotimes (col asm-blox-column-ct)
+               (let ((err (asm-blox--get-error-at-cell row col)))
                  (if err
                      (progn
                        (insert (propertize (char-to-string box-top-left)
@@ -317,16 +317,16 @@ of the board or very right.  TYPE will either be source or sink."
                    (insert box-line-top-bottom)
                    (insert box-top-right))
                  (insert space-between)))
-             (when (eql gis-200--display-mode 'execute)
-               (gis-200--display-widget))
+             (when (eql asm-blox--display-mode 'execute)
+               (asm-blox--display-widget))
              (insert "\n")))
           (insert-row-bottom
            (lambda (row)
              "Draw the  └───┘└───┘└───┘└───┘ part of the board. "
              (insert space-start)
              (insert space-between)
-             (dotimes (col gis-200-column-ct)
-               (let ((err (gis-200--get-error-at-cell row col)))
+             (dotimes (col asm-blox-column-ct)
+               (let ((err (asm-blox--get-error-at-cell row col)))
                  (if err
                      (progn (insert (propertize (char-to-string box-bottom-left)
                                                 'font-lock-face
@@ -341,8 +341,8 @@ of the board or very right.  TYPE will either be source or sink."
                    (insert box-line-top-bottom)
                    (insert box-bottom-right))
                  (insert space-between)))
-             (when (eql gis-200--display-mode 'execute)
-               (gis-200--display-widget))
+             (when (eql asm-blox--display-mode 'execute)
+               (asm-blox--display-widget))
              (insert "\n")))
           (insert-v-border
            (lambda (position)
@@ -353,12 +353,12 @@ of the board or very right.  TYPE will either be source or sink."
                      (1+ (- (length box-line-top-bottom) 2 left-of-arrows-len))))
                (insert space-start)
                (insert space-between)
-               (dotimes (col gis-200-column-ct)
+               (dotimes (col asm-blox-column-ct)
                  (insert (make-string left-of-arrows-len ?\s))
-                 (let ((sink-char (gis-200--row-arrow-label-display position
+                 (let ((sink-char (asm-blox--row-arrow-label-display position
                                                                     'sink
                                                                     col))
-                       (source-char (gis-200--row-arrow-label-display position
+                       (source-char (asm-blox--row-arrow-label-display position
                                                                       'source
                                                                       col)))
                    (if (eql position 'top)
@@ -366,8 +366,8 @@ of the board or very right.  TYPE will either be source or sink."
                      (insert (format "%s %s" source-char sink-char))))
                  (insert (make-string right-of-arrows-len ?\s))
                  (insert space-between)))
-             (when (eql gis-200--display-mode 'execute)
-               (gis-200--display-widget))
+             (when (eql asm-blox--display-mode 'execute)
+               (asm-blox--display-widget))
              (insert "\n")))
           (insert-row-middle
            (lambda (row box-row)
@@ -377,10 +377,10 @@ of the board or very right.  TYPE will either be source or sink."
               ((= 4 box-row)
                ;; NOTE: capital LEFT indicates arrow direction
                ;;       while lower-case represents board side.
-               (let ((display (gis-200--col-register-display row 0 'RIGHT)))
+               (let ((display (asm-blox--col-register-display row 0 'RIGHT)))
                  (insert display)))
               ((= 5 box-row)
-               (let ((label (gis-200--col-arrow-label-display 'left 'source row)))
+               (let ((label (asm-blox--col-arrow-label-display 'left 'source row)))
                  (if (equal label " ")
                      (insert space-between)
                    (progn (insert "  ")
@@ -388,7 +388,7 @@ of the board or very right.  TYPE will either be source or sink."
                           (insert arrow-right)
                           (insert ?\s)))))
               ((= 7 box-row)
-               (let ((label (gis-200--col-arrow-label-display 'left 'sink row)))
+               (let ((label (asm-blox--col-arrow-label-display 'left 'sink row)))
                  (if (equal label " ")
                      (insert space-between)
                    (progn (insert "  ")
@@ -396,12 +396,12 @@ of the board or very right.  TYPE will either be source or sink."
                           (insert arrow-left)
                           (insert ?\s)))))
               ((= 8 box-row)
-               (let ((display (gis-200--col-register-display row 0 'LEFT)))
+               (let ((display (asm-blox--col-register-display row 0 'LEFT)))
                  (insert display)))
               (t (insert space-between)))
              ;; Draw each box column
-             (dotimes (col gis-200-column-ct)
-               (let ((err (gis-200--get-error-at-cell row col)))
+             (dotimes (col asm-blox-column-ct)
+               (let ((err (asm-blox--get-error-at-cell row col)))
                  (if err
                      (insert (propertize (char-to-string box-vertical)
                                          'font-lock-face
@@ -410,34 +410,34 @@ of the board or very right.  TYPE will either be source or sink."
                  (when (= box-row 0)
                    (puthash (list row col)
                             (point)
-                            gis-200--beginning-of-box-points))
+                            asm-blox--beginning-of-box-points))
                  ;; Draw the inner contents of the box
-                 (let* ((text (gis-200--get-box-line-content row col box-row))
+                 (let* ((text (asm-blox--get-box-line-content row col box-row))
                         (spacing (make-string (- (length box-inside)
                                                  (length text))
                                               ?\s)))
-                   (if (and (= 11 box-row) err (eql gis-200--display-mode 'edit))
-                       (let ((err-text (nth 2 (gis-200--get-error-at-cell row col))))
+                   (if (and (= 11 box-row) err (eql asm-blox--display-mode 'edit))
+                       (let ((err-text (nth 2 (asm-blox--get-error-at-cell row col))))
                          (insert err-text)
                          (insert (make-string (- (length box-inside)
                                                  (length err-text))
                                               ?\s)))
-                     (insert (propertize text 'gis-200-box-id (list row col box-row)))
+                     (insert (propertize text 'asm-blox-box-id (list row col box-row)))
                      (insert (propertize spacing
-                                         'gis-200-box-id (list row col box-row)
-                                         'gis-200-text-type 'spacing))))
-                 (when (= box-row (1- gis-200-box-height))
-                   (puthash (list row col) (point) gis-200--end-of-box-points))
+                                         'asm-blox-box-id (list row col box-row)
+                                         'asm-blox-text-type 'spacing))))
+                 (when (= box-row (1- asm-blox-box-height))
+                   (puthash (list row col) (point) asm-blox--end-of-box-points))
                  (let ((pipe-str (cond
-                                  ((= box-row (1- gis-200-box-height))
+                                  ((= box-row (1- asm-blox-box-height))
                                    (if err
                                        (propertize (char-to-string box-vertical)
-                                                   'gis-200-text-type
+                                                   'asm-blox-text-type
                                                    `(box-end ,row ,col)
                                                    'font-lock-face
                                                    '(:foreground "red"))
                                      (propertize (char-to-string box-vertical)
-                                                 'gis-200-text-type
+                                                 'asm-blox-text-type
                                                  `(box-end ,row ,col))))
                                   (err
                                    (propertize (char-to-string box-vertical)
@@ -446,10 +446,10 @@ of the board or very right.  TYPE will either be source or sink."
                                   (t
                                    (char-to-string box-vertical)))))
                    (insert pipe-str)))
-               (when (< col (1- gis-200-column-ct))
+               (when (< col (1- asm-blox-column-ct))
                  (cond
                   ((= 4 box-row)
-                   (let ((display (gis-200--col-register-display row
+                   (let ((display (asm-blox--col-register-display row
                                                                  (1+ col)
                                                                  'RIGHT)))
                      (insert display)))
@@ -458,7 +458,7 @@ of the board or very right.  TYPE will either be source or sink."
                   ((= 7 box-row)
                    (progn (insert "  ") (insert arrow-left) (insert "  ")))
                   ((= 8 box-row)
-                   (let ((display (gis-200--col-register-display row
+                   (let ((display (asm-blox--col-register-display row
                                                                  (1+ col)
                                                                  'LEFT)))
                      (insert display)))
@@ -466,12 +466,12 @@ of the board or very right.  TYPE will either be source or sink."
                    (insert space-between)))))
              (cond
               ((= 4 box-row)
-               (let ((display (gis-200--col-register-display row
-                                                             gis-200-column-ct
+               (let ((display (asm-blox--col-register-display row
+                                                             asm-blox-column-ct
                                                              'RIGHT)))
                  (insert display)))
               ((= 5 box-row)
-               (let ((label (gis-200--col-arrow-label-display 'right 'sink row)))
+               (let ((label (asm-blox--col-arrow-label-display 'right 'sink row)))
                  (if (equal label " ")
                      (insert space-between)
                    (progn
@@ -480,7 +480,7 @@ of the board or very right.  TYPE will either be source or sink."
                      (insert label)
                      (insert "  ")))))
               ((= 7 box-row)
-               (let ((label (gis-200--col-arrow-label-display 'right 'source row)))
+               (let ((label (asm-blox--col-arrow-label-display 'right 'source row)))
                  (if (equal label " ")
                      (insert space-between)
                    (progn
@@ -489,14 +489,14 @@ of the board or very right.  TYPE will either be source or sink."
                      (insert label)
                      (insert "  ")))))
               ((= 8 box-row)
-               (let ((display (gis-200--col-register-display row
-                                                             gis-200-column-ct
+               (let ((display (asm-blox--col-register-display row
+                                                             asm-blox-column-ct
                                                              'LEFT)))
                  (insert display)))
               (t
                (insert space-between)))
-             (when (eql gis-200--display-mode 'execute)
-               (gis-200--display-widget))
+             (when (eql asm-blox--display-mode 'execute)
+               (asm-blox--display-widget))
              (insert "\n")))
           (insert-middle-row-space
            (lambda (row)
@@ -513,26 +513,26 @@ of the board or very right.  TYPE will either be source or sink."
                                                       ?\s)))
                (insert space-start)
                (insert space-between)
-               (dotimes (col gis-200-column-ct)
+               (dotimes (col asm-blox-column-ct)
                  (insert padding-space-left)
                  ;; logic to display arrow and contnents
                  (let* ((up-arrow-display
-                         (gis-200--row-register-display row col 'UP))
+                         (asm-blox--row-register-display row col 'UP))
                         (down-arrow-display
-                         (gis-200--row-register-display row col 'DOWN))
+                         (asm-blox--row-register-display row col 'DOWN))
                         (label-position (cond ((= 0 row) 'top)
                                               ((= 3 row) 'bottom)
                                               (t nil)))
                         (source-label
                          (and label-position
-                              (gis-200--row-arrow-label-display
+                              (asm-blox--row-arrow-label-display
                                label-position
                                (if (eql label-position 'top)
                                    'source 'sink)
                                col)))
                         (sink-label
                          (and label-position
-                              (gis-200--row-arrow-label-display
+                              (asm-blox--row-arrow-label-display
                                label-position
                                (if (eql label-position 'top)
                                    'sink 'source)
@@ -552,14 +552,14 @@ of the board or very right.  TYPE will either be source or sink."
                    (insert down-arrow-display))
                  (insert padding-space-right)
                  (insert space-between))
-               (when (eql gis-200--display-mode 'execute)
-                 (gis-200--display-widget))
+               (when (eql asm-blox--display-mode 'execute)
+                 (asm-blox--display-widget))
                (insert "\n")))))
       (funcall insert-v-border 'top)
       (funcall insert-middle-row-space 0)
       (dotimes (row 3)
         (funcall insert-row-top row)
-        (dotimes (box-row gis-200-box-height)
+        (dotimes (box-row asm-blox-box-height)
           (funcall insert-row-middle row box-row))
         (funcall insert-row-bottom row)
         (when (not (= 2 row))
@@ -569,21 +569,21 @@ of the board or very right.  TYPE will either be source or sink."
 
       (insert "\n\n")
       (let ((name
-             (gis-200--problem-spec-name gis-200--extra-gameboard-cells))
+             (asm-blox--problem-spec-name asm-blox--extra-gameboard-cells))
             (description
-             (gis-200--problem-spec-description gis-200--extra-gameboard-cells)))
+             (asm-blox--problem-spec-description asm-blox--extra-gameboard-cells)))
         (insert name ":\n")
         (insert description "\n"))
-      (when (and (eql gis-200--display-mode 'execute) gis-200-runtime-error)
+      (when (and (eql asm-blox--display-mode 'execute) asm-blox-runtime-error)
         (insert (format "\nERROR: %s at cell (%d, %d)\n"
-                        (car gis-200-runtime-error)
-                        (cadr gis-200-runtime-error)
-                        (caddr gis-200-runtime-error))))
-      (gis-200--propertize-errors))))
+                        (car asm-blox-runtime-error)
+                        (cadr asm-blox-runtime-error)
+                        (caddr asm-blox-runtime-error))))
+      (asm-blox--propertize-errors))))
 
-(defun gis-200--draw-win-message ()
-  (when (and (eql gis-200--display-mode 'execute)
-             (eql 'win gis-200--gameboard-state))
+(defun asm-blox--draw-win-message ()
+  (when (and (eql asm-blox--display-mode 'execute)
+             (eql 'win asm-blox--gameboard-state))
     (let ((inhibit-read-only t))
       (goto-char (point-min))
       (dolist (l '("+=========================+"
@@ -593,37 +593,37 @@ of the board or very right.  TYPE will either be source or sink."
         (insert "  " l)
         (forward-line)))))
 
-(defun gis-200--box-point-forward (ct)
+(defun asm-blox--box-point-forward (ct)
   "With the point in a text box, move forward a point in box-buffer by CT."
   (while (> ct 0)
     (cond
-     ((eql (get-text-property (point) 'gis-200-text-type) 'spacing)
+     ((eql (get-text-property (point) 'asm-blox-text-type) 'spacing)
       (forward-char))
-     ((not (gis-200-in-box-p))
-      (let ((col (- (current-column) gis-200-box-width)))
+     ((not (asm-blox-in-box-p))
+      (let ((col (- (current-column) asm-blox-box-width)))
         (forward-line 1)
         (move-to-column col)
         (setq ct (1- ct))))
      (t (forward-char)
         (setq ct (1- ct))))))
 
-(defun gis-200--propertize-errors ()
+(defun asm-blox--propertize-errors ()
   "Add text properties to errors."
-  (let ((errs gis-200-parse-errors))
+  (let ((errs asm-blox-parse-errors))
     (dolist (err errs)
       (let ((row (caar err))
             (col (cadar err))
             (pt (1- (caddr err)))
-            (gis-200--disable-redraw t))
-        (gis-200--move-to-box row col)
+            (asm-blox--disable-redraw t))
+        (asm-blox--move-to-box row col)
         ;; move to the point where the error occured.
         ;; TODO: create box-point-forward to save this logic
         (while (> pt 0)
           (cond
-           ((eql (get-text-property (point) 'gis-200-text-type) 'spacing)
+           ((eql (get-text-property (point) 'asm-blox-text-type) 'spacing)
             (forward-char))
-           ((not (gis-200-in-box-p))
-            (let ((col (- (current-column) gis-200-box-width)))
+           ((not (asm-blox-in-box-p))
+            (let ((col (- (current-column) asm-blox-box-width)))
               (forward-line 1)
               (move-to-column col)
               (setq pt (1- pt))))
@@ -635,14 +635,14 @@ of the board or very right.  TYPE will either be source or sink."
                              'font-lock-face
                              '(:underline (:color "red" :style wave))))))))
 
-(defun gis-200-redraw-game-board ()
+(defun asm-blox-redraw-game-board ()
   "Erase the buffer and redraw it."
   (let ((at-row (line-number-at-pos nil))
         (at-col (current-column))
         (prev-text (buffer-string)))
     (erase-buffer)
     (condition-case err
-        (gis-200-display-game-board)
+        (asm-blox-display-game-board)
       (error
        (erase-buffer)
        (insert prev-text)
@@ -651,109 +651,109 @@ of the board or very right.  TYPE will either be source or sink."
     (forward-line (1- at-row))
     (forward-char at-col)))
 
-(defun gis-200-in-box-p ()
+(defun asm-blox-in-box-p ()
   "Return non-nil if the point is in an edit box."
-  (get-text-property (point) 'gis-200-box-id))
+  (get-text-property (point) 'asm-blox-box-id))
 
-(defun gis-200-get-line-col-num (&optional point)
+(defun asm-blox-get-line-col-num (&optional point)
   "Return the line column number in the current box at POINT if provided."
-  (unless (gis-200-in-box-p)
+  (unless (asm-blox-in-box-p)
     (error "Not in text box"))
   (let ((i 0))
     (save-excursion
       (when point (goto-char point))
-      (while (get-text-property (point) 'gis-200-box-id)
+      (while (get-text-property (point) 'asm-blox-box-id)
         (forward-char -1)
         (setq i (1+ i))))
     (1- i)))
 
-(defun gis-200--beginning-of-box ()
+(defun asm-blox--beginning-of-box ()
   "Move the point to the beginning of the box."
-  (unless (gis-200-in-box-p)
+  (unless (asm-blox-in-box-p)
     (error "Not in box 1"))
   (let ((col (current-column)))
-    (while (gis-200-in-box-p)
+    (while (asm-blox-in-box-p)
       (forward-line -1)
       (move-to-column col)) ;; TODO - is this command buggy?
     (forward-line 1)     ;; TODO - use forward line
     (move-to-column col)
-    (while (gis-200-in-box-p)
+    (while (asm-blox-in-box-p)
       (forward-char -1))
     (forward-char 1)))
 
-(defun gis-200--move-to-end-of-box (row col)
+(defun asm-blox--move-to-end-of-box (row col)
   "Move poin to the end of the box at ROW COL."
-  (let ((end-pos (gethash (list row col) gis-200--end-of-box-points)))
+  (let ((end-pos (gethash (list row col) asm-blox--end-of-box-points)))
       (goto-char end-pos)))
 
-(defvar gis-200--beginning-of-box-points nil
+(defvar asm-blox--beginning-of-box-points nil
   "Contains a hashmap of the points where each box begins.
 This was added for performance reasons.")
 
-(defun gis-200--move-to-box (row col)
+(defun asm-blox--move-to-box (row col)
   "Move point to the point at ROW COL."
-  (when (and (eql gis-200--display-mode 'edit)
-             (not gis-200--disable-redraw))
+  (when (and (eql asm-blox--display-mode 'edit)
+             (not asm-blox--disable-redraw))
     (let ((inhibit-read-only t))
-      (gis-200-redraw-game-board)))
-  (let ((begin-pos (gethash (list row col) gis-200--beginning-of-box-points)))
+      (asm-blox-redraw-game-board)))
+  (let ((begin-pos (gethash (list row col) asm-blox--beginning-of-box-points)))
     (goto-char begin-pos)))
 
-(defun gis-200--move-to-box-point (row col)
+(defun asm-blox--move-to-box-point (row col)
   "Move point to ROW COL in current box."
-  (unless (gis-200-in-box-p)
+  (unless (asm-blox-in-box-p)
     (error "Not in box"))
-  (gis-200--beginning-of-box)
+  (asm-blox--beginning-of-box)
   (let ((start-col (current-column)))
     (forward-line row)
     (move-to-column start-col)
     (forward-char col)))
 
-(defun gis-200--beginning-of-line ()
+(defun asm-blox--beginning-of-line ()
   "Move to the beginning of the current edit box."
-  (while (gis-200-in-box-p)
+  (while (asm-blox-in-box-p)
     (forward-char -1))
   (forward-char 1))
 
-(defun gis-200--replace-box-text (text)
+(defun asm-blox--replace-box-text (text)
   "Replace the text in the current box with TEXT."
   (let* ((start-pos (point))
          (lines (split-string text "\n"))
-         (box-id (get-text-property (point) 'gis-200-box-id))
+         (box-id (get-text-property (point) 'asm-blox-box-id))
          (row (nth 0 box-id))
          (col (nth 1 box-id))
          (line (nth 2 box-id))
          (at-line-no 0)
          (start-line-col (current-column)))
-    (gis-200--beginning-of-box)
-    (while (gis-200-in-box-p)
+    (asm-blox--beginning-of-box)
+    (while (asm-blox-in-box-p)
       (let* ((at-line (or (car lines) ""))
-             (padding (make-string (- gis-200-box-width (length at-line)) ?\s)))
-        (delete-char gis-200-box-width)
+             (padding (make-string (- asm-blox-box-width (length at-line)) ?\s)))
+        (delete-char asm-blox-box-width)
         (insert (propertize (concat at-line padding)
-                            'gis-200-box-id
+                            'asm-blox-box-id
                             (list row col at-line-no)))
         (next-line 1)
         (move-to-column start-line-col)
-        (gis-200--beginning-of-line)
+        (asm-blox--beginning-of-line)
         (setq lines (cdr lines))
         (setq at-line-no (1+ at-line-no))))
     (goto-char start-pos)))
 
-(defun gis-200--func-in-buffer (func)
+(defun asm-blox--func-in-buffer (func)
   "Perform function FUNC as if in a buffer of the current box."
-  (unless (gis-200-in-box-p)
+  (unless (asm-blox-in-box-p)
     (error "Not in box"))
-  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
          (row (nth 0 box-id))
          (col (nth 1 box-id))
          (line (nth 2 box-id))
-         (line-col (gis-200-get-line-col-num))
-         (text (gis-200--get-box-content row col))
+         (line-col (asm-blox-get-line-col-num))
+         (text (asm-blox--get-box-content row col))
          (new-line)
          (new-col)
          (new-text))
-    (with-current-buffer (get-buffer-create gis-200--mirror-buffer-name) ;; TODO: use temp buffer?
+    (with-current-buffer (get-buffer-create asm-blox--mirror-buffer-name) ;; TODO: use temp buffer?
       (erase-buffer)
       (insert text)
       (goto-char (point-min))
@@ -770,158 +770,158 @@ This was added for performance reasons.")
         (setq new-col (current-column))))
     (when new-text
       (let ((inhibit-read-only t))
-        (gis-200--set-box-content row col new-text)
-        (gis-200--replace-box-text new-text)
-        (gis-200--move-to-box-point new-line new-col)))))
+        (asm-blox--set-box-content row col new-text)
+        (asm-blox--replace-box-text new-text)
+        (asm-blox--move-to-box-point new-line new-col)))))
 
-(defmacro gis-200--in-buffer (code)
+(defmacro asm-blox--in-buffer (code)
   "Perform CODE as if inside buffer of code box."
-  `(gis-200--func-in-buffer
+  `(asm-blox--func-in-buffer
     (lambda ()
       ,code)))
 
-(defun gis-200-self-insert-command ()
+(defun asm-blox-self-insert-command ()
   "Insert the character you type."
   (interactive)
-  (if (not (gis-200-in-box-p))
+  (if (not (asm-blox-in-box-p))
       (ding)
-    (gis-200--in-buffer
+    (asm-blox--in-buffer
      (insert (this-command-keys)))
-    (gis-200--push-undo-stack-value)))
+    (asm-blox--push-undo-stack-value)))
 
-(defun gis-200-backward-delete-char ()
+(defun asm-blox-backward-delete-char ()
   "Delete the character to the left of the point."
   (interactive)
-  (gis-200--in-buffer
+  (asm-blox--in-buffer
    (backward-delete-char 1))
-  (gis-200--push-undo-stack-value))
+  (asm-blox--push-undo-stack-value))
 
-(defun gis-200-delete-char ()
+(defun asm-blox-delete-char ()
   "Delete the character at the point."
   (interactive)
-  (gis-200--in-buffer
+  (asm-blox--in-buffer
    (delete-char 1))
-  (gis-200--push-undo-stack-value))
+  (asm-blox--push-undo-stack-value))
 
-(defun gis-200-kill-word ()
+(defun asm-blox-kill-word ()
   "Kill characters forward until encountering the end of a word."
   (interactive)
-  (gis-200--in-buffer
+  (asm-blox--in-buffer
    (kill-word 1))
-  (gis-200--push-undo-stack-value))
+  (asm-blox--push-undo-stack-value))
 
-(defun gis-200-kill-line ()
+(defun asm-blox-kill-line ()
   "Kill until the end of the current line."
   (interactive)
-  (gis-200--in-buffer
+  (asm-blox--in-buffer
    (kill-line))
-  (gis-200--push-undo-stack-value))
+  (asm-blox--push-undo-stack-value))
 
-(defun gis-200--move-beginning-of-line ()
+(defun asm-blox--move-beginning-of-line ()
   "Move the point to the beginning of the line."
   (interactive)
-  (if (gis-200-in-box-p)
-      (gis-200--in-buffer
+  (if (asm-blox-in-box-p)
+      (asm-blox--in-buffer
        (move-beginning-of-line 1))
     (beginning-of-line)))
 
-(defun gis-200--move-end-of-line ()
+(defun asm-blox--move-end-of-line ()
   "Move the point to the end of the line."
   (interactive)
-  (if (gis-200-in-box-p)
-      (gis-200--in-buffer
+  (if (asm-blox-in-box-p)
+      (asm-blox--in-buffer
        (move-end-of-line 1))
     (end-of-line)))
 
-(defun gis-200--beginning-of-buffer ()
+(defun asm-blox--beginning-of-buffer ()
   "Move the point to the beginning of the buffer."
   (interactive)
-  (if (gis-200-in-box-p)
-      (gis-200--in-buffer
+  (if (asm-blox-in-box-p)
+      (asm-blox--in-buffer
        (beginning-of-buffer))
     (beginning-of-buffer)))
 
-(defun gis-200--end-of-buffer ()
+(defun asm-blox--end-of-buffer ()
   "Move the point to the end of the buffer."
   (interactive)
-  (if (gis-200-in-box-p)
-      (gis-200--in-buffer
+  (if (asm-blox-in-box-p)
+      (asm-blox--in-buffer
        (end-of-buffer))
     (end-of-buffer)))
 
-(defun gis-200--newline ()
+(defun asm-blox--newline ()
   "Insert a new line."
   (interactive)
-  (gis-200--in-buffer
+  (asm-blox--in-buffer
    (newline))
-  (gis-200--push-undo-stack-value))
+  (asm-blox--push-undo-stack-value))
 
-(defun gis-200--forward-line ()
+(defun asm-blox--forward-line ()
   "Move forward a line."
   (interactive)
-  (gis-200--in-buffer
+  (asm-blox--in-buffer
    (forward-line)))
 
-(defun gis-200--shift-box (drow dcol)
+(defun asm-blox--shift-box (drow dcol)
   "Shift contents of current box with that of box in direction DROW DCOL."
-  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
          (row (car box-id))
          (col (cadr box-id))
          (next-col (mod (+ (+ col dcol)
-                           gis-200--gameboard-col-ct)
-                        gis-200--gameboard-col-ct))
-         (next-row (mod (+ (+ row drow) gis-200--gameboard-row-ct)
-                        gis-200--gameboard-row-ct))
+                           asm-blox--gameboard-col-ct)
+                        asm-blox--gameboard-col-ct))
+         (next-row (mod (+ (+ row drow) asm-blox--gameboard-row-ct)
+                        asm-blox--gameboard-row-ct))
          (line (caddr box-id))
-         (line-col (gis-200-get-line-col-num)))
-    (setq gis-200-parse-errors nil)
-    (gis-200--swap-box-contents row col next-row next-col)
-    (gis-200--swap-undo-stacks row col next-row next-col)
-    (gis-200--move-to-box next-row next-col)
-    (gis-200--move-to-box-point line line-col)
+         (line-col (asm-blox-get-line-col-num)))
+    (setq asm-blox-parse-errors nil)
+    (asm-blox--swap-box-contents row col next-row next-col)
+    (asm-blox--swap-undo-stacks row col next-row next-col)
+    (asm-blox--move-to-box next-row next-col)
+    (asm-blox--move-to-box-point line line-col)
     (let ((inhibit-read-only t))
-      (gis-200-redraw-game-board))))
+      (asm-blox-redraw-game-board))))
 
-(defun gis-200-shift-box-right ()
+(defun asm-blox-shift-box-right ()
   "Shift the current box with the one to the right."
   (interactive)
-  (gis-200--shift-box 0 1))
+  (asm-blox--shift-box 0 1))
 
-(defun gis-200-shift-box-left ()
+(defun asm-blox-shift-box-left ()
   "Shift the current box with the one to the left."
   (interactive)
-  (gis-200--shift-box 0 -1))
+  (asm-blox--shift-box 0 -1))
 
-(defun gis-200-shift-box-up ()
+(defun asm-blox-shift-box-up ()
   "Shift the current box with the one to the top."
   (interactive)
-  (gis-200--shift-box -1 0))
+  (asm-blox--shift-box -1 0))
 
-(defun gis-200-shift-box-down ()
+(defun asm-blox-shift-box-down ()
   "Shift the current box with the one to the bottom."
   (interactive)
-  (gis-200--shift-box 1 0))
+  (asm-blox--shift-box 1 0))
 
 
-(defun gis-200--kill (beg end &optional copy-only)
+(defun asm-blox--kill (beg end &optional copy-only)
   "Kill the text from BEG to END.
 If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
-  (let* ((box-id-1 (get-text-property beg 'gis-200-box-id))
+  (let* ((box-id-1 (get-text-property beg 'asm-blox-box-id))
          (_ (when (not box-id-1) (error "Can only kill region inside box")))
          (row-1 (car box-id-1))
          (col-1 (cadr box-id-1))
          (line-1 (caddr box-id-1))
-         (line-col-1 (gis-200-get-line-col-num beg))
-         (box-id-2 (get-text-property end 'gis-200-box-id))
+         (line-col-1 (asm-blox-get-line-col-num beg))
+         (box-id-2 (get-text-property end 'asm-blox-box-id))
          (_ (when (not box-id-2) (error "Can only kill region inside box")))
          (row-2 (car box-id-2))
          (col-2 (cadr box-id-2))
          (line-2 (caddr box-id-2))
-         (line-col-2 (gis-200-get-line-col-num end)))
+         (line-col-2 (asm-blox-get-line-col-num end)))
     (when (or (not (= row-1 row-2))
               (not (= col-1 col-2)))
       (error "Can't kill region across boxes"))
-    (let* ((text (gis-200--get-box-content row-1 col-1))
+    (let* ((text (asm-blox--get-box-content row-1 col-1))
            (new-text "")
            (kill-text "")
            (line-no 0)
@@ -956,40 +956,40 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                    ((> line-2 i line-1)
                     (setq kill-text (concat kill-text line "\n")))
                    (t (setq new-text (concat new-text line "\n")))))
-      (when (seq-find (lambda (l) (>= (length l) gis-200-box-width))
+      (when (seq-find (lambda (l) (>= (length l) asm-blox-box-width))
                       (split-string new-text "\n"))
         (error "Killing region makes a line too long"))
       (kill-new kill-text)
       (deactivate-mark)
       (when (not copy-only)
-        (gis-200--set-box-content row-1 col-1 (string-trim-right new-text "\n"))
+        (asm-blox--set-box-content row-1 col-1 (string-trim-right new-text "\n"))
         (goto-char beg)
-        (gis-200--push-undo-stack-value)
+        (asm-blox--push-undo-stack-value)
         (let ((inhibit-read-only t))
-          (gis-200-redraw-game-board))))))
+          (asm-blox-redraw-game-board))))))
 
-(defun gis-200--kill-region (beg end)
+(defun asm-blox--kill-region (beg end)
   "Kill the region from BEG to END."
   (interactive "r")
-  (gis-200--kill beg end))
+  (asm-blox--kill beg end))
 
-(defun gis-200--copy-region (beg end)
+(defun asm-blox--copy-region (beg end)
   "Copy the region from BEG to END."
   (interactive "r")
-  (gis-200--kill beg end t))
+  (asm-blox--kill beg end t))
 
-(defun gis-200--yank ()
+(defun asm-blox--yank ()
   "Yank text to current point."
   (interactive)
   (push-mark)
   (let* ((kill-text (current-kill 0))
-         (box-id (get-text-property (point) 'gis-200-box-id))
+         (box-id (get-text-property (point) 'asm-blox-box-id))
          (_ (when (not box-id) (error "Can only kill region inside box")))
          (row (car box-id))
          (col (cadr box-id))
          (line-row (caddr box-id))
-         (line-col (gis-200-get-line-col-num (point)))
-         (text (gis-200--get-box-content row col))
+         (line-col (asm-blox-get-line-col-num (point)))
+         (text (asm-blox--get-box-content row col))
          (lines (split-string text "\n"))
          (new-text ""))
     (cl-loop for line in lines
@@ -1007,40 +1007,40 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                                                    "\n")))))
                  (t (setq new-text (concat new-text line "\n")))))
     (setq new-text (string-trim-right new-text "\n"))
-    (when (or (seq-find (lambda (l) (>= (length l) gis-200-box-width))
+    (when (or (seq-find (lambda (l) (>= (length l) asm-blox-box-width))
                         (split-string new-text "\n"))
-              (>= (length (split-string new-text "\n")) gis-200-box-height))
+              (>= (length (split-string new-text "\n")) asm-blox-box-height))
       (error "Yanked text doesn't fit in box"))
-    (gis-200--set-box-content row col new-text)
-    (gis-200--push-undo-stack-value)
+    (asm-blox--set-box-content row col new-text)
+    (asm-blox--push-undo-stack-value)
     (let ((inhibit-read-only t))
-      (gis-200-redraw-game-board))))
+      (asm-blox-redraw-game-board))))
 
-(defun gis-200--refresh-contents ()
+(defun asm-blox--refresh-contents ()
   "Redraw the gameboard contents."
   (interactive)
   (let ((inhibit-read-only t))
-    (if (gis-200-in-box-p)
-        (gis-200--in-buffer
+    (if (asm-blox-in-box-p)
+        (asm-blox--in-buffer
          (forward-char 0)) ;; noop to redraw cell
-      (gis-200-redraw-game-board))))
+      (asm-blox-redraw-game-board))))
 
-(defun gis-200--coords-to-end-of-box ()
+(defun asm-blox--coords-to-end-of-box ()
   "Return (lines-down columns-right) to reach the end of the box."
-  (unless (gis-200-in-box-p)
+  (unless (asm-blox-in-box-p)
     (error "Not in box"))
-  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
          (row (car box-id))
          (col (cadr box-id))
-         (text (gis-200--get-box-content row col))
+         (text (asm-blox--get-box-content row col))
          (lines (split-string text "\n"))
          (line-ct (length lines))
          (last-line-len (length (car (last lines)))))
     (list line-ct last-line-len)))
 
-(defun gis-200--move-point-to-end-of-box-content ()
+(defun asm-blox--move-point-to-end-of-box-content ()
   "Move the point to the end of the content of the current box."
-  (let* ((coords (gis-200--coords-to-end-of-box))
+  (let* ((coords (asm-blox--coords-to-end-of-box))
          (lines (car coords))
          (cols (cadr coords)))
     (let ((col (current-column)))
@@ -1048,179 +1048,179 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (move-to-column col))
     (forward-char cols)))
 
-(defun gis-200--next-row-cell ()
+(defun asm-blox--next-row-cell ()
   "Move the point to the end of the box in the next row."
   (interactive)
-  (unless (gis-200-in-box-p)
+  (unless (asm-blox-in-box-p)
     (error "Not in box"))
-  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
          (row (car box-id))
          (col (cadr box-id))
-         (next-row (if (= row (1- gis-200--gameboard-row-ct)) 0 (1+ row))))
-    (gis-200--move-to-box next-row col)
-    (gis-200--move-point-to-end-of-box-content)))
+         (next-row (if (= row (1- asm-blox--gameboard-row-ct)) 0 (1+ row))))
+    (asm-blox--move-to-box next-row col)
+    (asm-blox--move-point-to-end-of-box-content)))
 
-(defun gis-200--next-cell ()
+(defun asm-blox--next-cell ()
   "Move the point to the end of the next box."
   (interactive)
-  (if (gis-200-in-box-p)
-      (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (if (asm-blox-in-box-p)
+      (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
              (row (car box-id))
              (col (cadr box-id))
-             (next-col (if (= col (1- gis-200-column-ct)) 0 (1+ col)))
-             (next-row (if (= col (1- gis-200-column-ct)) (1+ row) row))
-             (next-row (if (= next-row gis-200--gameboard-row-ct) 0 next-row)))
-        (gis-200--move-to-box next-row next-col)
-        (gis-200--move-point-to-end-of-box-content))
-    (while (and (not (gis-200-in-box-p))
+             (next-col (if (= col (1- asm-blox-column-ct)) 0 (1+ col)))
+             (next-row (if (= col (1- asm-blox-column-ct)) (1+ row) row))
+             (next-row (if (= next-row asm-blox--gameboard-row-ct) 0 next-row)))
+        (asm-blox--move-to-box next-row next-col)
+        (asm-blox--move-point-to-end-of-box-content))
+    (while (and (not (asm-blox-in-box-p))
                 (not (bobp)))
       (forward-char -1))
     (when (bobp)
-      (gis-200--move-to-box (1- gis-200--gameboard-row-ct) (1- gis-200--gameboard-col-ct)))
-    (gis-200--next-cell)))
+      (asm-blox--move-to-box (1- asm-blox--gameboard-row-ct) (1- asm-blox--gameboard-col-ct)))
+    (asm-blox--next-cell)))
 
 ;; TODO: DRY this and next-cell up.
-(defun gis-200--prev-cell ()
+(defun asm-blox--prev-cell ()
   "Move the point to the end of the previous box."
   (interactive)
-  (if (gis-200-in-box-p)
-      (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (if (asm-blox-in-box-p)
+      (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
              (row (car box-id))
              (col (cadr box-id))
-             (next-col (if (= col 0) (1- gis-200-column-ct) (1- col)))
+             (next-col (if (= col 0) (1- asm-blox-column-ct) (1- col)))
              (next-row (if (= col 0) (1- row) row))
-             (next-row (if (= next-row -1) (1- gis-200--gameboard-row-ct) next-row)))
-        (gis-200--move-to-box next-row next-col)
-        (gis-200--move-point-to-end-of-box-content))
-    (while (and (not (gis-200-in-box-p))
+             (next-row (if (= next-row -1) (1- asm-blox--gameboard-row-ct) next-row)))
+        (asm-blox--move-to-box next-row next-col)
+        (asm-blox--move-point-to-end-of-box-content))
+    (while (and (not (asm-blox-in-box-p))
                 (not (eobp)))
       (forward-char 1))
     (when (eobp)
-      (gis-200--move-to-box 0 0))
-    (gis-200--prev-cell)))
+      (asm-blox--move-to-box 0 0))
+    (asm-blox--prev-cell)))
 
-(defun gis-200--printable-char-p (c)
+(defun asm-blox--printable-char-p (c)
   "Retrun non-nil if C is a printable character."
   (<= 32 c 126))
 
-(defconst gis-200-mode-map
+(defconst asm-blox-mode-map
   (let ((map (make-keymap)))
     (prog1 map
       ;;(suppress-keymap map)
       (dotimes (i 128)
-        (when (gis-200--printable-char-p i)
-          (define-key map (char-to-string i) #'gis-200-self-insert-command)))
-      (define-key map (kbd "DEL") #'gis-200-backward-delete-char)
-      (define-key map (kbd "SPC") #'gis-200-self-insert-command)
-      (define-key map (kbd "RET") #'gis-200--newline)
-      (define-key map (kbd "C-c C-g") #'gis-200--refresh-contents)
-      (define-key map (kbd "C-c C-c") #'gis-200-start-execution)
-      (define-key map (kbd "M-d") #'gis-200-kill-word)
-      (define-key map (kbd "C-k") #'gis-200-kill-line)
-      (define-key map (kbd "C-a") #'gis-200--move-beginning-of-line)
-      (define-key map (kbd "C-d") #'gis-200-delete-char)
-      (define-key map (kbd "C-e") #'gis-200--move-end-of-line)
-      (define-key map (kbd "M-<") #'gis-200--beginning-of-buffer)
-      (define-key map (kbd "M->") #'gis-200--end-of-buffer)
-      (define-key map (kbd "<tab>") #'gis-200--next-cell)
-      (define-key map (kbd "<backtab>") #'gis-200--prev-cell)
-      (define-key map (kbd "<S-return>") #'gis-200--next-row-cell)
-      (define-key map (kbd "s-z") #'gis-200--undo)
-      (define-key map (kbd "s-y") #'gis-200--redo)
-      (define-key map (kbd "<s-up>") #'gis-200-shift-box-up)
-      (define-key map (kbd "<s-down>") #'gis-200-shift-box-down)
-      (define-key map (kbd "<s-left>") #'gis-200-shift-box-left)
-      (define-key map (kbd "<s-right>") #'gis-200-shift-box-right)
-      (define-key map [remap undo] #'gis-200--undo)
-      (define-key map (kbd "C-w") #'gis-200-kill-region)
-      (define-key map (kbd "M-w") #'gis-200--copy-region)
-      (define-key map (kbd "C-y") #'gis-200--yank))))
+        (when (asm-blox--printable-char-p i)
+          (define-key map (char-to-string i) #'asm-blox-self-insert-command)))
+      (define-key map (kbd "DEL") #'asm-blox-backward-delete-char)
+      (define-key map (kbd "SPC") #'asm-blox-self-insert-command)
+      (define-key map (kbd "RET") #'asm-blox--newline)
+      (define-key map (kbd "C-c C-g") #'asm-blox--refresh-contents)
+      (define-key map (kbd "C-c C-c") #'asm-blox-start-execution)
+      (define-key map (kbd "M-d") #'asm-blox-kill-word)
+      (define-key map (kbd "C-k") #'asm-blox-kill-line)
+      (define-key map (kbd "C-a") #'asm-blox--move-beginning-of-line)
+      (define-key map (kbd "C-d") #'asm-blox-delete-char)
+      (define-key map (kbd "C-e") #'asm-blox--move-end-of-line)
+      (define-key map (kbd "M-<") #'asm-blox--beginning-of-buffer)
+      (define-key map (kbd "M->") #'asm-blox--end-of-buffer)
+      (define-key map (kbd "<tab>") #'asm-blox--next-cell)
+      (define-key map (kbd "<backtab>") #'asm-blox--prev-cell)
+      (define-key map (kbd "<S-return>") #'asm-blox--next-row-cell)
+      (define-key map (kbd "s-z") #'asm-blox--undo)
+      (define-key map (kbd "s-y") #'asm-blox--redo)
+      (define-key map (kbd "<s-up>") #'asm-blox-shift-box-up)
+      (define-key map (kbd "<s-down>") #'asm-blox-shift-box-down)
+      (define-key map (kbd "<s-left>") #'asm-blox-shift-box-left)
+      (define-key map (kbd "<s-right>") #'asm-blox-shift-box-right)
+      (define-key map [remap undo] #'asm-blox--undo)
+      (define-key map (kbd "C-w") #'asm-blox-kill-region)
+      (define-key map (kbd "M-w") #'asm-blox--copy-region)
+      (define-key map (kbd "C-y") #'asm-blox--yank))))
 
-(defun gis-200-execution-next-command ()
+(defun asm-blox-execution-next-command ()
   "Perform a single step of execution."
   (interactive)
-  (when (not (gis-200--gameboard-in-final-state-p))
-    (gis-200--step))
+  (when (not (asm-blox--gameboard-in-final-state-p))
+    (asm-blox--step))
   (let ((inhibit-read-only t))
-    (gis-200-redraw-game-board)
-    (gis-200-execution-code-highlight)
-    (gis-200-execution-draw-stack))
-  (gis-200-check-winning-conditions)
-  (gis-200--draw-win-message))
+    (asm-blox-redraw-game-board)
+    (asm-blox-execution-code-highlight)
+    (asm-blox-execution-draw-stack))
+  (asm-blox-check-winning-conditions)
+  (asm-blox--draw-win-message))
 
-(defvar gis-200-multi-step-ct 10)
+(defvar asm-blox-multi-step-ct 10)
 
-(defun gis-200--execution-next-multiple-commands ()
-  "Perform a multiple steps of execution according to `gis-200-multi-step-ct'."
+(defun asm-blox--execution-next-multiple-commands ()
+  "Perform a multiple steps of execution according to `asm-blox-multi-step-ct'."
   (interactive)
-  (dotimes (_ gis-200-multi-step-ct)
-    (when (not (gis-200--gameboard-in-final-state-p))
-      (gis-200--step)
-      (gis-200-check-winning-conditions)))
+  (dotimes (_ asm-blox-multi-step-ct)
+    (when (not (asm-blox--gameboard-in-final-state-p))
+      (asm-blox--step)
+      (asm-blox-check-winning-conditions)))
   (let ((inhibit-read-only t))
-    (gis-200-redraw-game-board)
-    (gis-200-execution-code-highlight)
-    (gis-200-execution-draw-stack))
-  (gis-200-check-winning-conditions)
-  (gis-200--draw-win-message))
+    (asm-blox-redraw-game-board)
+    (asm-blox-execution-code-highlight)
+    (asm-blox-execution-draw-stack))
+  (asm-blox-check-winning-conditions)
+  (asm-blox--draw-win-message))
 
-(defun gis-200--execution-run ()
+(defun asm-blox--execution-run ()
   "Continuously run execution setps."
   (interactive)
-  (while (and (not (gis-200--gameboard-in-final-state-p))
+  (while (and (not (asm-blox--gameboard-in-final-state-p))
               (not (input-pending-p)))
-    (gis-200--step)
-    (gis-200-check-winning-conditions))
+    (asm-blox--step)
+    (asm-blox-check-winning-conditions))
   (let ((inhibit-read-only t))
-    (gis-200-redraw-game-board)
-    (gis-200-execution-code-highlight)
-    (gis-200-execution-draw-stack)
-    (gis-200--draw-win-message)))
+    (asm-blox-redraw-game-board)
+    (asm-blox-execution-code-highlight)
+    (asm-blox-execution-draw-stack)
+    (asm-blox--draw-win-message)))
 
-(defconst gis-200-execution-mode-map
+(defconst asm-blox-execution-mode-map
   (let ((map (make-keymap)))
     (prog1 map
-      (define-key map "n" #'gis-200-execution-next-command)
-      (define-key map "N" #'gis-200--execution-next-multiple-commands)
-      (define-key map "r" #'gis-200--execution-run)
+      (define-key map "n" #'asm-blox-execution-next-command)
+      (define-key map "N" #'asm-blox--execution-next-multiple-commands)
+      (define-key map "r" #'asm-blox--execution-run)
       (define-key map "q" #'quit-window))))
 
-(defconst gis-200-mode-syntax-table
+(defconst asm-blox-mode-syntax-table
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?| "-" st)
     st)
-  "Syntax table for gis-200 mode.")
+  "Syntax table for asm-blox mode.")
 
-(defconst gis-200-mode-highlights
+(defconst asm-blox-mode-highlights
   '(("\\<setq\\>" . 'font-lock-function-name-face)
     ("[0-9]+" . (1 'font-lock-constant-face))))
 
-(defun gis-200--create-execution-buffer ()
+(defun asm-blox--create-execution-buffer ()
   "Create a new uneditable gamebuffer for displaing execution of puzzles."
-  (let ((buffer (get-buffer-create "*gis-200-execution*"))
+  (let ((buffer (get-buffer-create "*asm-blox-execution*"))
         (origin-file-buffer (current-buffer)))
     (with-current-buffer buffer
-      (gis-200-execution-mode)
+      (asm-blox-execution-mode)
       (let ((inhibit-read-only t))
-        (gis-200-redraw-game-board)
-        (gis-200-execution-code-highlight)
-        (gis-200-execution-draw-stack)))
+        (asm-blox-redraw-game-board)
+        (asm-blox-execution-code-highlight)
+        (asm-blox-execution-draw-stack)))
     (switch-to-buffer buffer)
-    (setq gis-200-execution-origin-buffer origin-file-buffer)))
+    (setq asm-blox-execution-origin-buffer origin-file-buffer)))
 
-(defun gis-200-execution-code-highlight ()
+(defun asm-blox-execution-code-highlight ()
   "Add highlight face to where runtime's pc is."
   (let ((inhibit-read-only t))
-    (dotimes (row gis-200--gameboard-row-ct)
-      (dotimes (col gis-200--gameboard-col-ct)
-        (let* ((at-runtime (gis-200--cell-at-row-col row col))
-               (at-instr (gis-200--cell-runtime-current-instruction at-runtime))
-               (start-pos (gis-200-code-node-start-pos at-instr))
-               (end-pos (gis-200-code-node-end-pos at-instr)))
+    (dotimes (row asm-blox--gameboard-row-ct)
+      (dotimes (col asm-blox--gameboard-col-ct)
+        (let* ((at-runtime (asm-blox--cell-at-row-col row col))
+               (at-instr (asm-blox--cell-runtime-current-instruction at-runtime))
+               (start-pos (asm-blox-code-node-start-pos at-instr))
+               (end-pos (asm-blox-code-node-end-pos at-instr)))
           (when (and start-pos end-pos)
-            (gis-200--move-to-box row col)
-            (gis-200--box-point-forward (1- start-pos))
-            (let* ((text (gis-200--get-box-content row col))
+            (asm-blox--move-to-box row col)
+            (asm-blox--box-point-forward (1- start-pos))
+            (let* ((text (asm-blox--get-box-content row col))
                    (hl-text (substring-no-properties text (1- start-pos) (1- end-pos)))
                    (hl-lines (split-string hl-text "\n")))
               (while hl-lines
@@ -1233,14 +1233,14 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                     (forward-char -1)))
                 (setq hl-lines (cdr hl-lines))))))))))
 
-(defun gis-200-execution-draw-stack ()
+(defun asm-blox-execution-draw-stack ()
   "Display the stack for the current cell-runtimes."
   (let ((inhibit-read-only t))
-    (dotimes (row gis-200--gameboard-row-ct)
-      (dotimes (col gis-200--gameboard-col-ct)
-        (let* ((at-runtime (gis-200--cell-at-row-col row col))
-               (stack (reverse (gis-200--cell-runtime-stack at-runtime))))
-          (gis-200--move-to-end-of-box row col)
+    (dotimes (row asm-blox--gameboard-row-ct)
+      (dotimes (col asm-blox--gameboard-col-ct)
+        (let* ((at-runtime (asm-blox--cell-at-row-col row col))
+               (stack (reverse (asm-blox--cell-runtime-stack at-runtime))))
+          (asm-blox--move-to-end-of-box row col)
           (while stack
             (let ((stack-top (car stack)))
               (forward-char -4)
@@ -1251,220 +1251,220 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
               (forward-char -5))
             (setq stack (cdr stack))))))))
 
-(defun gis-200--create-widges-from-gameboard ()
+(defun asm-blox--create-widges-from-gameboard ()
   "Create widget objects from sources and sinks of gameboard."
-  (let ((sources (gis-200--problem-spec-sources gis-200--extra-gameboard-cells))
-        (sinks (gis-200--problem-spec-sinks gis-200--extra-gameboard-cells))
+  (let ((sources (asm-blox--problem-spec-sources asm-blox--extra-gameboard-cells))
+        (sinks (asm-blox--problem-spec-sinks asm-blox--extra-gameboard-cells))
         (widgets))
     (dolist (source sources)
-      (setq widgets (cons (gis-200--make-source-widget source)
+      (setq widgets (cons (asm-blox--make-source-widget source)
                           widgets)))
     (dolist (sink sinks)
-      (if (gis-200--cell-sink-editor-text sink)
-          (setq widgets (cons (gis-200--make-editor-widget sink)
+      (if (asm-blox--cell-sink-editor-text sink)
+          (setq widgets (cons (asm-blox--make-editor-widget sink)
                               widgets))
-        (setq widgets (cons (gis-200--make-sink-widget sink)
+        (setq widgets (cons (asm-blox--make-sink-widget sink)
                             widgets))))
-    (setq gis-200--current-widgets (reverse widgets))))
+    (setq asm-blox--current-widgets (reverse widgets))))
 
-(defun gis-200-start-execution ()
+(defun asm-blox-start-execution ()
   "Parse gameboard, displaying any errors, and display code execution buffer."
   (interactive)
   ;; parse the current buffer to make sure that the text we are
   ;; running is the actual text of the buffer.
-  (gis-200--parse-saved-buffer)
-  (setq gis-200-parse-errors nil)
+  (asm-blox--parse-saved-buffer)
+  (setq asm-blox-parse-errors nil)
   (let ((parse-errors)
         (parses))
     (maphash
      (lambda (coords code-text)
-       (let ((parse-result (gis-200--parse-cell coords code-text)))
+       (let ((parse-result (asm-blox--parse-cell coords code-text)))
          (cond
-          ((gis-200--parse-error-p parse-result)
+          ((asm-blox--parse-error-p parse-result)
            (setq parse-errors (cons (cons coords parse-result) parse-errors)))
-          ((gis-200--cell-runtime-p parse-result)
-           (gis-200--set-cell-at-row-col (car coords) (cadr coords) parse-result))
-          (t (let ((asm (gis-200--parse-tree-to-asm parse-result)))
-               (if (gis-200--parse-error-p asm)
+          ((asm-blox--cell-runtime-p parse-result)
+           (asm-blox--set-cell-at-row-col (car coords) (cadr coords) parse-result))
+          (t (let ((asm (asm-blox--parse-tree-to-asm parse-result)))
+               (if (asm-blox--parse-error-p asm)
                    (setq parse-errors (cons (cons coords asm) parse-errors)))
                (setq parses (cons (cons coords asm) parses)))))))
-     gis-200-box-contents)
+     asm-blox-box-contents)
     (if parse-errors
         (progn
-          (setq gis-200-parse-errors parse-errors)
+          (setq asm-blox-parse-errors parse-errors)
           (let ((inhibit-read-only t))
-            (gis-200-redraw-game-board)))
-      (setq gis-200-parse-errors nil)
+            (asm-blox-redraw-game-board)))
+      (setq asm-blox-parse-errors nil)
       (let ((inhibit-read-only t))
-        (gis-200-redraw-game-board))
+        (asm-blox-redraw-game-board))
       (dolist (parse parses)
         (let* ((coords (car parse))
                (row (car coords))
                (col (cadr coords))
                (asm (cdr parse)))
           (assert (numberp col))
-          (gis-200--set-cell-asm-at-row-col row col asm)))
-      (gis-200--backup-file-for-current-buffer)
-      (gis-200--reset-extra-gameboard-cells-state)
-      (gis-200--create-widges-from-gameboard)
-      (gis-200--create-execution-buffer))))
+          (asm-blox--set-cell-asm-at-row-col row col asm)))
+      (asm-blox--backup-file-for-current-buffer)
+      (asm-blox--reset-extra-gameboard-cells-state)
+      (asm-blox--create-widges-from-gameboard)
+      (asm-blox--create-execution-buffer))))
 
-(defun gis-200-execution-mode ()
-  "Activate gis-200 execution mod."
+(defun asm-blox-execution-mode ()
+  "Activate asm-blox execution mod."
   (kill-all-local-variables)
-  (use-local-map gis-200-execution-mode-map)
-  (setq mode-name "gis-200-execution"
+  (use-local-map asm-blox-execution-mode-map)
+  (setq mode-name "asm-blox-execution"
         buffer-read-only t)
   (setq-local truncate-lines 0
-              gis-200--display-mode 'execute)
-  (setq font-lock-defaults gis-200-mode-highlights)
-  (setq header-line-format "GIS-200 EXECUTION")
-  (setq gis-200-runtime-error nil)
-  (setq gis-200--gameboard-state nil)
-  (set-syntax-table gis-200-mode-syntax-table))
+              asm-blox--display-mode 'execute)
+  (setq font-lock-defaults asm-blox-mode-highlights)
+  (setq header-line-format "ASM-BLOX EXECUTION")
+  (setq asm-blox-runtime-error nil)
+  (setq asm-blox--gameboard-state nil)
+  (set-syntax-table asm-blox-mode-syntax-table))
 
-(defvar gis-200--skip-initial-parsing nil
+(defvar asm-blox--skip-initial-parsing nil
   "When non-nil, don't parse the initial gameboard.")
 
-(defvar gis-200--show-pair-idle-timer nil
+(defvar asm-blox--show-pair-idle-timer nil
   "Idle-timer for showing matching parenthesis.")
 
-(defun gis-200-mode ()
-  "Activate gis-200 editing mode."
+(defun asm-blox-mode ()
+  "Activate asm-blox editing mode."
   (interactive)
   (kill-all-local-variables)
-  (use-local-map gis-200-mode-map)
-  (setq mode-name "gis-200"
+  (use-local-map asm-blox-mode-map)
+  (setq mode-name "asm-blox"
         buffer-read-only t)
-  (setq gis-200-parse-errors nil)
+  (setq asm-blox-parse-errors nil)
   (setq-local truncate-lines 0)
-  (setq font-lock-defaults gis-200-mode-highlights)
-  (set-syntax-table gis-200-mode-syntax-table)
-  (unless gis-200--skip-initial-parsing
-    (gis-200--parse-saved-buffer)
+  (setq font-lock-defaults asm-blox-mode-highlights)
+  (set-syntax-table asm-blox-mode-syntax-table)
+  (unless asm-blox--skip-initial-parsing
+    (asm-blox--parse-saved-buffer)
     (let ((inhibit-read-only t))
-      (gis-200-redraw-game-board)))
-  (unless gis-200--show-pair-idle-timer
-    (setq gis-200--show-pair-idle-timer
-          (run-with-idle-timer 0.125 t 'gis-200--highlight-pairs))))
+      (asm-blox-redraw-game-board)))
+  (unless asm-blox--show-pair-idle-timer
+    (setq asm-blox--show-pair-idle-timer
+          (run-with-idle-timer 0.125 t 'asm-blox--highlight-pairs))))
 
 ;;;###autoload
-(add-to-list 'auto-mode-alist (cons "\\.gis\\'" 'gis-200-mode))
+(add-to-list 'auto-mode-alist (cons "\\.gis\\'" 'asm-blox-mode))
 
 ;;; Undo ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar gis-200--undo-stacks nil
+(defvar asm-blox--undo-stacks nil
   "Hashmap of stacks containing undo history of each buffer.")
 
-(cl-defstruct (gis-200--undo-state
-               (:constructor gis-200--undo-state-create)
+(cl-defstruct (asm-blox--undo-state
+               (:constructor asm-blox--undo-state-create)
                (:copier nil))
   "Struct representing a undo-state."
   text box-row box-col redo-list)
 
-(defun gis-200--initialize-undo-stacks ()
+(defun asm-blox--initialize-undo-stacks ()
   "Initialize all undo-stacks to be empty."
-  (setq gis-200--undo-stacks (make-hash-table :test 'equal))
+  (setq asm-blox--undo-stacks (make-hash-table :test 'equal))
   (dotimes (row 3)
-    (dotimes (col gis-200-column-ct)
-      (let* ((current-value (gis-200--get-box-content row col)))
+    (dotimes (col asm-blox-column-ct)
+      (let* ((current-value (asm-blox--get-box-content row col)))
         (puthash (list row col)
-                 (list (gis-200--undo-state-create :text current-value
+                 (list (asm-blox--undo-state-create :text current-value
                                                    :box-row 0
                                                    :box-col 0
                                                    :redo-list '()))
-                 gis-200--undo-stacks)))))
+                 asm-blox--undo-stacks)))))
 
-(defun gis-200--swap-undo-stacks (row-1 col-1 row-2 col-2)
+(defun asm-blox--swap-undo-stacks (row-1 col-1 row-2 col-2)
   "Swap the undo stacks of (ROW-1 COL-1) and (ROW-2 COL-2)."
-  (let ((stack-1 (gethash (list row-1 col-1) gis-200--undo-stacks))
-        (stack-2 (gethash (list row-2 col-2) gis-200--undo-stacks)))
-    (puthash (list row-1 col-1) stack-2 gis-200--undo-stacks)
-    (puthash (list row-2 col-2) stack-1 gis-200--undo-stacks)))
+  (let ((stack-1 (gethash (list row-1 col-1) asm-blox--undo-stacks))
+        (stack-2 (gethash (list row-2 col-2) asm-blox--undo-stacks)))
+    (puthash (list row-1 col-1) stack-2 asm-blox--undo-stacks)
+    (puthash (list row-2 col-2) stack-1 asm-blox--undo-stacks)))
 
-(defun gis-200--push-undo-stack-value ()
+(defun asm-blox--push-undo-stack-value ()
   "Push the contents of the current box as a new undo frame."
-  (unless gis-200--undo-stacks
-    (setq gis-200--undo-stacks (make-hash-table :test #'equal)))
-  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (unless asm-blox--undo-stacks
+    (setq asm-blox--undo-stacks (make-hash-table :test #'equal)))
+  (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
          (row (car box-id))
          (col (cadr box-id))
          (line-row (caddr box-id))
-         (text (gis-200--get-box-content row col))
+         (text (asm-blox--get-box-content row col))
          (key (list row col))
-         (states (gethash key gis-200--undo-stacks))
-         (top-text (and states (gis-200--undo-state-text (car states)))))
+         (states (gethash key asm-blox--undo-stacks))
+         (top-text (and states (asm-blox--undo-state-text (car states)))))
     (unless (equal top-text text)
-      (let* ((line-col (gis-200-get-line-col-num))
-             (state (gis-200--undo-state-create :text text
+      (let* ((line-col (asm-blox-get-line-col-num))
+             (state (asm-blox--undo-state-create :text text
                                                 :box-row line-row
                                                 :box-col line-col)))
-        (puthash key (cons state states) gis-200--undo-stacks)))))
+        (puthash key (cons state states) asm-blox--undo-stacks)))))
 
-(defun gis-200--undo ()
+(defun asm-blox--undo ()
   "Perform an undo in the current box."
   (interactive)
-  (if (not (gis-200-in-box-p))
+  (if (not (asm-blox-in-box-p))
       (ding)
-    (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+    (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
            (row (car box-id))
            (col (cadr box-id)))
-      (let* ((stack (gethash (list row col) gis-200--undo-stacks))
+      (let* ((stack (gethash (list row col) asm-blox--undo-stacks))
              (prev-state (cadr stack)))
         (if (<= (length stack) 1)
             (ding)
           ;; handle redo
-          (let* ((at-state-redo (gis-200--undo-state-redo-list (car stack)))
+          (let* ((at-state-redo (asm-blox--undo-state-redo-list (car stack)))
                  (new-redo (cons (car stack) at-state-redo)))
-            (setf (gis-200--undo-state-redo-list prev-state) new-redo))
-          (puthash (list row col) (cdr stack) gis-200--undo-stacks)
-          (let ((text (gis-200--undo-state-text prev-state))
-                (box-row (gis-200--undo-state-box-row prev-state))
-                (box-col (gis-200--undo-state-box-col prev-state)))
-            (gis-200--set-box-content row col text)
+            (setf (asm-blox--undo-state-redo-list prev-state) new-redo))
+          (puthash (list row col) (cdr stack) asm-blox--undo-stacks)
+          (let ((text (asm-blox--undo-state-text prev-state))
+                (box-row (asm-blox--undo-state-box-row prev-state))
+                (box-col (asm-blox--undo-state-box-col prev-state)))
+            (asm-blox--set-box-content row col text)
             ;; code-smell: always inhibiting read only
             (let ((inhibit-read-only t))
-              (gis-200-redraw-game-board))
-            (gis-200--move-to-box-point box-row box-col)))))))
+              (asm-blox-redraw-game-board))
+            (asm-blox--move-to-box-point box-row box-col)))))))
 
-(defun gis-200--redo ()
+(defun asm-blox--redo ()
   "Perform a redo in the current box."
   (interactive)
-  (if (not (gis-200-in-box-p))
+  (if (not (asm-blox-in-box-p))
       (ding)
-    (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+    (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
            (row (car box-id))
            (col (cadr box-id)))
-      (let* ((stack (gethash (list row col) gis-200--undo-stacks))
+      (let* ((stack (gethash (list row col) asm-blox--undo-stacks))
              (top-state (car stack))
-             (redo-list (gis-200--undo-state-redo-list top-state)))
+             (redo-list (asm-blox--undo-state-redo-list top-state)))
         (if (not redo-list)
             (ding)
           (let ((next-redo (car redo-list))
                 (rest-redos (cdr redo-list)))
-            (setf (gis-200--undo-state-redo-list next-redo) rest-redos)
-            (puthash (list row col) (cons next-redo stack) gis-200--undo-stacks)
-            (let ((text (gis-200--undo-state-text next-redo))
-                  (box-row (gis-200--undo-state-box-row next-redo))
-                  (box-col (gis-200--undo-state-box-col next-redo)))
-              (gis-200--set-box-content row col text)
+            (setf (asm-blox--undo-state-redo-list next-redo) rest-redos)
+            (puthash (list row col) (cons next-redo stack) asm-blox--undo-stacks)
+            (let ((text (asm-blox--undo-state-text next-redo))
+                  (box-row (asm-blox--undo-state-box-row next-redo))
+                  (box-col (asm-blox--undo-state-box-col next-redo)))
+              (asm-blox--set-box-content row col text)
               (let ((inhibit-read-only t)) ;; code-smell: always inhibiting read only
-                (gis-200-redraw-game-board))
-              (gis-200--move-to-box-point box-row box-col))))))))
+                (asm-blox-redraw-game-board))
+              (asm-blox--move-to-box-point box-row box-col))))))))
 
 
 ;;; Parenthesis match code ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar gis-200-pair-overlays nil "List of overlays used to highlight parenthesis pairs.")
+(defvar asm-blox-pair-overlays nil "List of overlays used to highlight parenthesis pairs.")
 
-(defun gis-200--find-closing-match ()
+(defun asm-blox--find-closing-match ()
   "Find the closing paren match of point."
-  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
          (row (car box-id))
          (col (cadr box-id))
          (line (caddr box-id))
-         (line-col (gis-200-get-line-col-num))
-         (text (gis-200--get-box-content row col)))
+         (line-col (asm-blox-get-line-col-num))
+         (text (asm-blox--get-box-content row col)))
     (with-temp-buffer
       (insert text)
       (goto-char (point-min))
@@ -1485,14 +1485,14 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                (drow (- new-row line)))
           (list drow dcol))))))
 
-(defun gis-200--find-opening-match ()
+(defun asm-blox--find-opening-match ()
   "Find the opening paren match of point."
-  (let* ((box-id (get-text-property (point) 'gis-200-box-id))
+  (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
          (row (car box-id))
          (col (cadr box-id))
          (line (caddr box-id))
-         (line-col (gis-200-get-line-col-num))
-         (text (gis-200--get-box-content row col)))
+         (line-col (asm-blox-get-line-col-num))
+         (text (asm-blox--get-box-content row col)))
     (with-temp-buffer
       (insert text)
       (goto-char (point-min))
@@ -1514,35 +1514,35 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                (drow (- new-row line)))
           (list drow dcol))))))
 
-(defun  gis-200--pair-delete-overlays ()
+(defun  asm-blox--pair-delete-overlays ()
   "Remove both show pair overlays."
-  (when gis-200-pair-overlays
-    (dolist (overlay gis-200-pair-overlays)
+  (when asm-blox-pair-overlays
+    (dolist (overlay asm-blox-pair-overlays)
       (delete-overlay overlay))
-    (setq gis-200-pair-overlays nil)))
+    (setq asm-blox-pair-overlays nil)))
 
-(defun gis-200--pair-create-overlays (start end)
+(defun asm-blox--pair-create-overlays (start end)
   "Create the show pair overlays for parens at point START and END."
-  (when gis-200-pair-overlays
-    (gis-200--pair-delete-overlays))
+  (when asm-blox-pair-overlays
+    (asm-blox--pair-delete-overlays))
   (let ((oleft (make-overlay start (1+ start) nil t nil))
         (oright (make-overlay end (1+ end) nil t nil)))
-    (setq gis-200-pair-overlays (list oleft oright))
-    (overlay-put oleft 'face 'gis-200-show-paren-match-face)
-    (overlay-put oright 'face 'gis-200-show-paren-match-face)
+    (setq asm-blox-pair-overlays (list oleft oright))
+    (overlay-put oleft 'face 'asm-blox-show-paren-match-face)
+    (overlay-put oright 'face 'asm-blox-show-paren-match-face)
     (overlay-put oleft 'type 'show-pair)))
 
-(defun gis-200--highlight-pairs ()
+(defun asm-blox--highlight-pairs ()
   "Highlight any relevant pairs at point."
-  (when (equal mode-name "gis-200") ;; TODO: use eql to make this faster
-    (if (gis-200-in-box-p)
+  (when (equal mode-name "asm-blox") ;; TODO: use eql to make this faster
+    (if (asm-blox-in-box-p)
         (save-excursion
           (save-match-data
             (while-no-input
               (cond
                ((looking-back ")")
                 (let* ((start-point (1- (point)))
-                       (opening-match-coords (gis-200--find-opening-match))
+                       (opening-match-coords (asm-blox--find-opening-match))
                        (d-row (car opening-match-coords))
                        (d-col (cadr opening-match-coords))
                        (at-col (current-column)))
@@ -1550,10 +1550,10 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                   (move-to-column at-col)
                   (forward-char d-col)
                   (let ((end-point (point)))
-                    (gis-200--pair-create-overlays start-point end-point))))
+                    (asm-blox--pair-create-overlays start-point end-point))))
                ((looking-at "(")
                 (let* ((start-point (point))
-                       (closing-match-coords (gis-200--find-closing-match)))
+                       (closing-match-coords (asm-blox--find-closing-match)))
                   (if closing-match-coords
                       (let ((d-row (car closing-match-coords))
                             (d-col (cadr closing-match-coords))
@@ -1562,65 +1562,65 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                         (move-to-column at-col)
                         (forward-char d-col)
                         (let ((end-point (point)))
-                          (gis-200--pair-create-overlays start-point end-point)))
-                    (when gis-200-pair-overlays
-                      (gis-200--pair-delete-overlays))))) ;; TODO: should display red match instead
-               (gis-200-pair-overlays
-                (gis-200--pair-delete-overlays))))))
-      (when gis-200-pair-overlays
-        (gis-200--pair-delete-overlays)))))
+                          (asm-blox--pair-create-overlays start-point end-point)))
+                    (when asm-blox-pair-overlays
+                      (asm-blox--pair-delete-overlays))))) ;; TODO: should display red match instead
+               (asm-blox-pair-overlays
+                (asm-blox--pair-delete-overlays))))))
+      (when asm-blox-pair-overlays
+        (asm-blox--pair-delete-overlays)))))
 
 ;;; Puzzle Selection
 
-(defun gis-200--puzzle-selection-setup-buffer (id)
+(defun asm-blox--puzzle-selection-setup-buffer (id)
   "Setup the puzzle buffer for the puzzle at ID."
-  (let ((puzzle (gis-200--get-puzzle-by-id id)))
+  (let ((puzzle (asm-blox--get-puzzle-by-id id)))
     (unless puzzle
       (error "No puzzle found with id %s" id))
-    (let ((buffer (get-buffer-create "*gis-200*"))  ;; TODO: allow for 1+ puzzles at once
-          (file-name (gis-200--generate-new-puzzle-filename id)))
-      (gis-200--initialize-box-contents)
-      (setq gis-200--extra-gameboard-cells (funcall puzzle))
+    (let ((buffer (get-buffer-create "*asm-blox*"))  ;; TODO: allow for 1+ puzzles at once
+          (file-name (asm-blox--generate-new-puzzle-filename id)))
+      (asm-blox--initialize-box-contents)
+      (setq asm-blox--extra-gameboard-cells (funcall puzzle))
       (switch-to-buffer buffer)
       (let ((inhibit-read-only t)
-            (gis-200--skip-initial-parsing t))
+            (asm-blox--skip-initial-parsing t))
         (set-visited-file-name file-name)
-        (gis-200-redraw-game-board)
-        (gis-200-mode)
+        (asm-blox-redraw-game-board)
+        (asm-blox-mode)
         (save-buffer)))))
 
-(defun gis-200-select-puzzle ()
+(defun asm-blox-select-puzzle ()
   "Start the puzzle for the puzzle under the point."
   (interactive)
   (let ((at-puzzle-id
-         (get-text-property (point) 'gis-200-puzzle-selection-id))
+         (get-text-property (point) 'asm-blox-puzzle-selection-id))
         (at-puzzle-filename
-         (get-text-property (point) 'gis-200-puzzle-selection-filename)))
+         (get-text-property (point) 'asm-blox-puzzle-selection-filename)))
     (unless at-puzzle-id
       (error "No puzzle under point"))
     (if at-puzzle-filename
         (find-file at-puzzle-filename)
-      (gis-200--puzzle-selection-setup-buffer at-puzzle-id))
+      (asm-blox--puzzle-selection-setup-buffer at-puzzle-id))
     ;; refresh the puzzle selection buffer so
     ;; the user can see that their file was created.
-    (gis-200-puzzle-selection-prepare-buffer)))
+    (asm-blox-puzzle-selection-prepare-buffer)))
 
-(defconst gis-200-puzzle-selection-mode-map
+(defconst asm-blox-puzzle-selection-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
       (define-key map "q" #'quit-window)
-      (define-key map "g" #'gis-200-puzzle-selection-refresh)
-      (define-key map (kbd "RET") #'gis-200-select-puzzle)))
-  "Mode map for selecting a gis-200 puzzle.")
+      (define-key map "g" #'asm-blox-puzzle-selection-refresh)
+      (define-key map (kbd "RET") #'asm-blox-select-puzzle)))
+  "Mode map for selecting a asm-blox puzzle.")
 
-(defun gis-200--font-for-difficulty (difficulty)
+(defun asm-blox--font-for-difficulty (difficulty)
   (pcase difficulty
     ('tutorial "LavenderBlush2")
     ('easy "forest green")
     ('medium "goldenrod")
     ('hard "orange red")))
 
-(defun gis-200--puzzles-by-difficulty ()
+(defun asm-blox--puzzles-by-difficulty ()
   "Return the puzzles in order of difficulty."
   (let* ((difficulty-to-num
           (lambda (d)
@@ -1632,75 +1632,75 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
          (compare-difficulty
           (lambda (a b)
             (< (funcall difficulty-to-num
-                        (gis-200--problem-spec-difficulty (funcall a)))
+                        (asm-blox--problem-spec-difficulty (funcall a)))
                (funcall difficulty-to-num
-                        (gis-200--problem-spec-difficulty (funcall b)))))))
-    (seq-sort compare-difficulty gis-200-puzzles)))
+                        (asm-blox--problem-spec-difficulty (funcall b)))))))
+    (seq-sort compare-difficulty asm-blox-puzzles)))
 
-(defun gis-200-puzzle-selection-prepare-buffer ()
+(defun asm-blox-puzzle-selection-prepare-buffer ()
   "Prepare the puzzle selection buffer."
-  (with-current-buffer (get-buffer-create "*gis-200-puzzle-selection*")
+  (with-current-buffer (get-buffer-create "*asm-blox-puzzle-selection*")
     (let ((inhibit-read-only t))
       (erase-buffer)
-      (dolist (puzzle-fn (gis-200--puzzles-by-difficulty))
+      (dolist (puzzle-fn (asm-blox--puzzles-by-difficulty))
         (let* ((puzzle (funcall puzzle-fn))
-               (name (gis-200--problem-spec-name puzzle))
-               (difficulty (gis-200--problem-spec-difficulty puzzle))
-               (difficulty-color (gis-200--font-for-difficulty difficulty))
+               (name (asm-blox--problem-spec-name puzzle))
+               (difficulty (asm-blox--problem-spec-difficulty puzzle))
+               (difficulty-color (asm-blox--font-for-difficulty difficulty))
                (description (replace-regexp-in-string
                              "\n"
                              " "
-                             (gis-200--problem-spec-description puzzle)))
+                             (asm-blox--problem-spec-description puzzle)))
                (line-str (format "%3s %-8s %-25s %-60s   "
-                                 (if (gis-200--puzzle-won-p name) "[x]" "[ ]")
+                                 (if (asm-blox--puzzle-won-p name) "[x]" "[ ]")
                                  (propertize (symbol-name difficulty)
                                              'font-lock-face
                                              `(:foreground ,difficulty-color))
                                  name
                                  (truncate-string-to-width description 60
                                                            nil nil t))))
-          (insert (propertize line-str 'gis-200-puzzle-selection-id name))
-          (let ((saved-file-ct (gis-200--saved-puzzle-ct-by-id name)))
+          (insert (propertize line-str 'asm-blox-puzzle-selection-id name))
+          (let ((saved-file-ct (asm-blox--saved-puzzle-ct-by-id name)))
             (dotimes (i saved-file-ct)
               (insert
                (propertize (format "[%d]" (1+ i))
-                           'gis-200-puzzle-selection-id name
-                           'gis-200-puzzle-selection-filename
-                           (gis-200--make-puzzle-idx-file-name name (1+ i))))
-              (insert (propertize " " 'gis-200-puzzle-selection-id name)))))
+                           'asm-blox-puzzle-selection-id name
+                           'asm-blox-puzzle-selection-filename
+                           (asm-blox--make-puzzle-idx-file-name name (1+ i))))
+              (insert (propertize " " 'asm-blox-puzzle-selection-id name)))))
         (insert "\n")))))
 
-(defun gis-200-puzzle-selection-refresh ()
+(defun asm-blox-puzzle-selection-refresh ()
   "Refresh the contents of the puzzle display buffer."
   (interactive)
   (let ((line-num (line-number-at-pos))
         (col-num (current-column)))
-    (gis-200-puzzle-selection-prepare-buffer)
+    (asm-blox-puzzle-selection-prepare-buffer)
     (goto-char (point-min))
     (forward-line (1- line-num))
     (forward-char col-num)))
 
-(defun gis-200-puzzle-selection-mode ()
-  "Activate mode for selecting gis-200 puzzles."
+(defun asm-blox-puzzle-selection-mode ()
+  "Activate mode for selecting asm-blox puzzles."
   (interactive)
   (kill-all-local-variables)
-  (use-local-map gis-200-puzzle-selection-mode-map)
-  (setq mode-name "gis-200-puzzle-selection"
+  (use-local-map asm-blox-puzzle-selection-mode-map)
+  (setq mode-name "asm-blox-puzzle-selection"
         buffer-read-only t)
   (setq header-line-format
         (format "     %-8s %-25s %-60s   %s" "STRAIN" "PUZZLE NAME" "DESCRIPTION" "SAVED FILES"))
   (setq-local truncate-lines 0)
   (hl-line-mode t))
 
-(defun gis-200 ()
-  "Open gis-200 puzzle selection screen."
+(defun asm-blox ()
+  "Open asm-blox puzzle selection screen."
   (interactive)
-  (let ((buffer (get-buffer-create "*gis-200-puzzle-selection*")))
+  (let ((buffer (get-buffer-create "*asm-blox-puzzle-selection*")))
     (switch-to-buffer buffer)
-    (gis-200-puzzle-selection-mode)
-    (gis-200-puzzle-selection-prepare-buffer)
+    (asm-blox-puzzle-selection-mode)
+    (asm-blox-puzzle-selection-prepare-buffer)
     (goto-char (point-min))))
 
-(provide 'gis-200-display)
+(provide 'asm-blox-display)
 
-;;; gis-200-display.el ends here
+;;; asm-blox-display.el ends here
