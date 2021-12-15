@@ -418,10 +418,11 @@ of the board or very right.  TYPE will either be source or sink."
                                               ?\s)))
                    (if (and (= 11 box-row) err (eql asm-blox--display-mode 'edit))
                        (let ((err-text (nth 2 (asm-blox--get-error-at-cell row col))))
-                         (insert err-text)
-                         (insert (make-string (- (length box-inside)
-                                                 (length err-text))
-                                              ?\s)))
+                         (let ((err-ov-beg (1- (point))))
+                           (let ((ov (make-overlay err-ov-beg (1+ err-ov-beg))))
+                             (overlay-put ov 'after-string (concat err-text (make-string (- asm-blox-box-width (length err-text)) ?\s)))
+                             (overlay-put ov 'evaporate t))
+                           (insert (propertize "                    " 'invisible t ))))
                      (insert (propertize text 'asm-blox-box-id (list row col box-row)))
                      (insert (propertize spacing
                                          'asm-blox-box-id (list row col box-row)
@@ -1195,12 +1196,14 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   '(("\\<setq\\>" . 'font-lock-function-name-face)
     ("[0-9]+" . (1 'font-lock-constant-face))))
 
-(defun asm-blox--create-execution-buffer ()
+(defun asm-blox--create-execution-buffer (box-contents extra-cells)
   "Create a new uneditable gamebuffer for displaing execution of puzzles."
   (let ((buffer (get-buffer-create "*asm-blox-execution*"))
         (origin-file-buffer (current-buffer)))
     (with-current-buffer buffer
       (asm-blox-execution-mode)
+      (setq asm-blox-box-contents box-contents)
+      (setq asm-blox--extra-gameboard-cells extra-cells)
       (let ((inhibit-read-only t))
         (asm-blox-redraw-game-board)
         (asm-blox-execution-code-highlight)
@@ -1272,7 +1275,6 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   (interactive)
   ;; parse the current buffer to make sure that the text we are
   ;; running is the actual text of the buffer.
-  (asm-blox--parse-saved-buffer)
   (setq asm-blox-parse-errors nil)
   (let ((parse-errors)
         (parses))
@@ -1307,7 +1309,9 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (asm-blox--backup-file-for-current-buffer)
       (asm-blox--reset-extra-gameboard-cells-state)
       (asm-blox--create-widges-from-gameboard)
-      (asm-blox--create-execution-buffer))))
+      (let ((box-contents asm-blox-box-contents)
+            (extra-cells asm-blox--extra-gameboard-cells))
+        (asm-blox--create-execution-buffer box-contents extra-cells)))))
 
 (defun asm-blox-execution-mode ()
   "Activate asm-blox execution mod."
@@ -1579,14 +1583,15 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (error "No puzzle found with id %s" id))
     (let ((buffer (get-buffer-create "*asm-blox*"))  ;; TODO: allow for 1+ puzzles at once
           (file-name (asm-blox--generate-new-puzzle-filename id)))
-      (asm-blox--initialize-box-contents)
-      (setq asm-blox--extra-gameboard-cells (funcall puzzle))
       (switch-to-buffer buffer)
       (let ((inhibit-read-only t)
             (asm-blox--skip-initial-parsing t))
         (set-visited-file-name file-name)
-        (asm-blox-redraw-game-board)
+        ;; make sure buffer-local variables set properly
         (asm-blox-mode)
+        (setq asm-blox--extra-gameboard-cells (funcall puzzle))
+        (asm-blox--initialize-box-contents)
+        (asm-blox-redraw-game-board)
         (save-buffer)))))
 
 (defun asm-blox-select-puzzle ()

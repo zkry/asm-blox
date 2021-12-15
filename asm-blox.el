@@ -40,9 +40,9 @@
 (defconst asm-blox--gameboard-col-ct 4)
 (defconst asm-blox--gameboard-row-ct 3)
 
-(defvar asm-blox-box-contents nil)
+(defvar-local asm-blox-box-contents nil)
 (defvar asm-blox--gameboard nil)
-(defvar asm-blox--extra-gameboard-cells nil)
+(defvar-local asm-blox--extra-gameboard-cells nil)
 (defvar asm-blox--gameboard-state nil
   "Contains the state of the board whether it be victory or error.")
 (defvar asm-blox--parse-depth nil)
