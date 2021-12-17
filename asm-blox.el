@@ -161,6 +161,10 @@ The format of the error is (list message row column).")
                                                   (digit-char-p (current-char)))
                                         (forward-char 1))
                                       (let ((number (string-to-number (buffer-substring-no-properties start (point)))))
+                                        (when (< number -999)
+                                          (throw 'error `(error ,(point) "TOO LOW NUMBER")))
+                                        (when (> number 999)
+                                          (throw 'error `(error ,(point) "TOO HIGH NUMBER")))
                                         (push number elements))))
 
                                    ;; Unknown character
@@ -236,24 +240,24 @@ The format of the error is (list message row column).")
       (let* ((specs (cdr cmd-spec))
              (rest-children (cdr children))
              (at-spec (car specs)))
-        (catch 'err
+        (catch 'error
           (while (or specs rest-children)
             (cond
              ((eql at-spec 'asm-blox--subexpressions)
               (if (seq-every-p #'asm-blox-code-node-p rest-children)
                   (setq rest-children nil)
-                (throw 'err `(error ,start-pos "bad end expressions"))))
+                (throw 'error `(error ,start-pos "bad end expressions"))))
              ((and rest-children (not specs))
-              (throw 'err `(error ,start-pos "too many args")))
+              (throw 'error `(error ,start-pos "too many args")))
              ((and specs (not rest-children))
-              (throw 'err `(error ,start-pos "not enough args")))
+              (throw 'error `(error ,start-pos "not enough args")))
              (t
               (let* ((at-child (car rest-children))
                      (ok-p (funcall at-spec at-child)))
                 (if ok-p
                     (setq rest-children (cdr rest-children))
                   (let ((msg (format "bad arg to '%s'" first-child)))
-                    (throw 'err `(error ,start-pos ,msg)))))))
+                    (throw 'error `(error ,start-pos ,msg)))))))
             (setq specs (cdr specs))
             (setq at-spec (car specs)))))))))
 
@@ -276,7 +280,7 @@ The format of the error is (list message row column).")
      ((asm-blox-code-node-p parse)
       (let ((err (asm-blox--code-node-validate parse)))
         (if err
-            (throw 'err err)
+            (throw 'error err)
           (let* ((children (asm-blox-code-node-children parse))
                  (start-pos (asm-blox-code-node-start-pos parse))
                  (end-pos (asm-blox-code-node-end-pos parse))
@@ -284,7 +288,7 @@ The format of the error is (list message row column).")
                  (rest-children (cdr children)))
             (cond
              ((not first-child)
-              (throw 'err `(error ,start-pos "No cmd found")))
+              (throw 'error `(error ,start-pos "No cmd found")))
 
              ((eql first-child 'BLOCK)
               (let* ((label-symbol (asm-blox--make-label))
@@ -317,12 +321,7 @@ The format of the error is (list message row column).")
                      (label-symbol
                       (or (cdr (assoc lbl-ref-level
                                       asm-blox--branch-labels))
-                          (concat "NOT_FOUND_"
-                                  (number-to-string br-num)
-                                  "_"
-                                  (number-to-string asm-blox--parse-depth)
-                                  "_"
-                                  (assoc br-num asm-blox--branch-labels)))))
+                          (throw 'error `(error ,start-pos "Label not found")))))
                 (asm-blox--code-node-create
                  :children (list 'JMP label-symbol)
                  :start-pos start-pos
@@ -333,12 +332,7 @@ The format of the error is (list message row column).")
                      (lbl-ref-level (- asm-blox--parse-depth br-num 1))
                      (label-symbol
                       (or (cdr (assoc lbl-ref-level asm-blox--branch-labels))
-                          (concat "NOT_FOUND_"
-                                  (number-to-string br-num)
-                                  "_"
-                                  (number-to-string asm-blox--parse-depth)
-                                  "_"
-                                  (assoc br-num asm-blox--branch-labels)))))
+                          (throw 'error `(error ,start-pos "Label not found")))))
                 (asm-blox--code-node-create
                  :children (list 'JMP_IF label-symbol)
                  :start-pos start-pos
@@ -394,7 +388,7 @@ The format of the error is (list message row column).")
 
 (defun asm-blox--parse-tree-to-asm (parse)
   "Generate game bytecode from tree of PARSE, resolving labels."
-  (catch 'err
+  (catch 'error
     (let ((asm (flatten-list (asm-blox--parse-tree-to-asm* parse))))
       (asm-blox--resolve-labels asm)
       asm)))
@@ -625,10 +619,7 @@ If the port does't have a value, set staging to nil."
     (when (>= (length stack) 4)
       (let ((row (asm-blox--cell-runtime-row cell-runtime))
             (col (asm-blox--cell-runtime-col cell-runtime)))
-        (setq asm-blox-runtime-error ;; TODO: extract the logic here to separate function
-              (list "Stack overflow" row col))
-        (setq asm-blox--gameboard-state 'error)
-        (message "Stack overflow error at (%d, %d)" row col))) ;; Stack size hardcoded.
+        (throw 'runtime-error `(error "Stack overflow" ,row ,col))))
     (setf (asm-blox--cell-runtime-stack cell-runtime) (cons value stack))))
 
 (defun asm-blox--cell-runtime-pop (cell-runtime)
@@ -636,14 +627,24 @@ If the port does't have a value, set staging to nil."
   (let* ((stack (asm-blox--cell-runtime-stack cell-runtime))
          (val (car stack)))
     ;; TODO: Handle stack underflow error.
+    (when (not val)
+      (let ((row (asm-blox--cell-runtime-row cell-runtime))
+            (col (asm-blox--cell-runtime-col cell-runtime)))
+        (throw 'runtime-error `(error "Stack underflow" ,row ,col))))
     (prog1 val
       (setf (asm-blox--cell-runtime-stack cell-runtime) (cdr stack)))))
 
 (defun asm-blox--binary-operation (cell-runtime function)
   "Perform binary operation FUNCTION on the top two items of CELL-RUNTIME."
-  (let* ((v1 (asm-blox--cell-runtime-pop cell-runtime))
+  (let* ((row (asm-blox--cell-runtime-row cell-runtime))
+         (col (asm-blox--cell-runtime-col cell-runtime))
+         (v1 (asm-blox--cell-runtime-pop cell-runtime))
          (v2 (asm-blox--cell-runtime-pop cell-runtime))
          (res (funcall function v2 v1)))
+    (when (> res 999)
+      (setq res (- res (* 2 999))))
+    (when (< res -999)
+      (setq res (+ res (* 2 999))))
     (asm-blox--cell-runtime-push cell-runtime res)))
 
 (defun asm-blox--cell-runtime-set-stack (cell-runtime offset &optional op)
@@ -836,17 +837,22 @@ This logic  is needed to display current command properly."
 
 (defun asm-blox--gameboard-step ()
   "Perform step on all cells on the gameboard."
-  (let ((last-cell-fns '()))
-    (dotimes (idx (length asm-blox--gameboard))
-      (let ((cell (aref asm-blox--gameboard idx)))
-        (let ((fn (asm-blox--cell-runtime-run-function cell)))
-          (if (functionp fn)
-              (setq last-cell-fns (cons (cons fn cell) last-cell-fns))
-            (asm-blox--cell-runtime-step cell)))))
-    ;; We need to run the non-code cells last because they directly
-    ;; manipulate their ports.
-    (dolist (fn+cell last-cell-fns)
-      (funcall (car fn+cell) (cdr fn+cell)))))
+  (catch 'done
+    (let ((last-cell-fns '()))
+      (dotimes (idx (length asm-blox--gameboard))
+        (let ((cell (aref asm-blox--gameboard idx)))
+          (let ((fn (asm-blox--cell-runtime-run-function cell)))
+            (if (functionp fn)
+                (setq last-cell-fns (cons (cons fn cell) last-cell-fns))
+              (let ((res (catch 'runtime-error (asm-blox--cell-runtime-step cell))))
+                (when (eql (car res) 'error)
+                  (setq asm-blox--gameboard-state 'error)
+                  (setq asm-blox-runtime-error (cdr res))
+                  (throw 'done nil)))))))
+      ;; We need to run the non-code cells last because they directly
+      ;; manipulate their ports.
+      (dolist (fn+cell last-cell-fns)
+        (funcall (car fn+cell) (cdr fn+cell))))))
 
 (defun asm-blox--resolve-port-values ()
   "Move staging port values to main, propogate nils up to staging."

@@ -730,11 +730,11 @@ This was added for performance reasons.")
     (while (asm-blox-in-box-p)
       (let* ((at-line (or (car lines) ""))
              (padding (make-string (- asm-blox-box-width (length at-line)) ?\s)))
-        (delete-char asm-blox-box-width)
+        (delete-forward-char asm-blox-box-width)
         (insert (propertize (concat at-line padding)
                             'asm-blox-box-id
                             (list row col at-line-no)))
-        (next-line 1)
+        (forward-line 1)
         (move-to-column start-line-col)
         (asm-blox--beginning-of-line)
         (setq lines (cdr lines))
@@ -1134,7 +1134,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (define-key map (kbd "<s-left>") #'asm-blox-shift-box-left)
       (define-key map (kbd "<s-right>") #'asm-blox-shift-box-right)
       (define-key map [remap undo] #'asm-blox--undo)
-      (define-key map (kbd "C-w") #'asm-blox-kill-region)
+      (define-key map (kbd "C-w") #'asm-blox--kill-region)
       (define-key map (kbd "M-w") #'asm-blox--copy-region)
       (define-key map (kbd "C-y") #'asm-blox--yank))))
 
@@ -1148,7 +1148,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
     (asm-blox-execution-code-highlight)
     (asm-blox-execution-draw-stack))
   (asm-blox-check-winning-conditions)
-  (asm-blox--draw-win-message))
+  (asm-blox--draw-win-message)
+  (goto-char (point-min)))
 
 (defvar asm-blox-multi-step-ct 10)
 
@@ -1164,7 +1165,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
     (asm-blox-execution-code-highlight)
     (asm-blox-execution-draw-stack))
   (asm-blox-check-winning-conditions)
-  (asm-blox--draw-win-message))
+  (asm-blox--draw-win-message)
+  (goto-char (point-min)))
 
 (defun asm-blox--execution-run ()
   "Continuously run execution setps."
@@ -1192,10 +1194,6 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
     (modify-syntax-entry ?| "-" st)
     st)
   "Syntax table for asm-blox mode.")
-
-(defconst asm-blox-mode-highlights
-  '(("\\<setq\\>" . 'font-lock-function-name-face)
-    ("[0-9]+" . (1 'font-lock-constant-face))))
 
 (defun asm-blox--create-execution-buffer (box-contents extra-cells)
   "Create a new uneditable gamebuffer for displaing execution of puzzles."
@@ -1312,7 +1310,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (asm-blox--create-widges-from-gameboard)
       (let ((box-contents asm-blox-box-contents)
             (extra-cells asm-blox--extra-gameboard-cells))
-        (asm-blox--create-execution-buffer box-contents extra-cells)))))
+        (asm-blox--create-execution-buffer box-contents extra-cells)
+        (goto-char (point-min))))))
 
 (defun asm-blox-execution-mode ()
   "Activate asm-blox execution mod."
@@ -1322,7 +1321,6 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
         buffer-read-only t)
   (setq-local truncate-lines 0
               asm-blox--display-mode 'execute)
-  (setq font-lock-defaults asm-blox-mode-highlights)
   (setq header-line-format "ASM-BLOX EXECUTION")
   (setq asm-blox-runtime-error nil)
   (setq asm-blox--gameboard-state nil)
@@ -1343,7 +1341,6 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
         buffer-read-only t)
   (setq asm-blox-parse-errors nil)
   (setq-local truncate-lines 0)
-  (setq font-lock-defaults asm-blox-mode-highlights)
   (set-syntax-table asm-blox-mode-syntax-table)
   (unless asm-blox--skip-initial-parsing
     (asm-blox--parse-saved-buffer)
