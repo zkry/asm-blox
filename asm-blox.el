@@ -434,11 +434,16 @@ cells have moved, the staging port becomes the current port."
   row col
   staging-up staging-down staging-left staging-right
   up down left right
-  run-function
+  run-function message-function
   run-spec
   run-state)
 
-
+(defun asm-blox--cell-message-at-pos (row col)
+  "Return cell runtimes display message at ROW COL if exists."
+  (let* ((cell-runtime (asm-blox--cell-at-row-col row col))
+         (msg-fn (asm-blox--cell-runtime-message-function cell-runtime)))
+    (when msg-fn
+      (funcall msg-fn cell-runtime))))
 
 (defun asm-blox--cell-runtime-current-instruction (cell-runtime)
   "Return the current instruction of CELL-RUNTIME based in pc."
@@ -837,22 +842,22 @@ This logic  is needed to display current command properly."
 
 (defun asm-blox--gameboard-step ()
   "Perform step on all cells on the gameboard."
-  (catch 'done
-    (let ((last-cell-fns '()))
-      (dotimes (idx (length asm-blox--gameboard))
-        (let ((cell (aref asm-blox--gameboard idx)))
-          (let ((fn (asm-blox--cell-runtime-run-function cell)))
-            (if (functionp fn)
-                (setq last-cell-fns (cons (cons fn cell) last-cell-fns))
-              (let ((res (catch 'runtime-error (asm-blox--cell-runtime-step cell))))
-                (when (eql (car res) 'error)
-                  (setq asm-blox--gameboard-state 'error)
-                  (setq asm-blox-runtime-error (cdr res))
-                  (throw 'done nil)))))))
-      ;; We need to run the non-code cells last because they directly
-      ;; manipulate their ports.
-      (dolist (fn+cell last-cell-fns)
-        (funcall (car fn+cell) (cdr fn+cell))))))
+  (let ((res
+         (catch 'runtime-error
+           (let ((last-cell-fns '()))
+             (dotimes (idx (length asm-blox--gameboard))
+               (let ((cell (aref asm-blox--gameboard idx)))
+                 (let ((fn (asm-blox--cell-runtime-run-function cell)))
+                   (if (functionp fn)
+                       (setq last-cell-fns (cons (cons fn cell) last-cell-fns))
+                     (asm-blox--cell-runtime-step cell)))))
+             ;; We need to run the non-code cells last because they directly
+             ;; manipulate their ports.
+             (dolist (fn+cell last-cell-fns)
+               (funcall (car fn+cell) (cdr fn+cell)))))))
+    (when (eql (car res) 'error)
+      (setq asm-blox--gameboard-state 'error)
+      (setq asm-blox-runtime-error (cdr res)))))
 
 (defun asm-blox--resolve-port-values ()
   "Move staging port values to main, propogate nils up to staging."
@@ -1852,6 +1857,21 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
            (intern (upcase .pointPort))
            point))))))
 
+
+
+(defun asm-blox--yaml-message-heap (cell-runtime)
+  (let* ((state (asm-blox--cell-runtime-run-state cell-runtime))
+         (offset (car state))
+         (data (cdr state))
+         (row (asm-blox--cell-runtime-row cell-runtime))
+         (col (asm-blox--cell-runtime-col cell-runtime)))
+    (cond
+     ((>= offset (length data)) "end of file")
+     ((>= offset 0)
+      (let ((offset-val (aref data offset)))
+        (format "%d @%d/%d" offset-val offset (1- (length data)))))
+     (t "~~~"))))
+
 (defun asm-blox--yaml-step-heap (cell-runtime)
   "Perform runtime step for CELL-RUNTIME of type YAML HEAP."
   (let* ((row (asm-blox--cell-runtime-row cell-runtime))
@@ -1888,6 +1908,8 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
                (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
                (opposite-port (asm-blox--mirror-direction port-sym))
                (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
+          (when (not (<= 0 offset (1- (length data))))
+            (throw 'runtime-error `(error "idx out of bounds" ,row ,col)))
           (when recieve-val
             (asm-blox--remove-value-from-direction from-cell opposite-port)
             (aset data offset recieve-val)
@@ -1912,7 +1934,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
       (when .readPort
         (let* ((port-sym (intern (upcase .readPort)))
                (val (asm-blox--get-value-from-direction cell-runtime port-sym))
-               (datum (if (>= offset (length data)) -1 (aref data offset))))
+               (datum (if (>= offset (length data)) -999 (aref data offset))))
           (when val
             (asm-blox--remove-value-from-direction cell-runtime port-sym))
           (asm-blox--cell-runtime-set-staging-value-from-direction
@@ -1923,7 +1945,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
         (when (= -1 offset) (setq offset 0)) ;; another hack related to the way readPort works
         (let* ((port-sym (intern (upcase .peekPort)))
                (val (asm-blox--get-value-from-direction cell-runtime port-sym))
-               (datum (if (>= offset (length data)) -1 (aref data offset))))
+               (datum (if (>= offset (length data)) -999 (aref data offset))))
           (when val
             (asm-blox--remove-value-from-direction cell-runtime port-sym))
           (asm-blox--cell-runtime-set-staging-value-from-direction
@@ -1967,6 +1989,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
        :row row
        :col col
        :run-function #'asm-blox--yaml-step-heap
+       :message-function #'asm-blox--yaml-message-heap
        ;; -1 because used hack to increment offset which will
        ;; run once at the start of the game.
        :run-state (cons -1 data)
