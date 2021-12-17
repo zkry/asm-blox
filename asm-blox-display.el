@@ -761,10 +761,11 @@ This was added for performance reasons.")
       (goto-line (1+ line))
       (move-to-column line-col)
       (funcall func)
-      (if (> (length (buffer-substring-no-properties
-                      (line-beginning-position)
-                      (line-end-position)))
-             19) ;; TODO: 19 is magic number
+      (if (or (> (length (buffer-substring-no-properties
+                          (line-beginning-position)
+                          (line-end-position)))
+                 19) ;; TODO: 19 is magic number
+              (> (length (split-string (buffer-string) "\n")) 11))
           (ding)
         (setq new-text (buffer-string))
         (setq new-line (1- (line-number-at-pos)))
