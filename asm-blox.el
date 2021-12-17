@@ -106,7 +106,9 @@ The format of the error is (list message row column).")
                             (while t
                               (consume-space)
                               (if (eobp)
-                                  (throw 'end nil)
+                                  (if top-level
+                                      (throw 'end nil)
+                                    (throw 'error `(error ,(point) "SYNTAX ERROR")))
                                 (let ((at-char (current-char)))
                                   (cond
                                    ;; Start of children list
