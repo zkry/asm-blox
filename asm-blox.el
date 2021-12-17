@@ -1748,6 +1748,18 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
       ("Network" (error "Network not implemented"))
       ("Heap" (asm-blox--yaml-create-heap row col .metadata .spec)))))
 
+(defun asm-blox--yaml-message-stack (cell-runtime)
+  (let* ((state (asm-blox--cell-runtime-run-state cell-runtime))
+         (spec (asm-blox--cell-runtime-run-spec cell-runtime))
+         (size (cdr (assoc 'size spec)))
+         (output-port (intern (upcase (cdr (assoc 'outputPort spec)))))
+         (val (asm-blox--get-value-from-direction cell-runtime output-port)))
+    (when val
+      (setq state (cons val state)))
+    (if (= 0 (length state))
+        "empty stack"
+      (format "top:%d size:%d/%d" (car state) (length state) size))))
+
 (defun asm-blox--yaml-step-stack (cell-runtime)
   "Perform the step operation for the CELL-RUNTIME of kind Stack."
   (let ((row (asm-blox--cell-runtime-row cell-runtime))
@@ -1777,7 +1789,8 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
              (asm-blox--remove-value-from-direction from-cell opposite-port)
              (setq state (cons recieve-val state))
              (when (> (length state) (or .size 20)) ;; TODO: find a good way of setting defualts.
-               (error "Stack overflow %d/%d" (length state) (or .size 20))))))
+               (throw 'runtime-error `(error ,(format "Stack overflow %d/%d" (length state) (or .size 20))
+                                             ,row ,col))))))
        .inputPorts)
 
       ;; Add size to sizePort
@@ -1857,14 +1870,10 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
            (intern (upcase .pointPort))
            point))))))
 
-
-
 (defun asm-blox--yaml-message-heap (cell-runtime)
   (let* ((state (asm-blox--cell-runtime-run-state cell-runtime))
          (offset (car state))
-         (data (cdr state))
-         (row (asm-blox--cell-runtime-row cell-runtime))
-         (col (asm-blox--cell-runtime-col cell-runtime)))
+         (data (cdr state)))
     (cond
      ((>= offset (length data)) "end of file")
      ((>= offset 0)
@@ -1963,6 +1972,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
    :row row
    :col col
    :run-function #'asm-blox--yaml-step-stack
+   :message-function #'asm-blox--yaml-message-stack
    :run-spec spec))
 
 (defun asm-blox--yaml-create-controller (row col metadata spec)
