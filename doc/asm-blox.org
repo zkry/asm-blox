@@ -1,0 +1,308 @@
+#+title: Asm-Blox User Manual
+#+author: Zachary Romero
+#+date: 2021
+#+language: en
+
+#+BEGIN_QUOTE
+Copyright (C) 2020-2021 Zachary Romero <zkry@posteo.org>
+
+You can redistribute this document and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This document is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+#+END_QUOTE
+
+* Introduction
+
+  Asm-Blox is an attempt to make Emacs more exciting by merging it
+  with trendy topics, namely blocks (a la Minecraft), YAML (think
+  Kubernetes, Helm, etc.), and WASM (have to mention Rust!).  Asm-blox
+  is an attempt to combine all these elements together in a an
+  exciting game package, taking inspiration from the budding genre of
+  programming puzzle games.
+
+  The game tasks you with writing a program in an idealized version of
+  WebAssembly Text to solve a simple programming puzzle.  Puzzles
+  range in difficulty and at first you'll try to get use to the
+  unusual instructions later using what you've learned in conjunction
+  with pre-made utility components to solve even more complex problems.
+
+* TODO Installation
+
+  The package is not yet available on MELPA.
+
+* Getting Started
+
+** Puzzle Selection
+  By running ~asm-blox~ you can open the /puzzle selection page/.  On
+  this page you can see a list of all of the puzzles with their
+  difficulty and description.  You will also see the puzzles
+  previously created on the right side of the screen. Pressing ~RET~
+  when the point is on any one of them will load said puzzle.
+
+** Saved Puzzles and Backups
+
+  Puzzles are saved in the directory indicated by the variable
+  ~asm-blox-save-directory-name~.  Puzzles are saved as they are
+  edited (ie 12 boxes with text in them).  In the case that the file
+  is saved in a bad format it may become corrupted.  In this case
+  there are backups saved each time the file is ran which end in
+  ~.backup.txt~.  When a puzzle is completed, a file with the
+  extension ~.win.txt~ is saved.
+
+* Gameplay
+
+** Overview
+
+   The gameboard consists of three rows and four columns in which the
+   user will enter their solution.  Each box will be referred to as a
+   /code cell/. Code cells can contain WAT or YAML.  The following is
+   an example of a WAT cell:
+
+   #+begin_quote
+
+      ┌────────────────────┐
+      │(left)(ne (get 0)   │
+      │        (const ?<)) │
+      │(ne(get 0)          │
+      │   (const ?>))(and) │
+      │(block(block        │
+   X→ │  (br_if 0)         │  →
+      │  (send down)(down) │
+      │  (br 1))           │  ←
+      │ (send right)       │
+      │ (right))           │
+      │(clr)               │
+      │                    │
+      └────────────────────┘
+                ↑ ↓
+
+  #+end_quote
+
+   In later sections, I will go over the meanings of the various
+   commands.  Arrows entering the box are the box's /input ports/, The
+   arrows goign out are the box's /output ports/.  On the edges of the
+   gameboard you will see some labeled arrows.  The input of the
+   puzzle will come through these ports.  Labeled arrows going out of
+   a box is where you have to send your answer.
+
+   The following is an example of a YAML cell:
+
+#+begin_quote
+
+                ↑ ↓
+      ┌────────────────────┐
+      │apiVersion: v1      │
+      │kind: Heap          │
+      │spec:               │
+      │  size: 100         │
+      │  setPort: up       │
+   →  │  seekPort: left    │  →
+      │  peekPort: up      │
+   ←  │  offsetPort: left  │  ←
+      │                    │
+      │                    │
+      │                    │
+      │                    │
+      └────────────────────┘
+                ↑ ↓
+
+#+end_quote
+
+** Execution
+
+   By pressing ~C-c C-c~ (~asm-blox-start-execution~) you can execute
+   the current puzzle.  This opens up a new buffer where the puzzle's
+   inputs and outputs will become visible.  The following keybindings
+   will then be available to you in an execution buffer:
+
+   - ~n~ (~asm-blox-execution-next-command~) will perform one step of
+     execution.
+   - ~N~ (~asm-blox--execution-next-multiple-commands~) will perform
+     the number of steps defined by the variable.
+     ~asm-blox-multi-step-ct~.
+   - ~r~ (~asm-blox--execution-run~) will run the program until it
+     finishes, an error occurs, or is stopped.
+   - ~q~ (~quit-window~) will stop execution.
+
+   Submitting the wrong answer will cause execution to stop as well as
+   any runtime error.
+
+* WAT Command Set
+
+   The following is a complete description of all the available WAT
+   commands in the game.  *Note that the commands are case insensitive*
+
+** Execution Model of WAT Cells
+
+   Cells run on a stack-based architecture.  Each command will consume
+   zero to two items from the stack and push zero or one item.  Each
+   cell has a stack size of four. Any element past that will cause a
+   /stack-overflow error/.  If the stack doesn't have enough items, a
+   /stack-underflow errors/ occurs.
+
+** Stack Commands
+
+   - ~const~ /number/: Pushes /number/ onto the stack.
+
+   - ~set~ /stack-offset/: Sets the stack item at /stack-offset/ to
+     the value at the top of the stack, popping it.
+
+   - ~inc~ /stack-offset/ /.../: Increment the value on the stack at
+     /stack-offset/. *NOTE:* To increment the value at the top of the
+     stack use =(inc -1)=.
+
+   - ~dec~ /stack-offset/: Decrement the value of the stack at
+     /stack-offset/. *NOTE:* To decrement the value at the top of the
+     stack use =(dec -1)=.
+
+   - ~clr~: Clear the entire stack.
+
+   - ~dup~: Duplicate the stack. Note: this will overflow the stack if
+     there is more than two items on the stack.
+
+   - ~drop~ /.../: Pop the item off the top of the stack.
+
+** Numeric Commands
+   - ~add~ /.../: Remove the top two items on the stack, add them, and
+     push the result on the stack.
+
+   - ~sub~ /.../: Remove the top two items on the stack, subtract the
+     upper item from the lower one and add the item back on the stack.
+
+   - ~mul~ /.../: Remove the top two items on the stack, multiply them
+     and push the result on the stack.
+
+   - ~div~ /.../: Remove the top two items on the stack, divide the
+     lower item by the upper item and push the /quotient/ on the stack.
+
+   - ~rem~ /.../: Remove the top two items on the stack, divide the
+     lower item by the upper item and push the /remainder/ on the stack.
+
+   - ~neg~ /.../: Remove the top item from the stack and invert its sign.
+
+** Boolean Operations
+
+   asm-blox has no notion of true or false.  The number 0 is used for
+   false and any other number is true.
+
+   - ~and~ /.../: Remove the top two items on the stack, pushing 1 if
+     they are both true, 0 otherwise.
+
+   - ~or~ /.../: Remove the top two items on the stack, pushing 1 if
+     either of them is true, 0 otherwise.
+
+   - ~not~ /.../: Remove the top item from the stack and push its
+     inverted truth value onto the stack.
+
+** Comparison Operations
+
+   Note that all comparison operations compare from bottom to top of
+   the stack.  This means that an operation such as =(lt (const 1)
+   (const 3))= will be true.
+
+   - ~lt~ /.../: Pop two items on stack and push 1 if the bottom item
+     is /less than/ the top, 0 otherwise.
+
+   - ~gt~ /.../: Pop two items on stack and push 1 if the bottom item
+     is /greater than/ the top, 0 otherwise.
+
+   - ~ge~ /.../: Pop two items on stack and push 1 if the bottom item
+     is /greater than or equal to/ the top, 0 otherwise.
+
+   - ~le~ /.../: Pop two items on stack and push 1 if the bottom item
+     is /less than or equal to/ the top, 0 otherwise.
+
+   - ~eq~ /.../: Pop two items on stack and push 1 if the bottom item
+     is /equal/ the top, 0 otherwise.
+
+   - ~ne~ /.../: Pop two items on stack and push 1 if the bottom item
+     is /not equal to/ the top, 0 otherwise.
+
+   - ~lz~ /.../: Pop one items on stack and push 1 if it is less than
+     zero, 0 otherwise.
+
+   - ~gz~ /.../: Pop one items on stack and push 1 if it is greater
+     than zero, 0 otherwise.
+
+** Other Operations
+
+   - ~nop~: Do nothing
+
+
+** Port Operations
+
+   The following commands are used to interact with the port network.
+   Note that commands like =(up)= and =(down)= are given for
+   convenience.
+
+   - ~send~ /port/ /.../: Send the item off the top of the stack to
+     /port/ if it empty.  If the port is full, block.
+   - ~get~ /port/: Push the item from /port/ onto the stack.
+   - ~up~: Push the item from the /up/ port onto the stack.
+   - ~down~: Push the item from the /down/ port onto the stack.
+   - ~left~: Push the item from the /left/ port onto the stack.
+   - ~right~: Push the item from the /right/ port onto the stack.
+
+** Blocks and Loops
+
+   WAT cells come with two methods of control-flow: ~loop~ and
+   ~block~.  If you're familiar with WAT the logic works similar.
+
+   The commands ~br~ and ~br_if~ are the two commands to work with
+   ~block~ and ~loop~.  A ~br~ command will either skip to the end of
+   a ~block~ or loop to the top of a ~loop~.  A ~br~ must specify
+   which block or loop it is referring to via a number.  Consider the
+   following example:
+
+   #+begin_src wat
+     (block   ; 2
+      (block  ; 1
+       (block ; 0
+        (br <block ID>))))
+ #+end_src
+
+ The <block ID> above can be either 0, 1, or 2 since it is contained
+ in three nested blocks.  If <block ID> was set to 1, then control
+ flow would jump past the middle block.  If <block ID> was 2 then the
+ control would pass all of the blocks.
+
+
+Let's consider another example with ~loop~.  Suppose we want to send
+the numbers from 0 to 10 to the down port.  We could write the
+following code:
+
+#+begin_src wat
+  (const 0) ; 1
+  (loop     ; 2
+   (send down (get 0)) ; 3
+   (set 0 (add (get 0)
+               (const 1))) ; 4
+   (ne (get 0) (const 10)) ; 5
+   (br_if 0))              ; 6
+#+end_src
+
+  1. Initialize the top of the stack to 0.
+  2. Setup a loop
+  3. Send the value at the bottom of the stack down.
+  4. Set the value at the bottom of the stack to be 1 plus its current
+     value.
+  5. Push 1 if the item at the bottom of the stack is not equal to zero
+  6. If true (ie 1) is on the top of the stack, jump to the loop.
+
+  ~block~, ~loop~, ~br~ and ~br_if~ can be combined to create a wide
+  variety of constructs.
+
+  Commands:
+
+  - ~block~: Setup a block. Any ~br~ command pointing to this block
+    will jump past the end of the block.
+  - ~loop~: Setup a block. Any ~br~ command pointing to this block
+    will jump to the beginning of this block.
+  - ~br~: Unconditionally jump to a block.
+  - ~br_if~: Consume the top item of the stack, jumping if true,
+    continuing if false.

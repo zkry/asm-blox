@@ -1789,6 +1789,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
              (asm-blox--remove-value-from-direction from-cell opposite-port)
              (setq state (cons recieve-val state))
              (when (> (length state) (or .size 20)) ;; TODO: find a good way of setting defualts.
+               (setf (asm-blox--cell-runtime-run-state cell-runtime) state)
                (throw 'runtime-error `(error ,(format "Stack overflow %d/%d" (length state) (or .size 20))
                                              ,row ,col))))))
        .inputPorts)

@@ -12,4 +12,21 @@
 
 # Installation
 
-  The game is still a work in progress.
+  The game is still in progress but you can install it by adding the
+  files in your load path and calling `(require 'asm-blox)`.
+
+# Usage
+
+  You can initialize a game with the command <kbd>M-x asm-blox</kbd>.
+  This will open up a menu with a list of puzzles to choose from.  By
+  pressing <kbd>RET</kbd> a new solution to that puzzle will be
+  created.  Back on the puzzle selection screen, you can view and open
+  up saved files by pressing <kbd>RET</kbd> on the `[1]`-like text.
+
+  For the rest, you'll have to look at the manual...
+
+
+# Configuration
+
+  - `asm-blox-save-directory-name`: the directory in which all puzzles
+    will be saved.
