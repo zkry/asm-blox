@@ -424,7 +424,7 @@ of the board or very right.  TYPE will either be source or sink."
                            (overlay-put ov 'after-string (concat err-text (make-string (- asm-blox-box-width (length err-text)) ?\s)))
                            (overlay-put ov 'evaporate t))
                          (insert (propertize "                    " 'invisible t )))))  ;; DRY these two cases
-                    ((and (= 11 box-row) (asm-blox--cell-message-at-pos row col) (eql asm-blox--display-mode 'execute))
+                    ((and (= 11 box-row) (eql asm-blox--display-mode 'execute) (asm-blox--cell-message-at-pos row col))
                      (let ((text (asm-blox--cell-message-at-pos row col)))
                        (let ((ov-beg (1- (point))))
                          (let ((ov (make-overlay ov-beg (1+ ov-beg))))
@@ -828,7 +828,7 @@ This was added for performance reasons.")
    (kill-line))
   (asm-blox--push-undo-stack-value))
 
-(defun asm-blox--move-beginning-of-line ()
+(defun asm-blox-move-beginning-of-line ()
   "Move the point to the beginning of the line."
   (interactive)
   (if (asm-blox-in-box-p)
@@ -836,7 +836,7 @@ This was added for performance reasons.")
        (move-beginning-of-line 1))
     (beginning-of-line)))
 
-(defun asm-blox--move-end-of-line ()
+(defun asm-blox-move-end-of-line ()
   "Move the point to the end of the line."
   (interactive)
   (if (asm-blox-in-box-p)
@@ -844,7 +844,7 @@ This was added for performance reasons.")
        (move-end-of-line 1))
     (end-of-line)))
 
-(defun asm-blox--beginning-of-buffer ()
+(defun asm-blox-beginning-of-buffer ()
   "Move the point to the beginning of the buffer."
   (interactive)
   (if (asm-blox-in-box-p)
@@ -852,7 +852,7 @@ This was added for performance reasons.")
        (beginning-of-buffer))
     (beginning-of-buffer)))
 
-(defun asm-blox--end-of-buffer ()
+(defun asm-blox-end-of-buffer ()
   "Move the point to the end of the buffer."
   (interactive)
   (if (asm-blox-in-box-p)
@@ -979,17 +979,17 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
         (let ((inhibit-read-only t))
           (asm-blox-redraw-game-board))))))
 
-(defun asm-blox--kill-region (beg end)
+(defun asm-blox-kill-region (beg end)
   "Kill the region from BEG to END."
   (interactive "r")
   (asm-blox--kill beg end))
 
-(defun asm-blox--copy-region (beg end)
+(defun asm-blox-copy-region (beg end)
   "Copy the region from BEG to END."
   (interactive "r")
   (asm-blox--kill beg end t))
 
-(defun asm-blox--yank ()
+(defun asm-blox-yank ()
   "Yank text to current point."
   (interactive)
   (push-mark)
@@ -1071,7 +1071,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
     (asm-blox--move-to-box next-row col)
     (asm-blox--move-point-to-end-of-box-content)))
 
-(defun asm-blox--next-cell ()
+(defun asm-blox-next-cell ()
   "Move the point to the end of the next box."
   (interactive)
   (if (asm-blox-in-box-p)
@@ -1088,10 +1088,10 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (forward-char -1))
     (when (bobp)
       (asm-blox--move-to-box (1- asm-blox--gameboard-row-ct) (1- asm-blox--gameboard-col-ct)))
-    (asm-blox--next-cell)))
+    (asm-blox-next-cell)))
 
 ;; TODO: DRY this and next-cell up.
-(defun asm-blox--prev-cell ()
+(defun asm-blox-prev-cell ()
   "Move the point to the end of the previous box."
   (interactive)
   (if (asm-blox-in-box-p)
@@ -1108,7 +1108,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (forward-char 1))
     (when (eobp)
       (asm-blox--move-to-box 0 0))
-    (asm-blox--prev-cell)))
+    (asm-blox-prev-cell)))
 
 (defun asm-blox--printable-char-p (c)
   "Retrun non-nil if C is a printable character."
@@ -1128,24 +1128,24 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (define-key map (kbd "C-c C-c") #'asm-blox-start-execution)
       (define-key map (kbd "M-d") #'asm-blox-kill-word)
       (define-key map (kbd "C-k") #'asm-blox-kill-line)
-      (define-key map (kbd "C-a") #'asm-blox--move-beginning-of-line)
+      (define-key map (kbd "C-a") #'asm-blox-move-beginning-of-line)
+      (define-key map (kbd "C-e") #'asm-blox-move-end-of-line)
       (define-key map (kbd "C-d") #'asm-blox-delete-char)
-      (define-key map (kbd "C-e") #'asm-blox--move-end-of-line)
-      (define-key map (kbd "M-<") #'asm-blox--beginning-of-buffer)
-      (define-key map (kbd "M->") #'asm-blox--end-of-buffer)
-      (define-key map (kbd "<tab>") #'asm-blox--next-cell)
-      (define-key map (kbd "<backtab>") #'asm-blox--prev-cell)
+      (define-key map (kbd "M-<") #'asm-blox-beginning-of-buffer)
+      (define-key map (kbd "M->") #'asm-blox-end-of-buffer)
+      (define-key map (kbd "<tab>") #'asm-blox-next-cell)
+      (define-key map (kbd "<backtab>") #'asm-blox-prev-cell)
       (define-key map (kbd "<S-return>") #'asm-blox--next-row-cell)
-      (define-key map (kbd "s-z") #'asm-blox--undo)
-      (define-key map (kbd "s-y") #'asm-blox--redo)
+      (define-key map (kbd "s-z") #'asm-blox-undo)
+      (define-key map (kbd "s-y") #'asm-blox-redo)
       (define-key map (kbd "<s-up>") #'asm-blox-shift-box-up)
       (define-key map (kbd "<s-down>") #'asm-blox-shift-box-down)
       (define-key map (kbd "<s-left>") #'asm-blox-shift-box-left)
       (define-key map (kbd "<s-right>") #'asm-blox-shift-box-right)
       (define-key map [remap undo] #'asm-blox--undo)
-      (define-key map (kbd "C-w") #'asm-blox--kill-region)
-      (define-key map (kbd "M-w") #'asm-blox--copy-region)
-      (define-key map (kbd "C-y") #'asm-blox--yank))))
+      (define-key map (kbd "C-w") #'asm-blox-kill-region)
+      (define-key map (kbd "M-w") #'asm-blox-copy-region)
+      (define-key map (kbd "C-y") #'asm-blox-yank))))
 
 (defun asm-blox-execution-next-command ()
   "Perform a single step of execution."
@@ -1412,7 +1412,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                                                 :box-col line-col)))
         (puthash key (cons state states) asm-blox--undo-stacks)))))
 
-(defun asm-blox--undo ()
+(defun asm-blox-undo ()
   "Perform an undo in the current box."
   (interactive)
   (if (not (asm-blox-in-box-p))
@@ -1438,7 +1438,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
               (asm-blox-redraw-game-board))
             (asm-blox--move-to-box-point box-row box-col)))))))
 
-(defun asm-blox--redo ()
+(defun asm-blox-redo ()
   "Perform a redo in the current box."
   (interactive)
   (if (not (asm-blox-in-box-p))

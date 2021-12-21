@@ -63,25 +63,24 @@ General Public License for more details.
    /code cell/. Code cells can contain WAT or YAML.  The following is
    an example of a WAT cell:
 
-   #+begin_quote
 
-      ┌────────────────────┐
-      │(left)(ne (get 0)   │
-      │        (const ?<)) │
-      │(ne(get 0)          │
-      │   (const ?>))(and) │
-      │(block(block        │
-   X→ │  (br_if 0)         │  →
-      │  (send down)(down) │
-      │  (br 1))           │  ←
-      │ (send right)       │
-      │ (right))           │
-      │(clr)               │
-      │                    │
-      └────────────────────┘
-                ↑ ↓
+   #+begin_example
 
-  #+end_quote
+        +--------------------+
+        |(left)(ne (get 0)   |
+        |        (const ?<)) |
+        |(ne(get 0)          |
+        |   (const ?>))(and) |
+        |(block(block        |
+        |  (br_if 0)         |
+        |  (send down)(down) |
+        |  (br 1))           |
+        | (send right)       |
+        | (right))           |
+        |(clr)               |
+        |                    |
+        +--------------------+
+  #+end_example
 
    In later sections, I will go over the meanings of the various
    commands.  Arrows entering the box are the box's /input ports/, The
@@ -92,26 +91,22 @@ General Public License for more details.
 
    The following is an example of a YAML cell:
 
-#+begin_quote
-
-                ↑ ↓
-      ┌────────────────────┐
-      │apiVersion: v1      │
-      │kind: Heap          │
-      │spec:               │
-      │  size: 100         │
-      │  setPort: up       │
-   →  │  seekPort: left    │  →
-      │  peekPort: up      │
-   ←  │  offsetPort: left  │  ←
-      │                    │
-      │                    │
-      │                    │
-      │                    │
-      └────────────────────┘
-                ↑ ↓
-
-#+end_quote
+#+begin_example
+      +--------------------+
+      |apiVersion: v1      |
+      |kind: Heap          |
+      |spec:               |
+      |  size: 100         |
+      |  setPort: up       |
+      |  seekPort: left    |
+      |  peekPort: up      |
+      |  offsetPort: left  |
+      |                    |
+      |                    |
+      |                    |
+      |                    |
+      +--------------------+
+#+end_example
 
 ** Execution
 
@@ -306,3 +301,174 @@ following code:
   - ~br~: Unconditionally jump to a block.
   - ~br_if~: Consume the top item of the stack, jumping if true,
     continuing if false.
+
+* YAML Blocks
+
+   YAML cells can be constructed in addition to WAT blocks to add
+   pre-made processes which add essential functionality to solve some
+   problems.  The current available types of YAML blocks includes:
+   Stack, Heap, and Controller.
+
+   YAML blocks written using YAML similar to that of the extremely
+   popular Kubernetes and are detailed in the following sections.  The
+   top level items in a yaml block are ~apiVersion~, ~kind~, and
+   ~spec~.  ~apiVersion~ will always be the value "v1".
+
+** Stack Cells
+
+   When the ~kind~ of a YAML cell is "Stack", a Stack is created.  A
+   stack reads data from an input source, adding it to an internal
+   data store, and makes it available to an external port.  The
+   following is an example of a stack.
+
+   #+begin_example
+
+     +--------------------+
+     |apiVersion: v1      |
+     |kind: Stack         |
+     |spec:               |
+     |  inputPort: down   |
+     |  outputPort: right |
+     |  size: 20          |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     +--------------------+
+
+   #+end_example
+
+   The following are spec properties of a YAML stack:
+
+   - ~inputPort~: any value sent here will be added to the top of the stack.
+   - ~outputPort~: if another cell reads from here, it will be popped
+     off the stack.
+   - ~size~: the maximum amount of elements that can be on the stack
+     before a stack-overflow error occurs.  The maximum size of a
+     stack is 999.
+   - ~size-port~: the port to which the current amount of elements on
+     the stack is written to.
+
+** Heap Cells
+
+   Heap cells are created by setting the ~kind~ property of a YAML
+   cell to Heap.  Heaps provide you with an array of memory for your
+   cells to read and write to.  The following is an example of a heap
+   cell:
+
+
+   #+begin_example
+
+   +--------------------+
+   |apiVersion: v1      |
+   |kind: Heap          |
+   |spec:               |
+   |  readPort: down    |
+   |  writePort: down   |
+   |  seekPort: left    |
+   |  offsetPort: left  |
+   |  setPort: up       |
+   |  peekPort: up      |
+   |                    |
+   |                    |
+   |                    |
+   +--------------------+
+   #+end_example
+
+** Controller Cells and Editor Problems
+
+   Some problems require the special Asm-blox Editor integration.
+   These problems, when executed, will show an editor with the
+   expected output under it.  Your goal in these problems is to get
+   the editor to match the target text.  You can interact with the
+   editor via Controller cells.  A controller cell is a YAML cell with
+   a value of "Controller" for the ~kind~ property.  By configuring
+   the ports on the Controller cell you can move the point and insert
+   text, sort of like how you would in Emacs itself.  You can have
+   multiple controllers in a game.
+
+
+   The following is an example of a controller cell:
+
+   #+begin_example
+    +--------------------+
+    |apiVersion: v1      |
+    |kind: Controller    |
+    |spec:               |
+    |  inputPort: left   |
+    |  setPointPort:     |
+    |    down            |
+    |  pointPort:up      |
+    |                    |
+    |                    |
+    |                    |
+    |                    |
+    |                    |
+    +--------------------+
+   #+end_example
+
+   Controller cells allow you to set the following properties on the ~spec~:
+
+   - ~inputPort~: Data sent to this input point will be written to the
+     buffer at the current point.  ASCII characters with a value of 32
+     through 126 can be printed. You may also send ASCII 10 (?\n) for
+     a newline, 8 (?\b) or -1 for a backwards delete and -2 for a
+     forwards delete.
+   - ~setPointPort~: Data sent to this input port will set the
+     position of the port.  A value past the bounds of the buffer will
+     bring the point to the beginning (position 1) or the end of the buffer.
+   - ~charAtPort~: This output port will contain the character in
+     front of the point.
+   - ~pointPort~: This output port will contain the current point position.
+
+
+* Editing Commands
+
+  The following commands may be helpful when editing asm-blox code:
+
+  - ~asm-blox-start-execution~ (bound ~C-c C-c~): compile the code
+    cells and create an execution buffer.
+  - ~asm-blox-move-beginning-of-line~ (bound ~C-a~): Move the point to
+    the beginning of a code cell line if in a cell, to the beginning
+    of the line otherwise.
+  - ~asm-blox-move-end-of-line~ (bound ~C-e~): Move the point to the
+    end of a code cell line if in a cell, to the end of the buffers
+    line otherwise.
+  - ~asm-blox-beginning-of-buffer~ (bound ~M-<~): Move the point to
+    the end of a code cell if in a cell, to the end of the buffer otherwise.
+  - ~asm-blox-end-of-buffer~ (bound ~M->~): Move the point to the end
+    of a code cell if in a cell, to the end of the buffer otherwise.
+  - ~asm-blox-next-cell~ (bound ~<tab>~): Move the point to the end
+    of the next code cell.
+  - ~asm-blox-prev-cell~ (bound ~<backtab>~): Move the point to the
+    end of the previous code cell.
+
+** Undo and Redo
+
+   Asm-blox support undo and redo on a per-cell basis.
+
+   - ~asm-blox-undo~ (bound ~s-z~): undo a previous action in the
+     current code cell.
+   - ~asm-blox-redo~ (bound ~s-y~): redo a previous undo in the
+     current code cell.
+
+** Advanced editing
+
+   - ~asm-blox-shift-box-up~ (bound ~<s-up>~): Swap the current code
+     cell with the one above the current one.
+   - ~asm-blox-shift-box-down~ (bound ~<s-down>~): Swap the current
+     code cell with the one below the current one.
+   - ~asm-blox-shift-box-left~ (bound ~<s-left>~): Swap the current
+     code cell with the one to the left of the current one.
+   - ~asm-blox-shift-box-right~ (bound ~<s-right>~): Swap the current
+     code cell with the one to the right of the current one.
+   - ~asm-blox-kill-region~ (bound ~<C-w>~): kill the highlighted
+     region of the current code cell.  Note that the two ends of the
+     region must be in the same code cell.
+   - ~asm-blox-copy-region~ (bound ~<M-w>~): copy the highlighted
+     region of the current code cell.  Note that the two ends of the
+     region must be in the same code cell.
+   - ~asm-blox-yank~ (bound ~C-y~); paste the yanked region to the
+     current code cell.
