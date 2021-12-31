@@ -140,6 +140,14 @@ General Public License for more details.
    /stack-overflow error/.  If the stack doesn't have enough items, a
    /stack-underflow errors/ occurs.
 
+   Many commands can have nested operations.  These are indicated by a
+   /.../ in the following sections.  When forms are nested, they will
+   run before the parent item pushing their items onto the stack
+   before the parent command is executed.  For example, the following
+   instruction executes as would be expected in Lisp (=(+ 10 (- 20))=):
+
+   =(add (const 10) (neg (const 20)))=
+
 ** Stack Commands
 
    - ~const~ /number/: Pushes /number/ onto the stack.
