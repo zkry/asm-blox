@@ -1727,6 +1727,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
     (save-window-excursion
       (let ((inhibit-read-only t))
         (find-file new-name)
+        (erase-buffer)
         (insert buffer-contents)
         (save-buffer)
         (kill-buffer)))))

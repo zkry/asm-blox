@@ -1,3 +1,5 @@
+  ![logo](./doc/asm-blox-logo.png)
+
 # asm-blox: a programming game inspired by WAT and YAML
 
   Solve a variety of puzzles involving moving data using WAT and YAML.
