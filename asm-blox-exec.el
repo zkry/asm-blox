@@ -1182,6 +1182,23 @@ cell-runtime but rather the in-between row/col."
         (save-buffer)
         (kill-buffer)))))
 
+(defun asm-blox--restore-backup ()
+  "Create a backup file for the current buffer."
+  (let* ((buffer-contents (buffer-string))
+         (bfn (buffer-file-name))
+         (name (file-name-nondirectory bfn))
+         (path (file-name-directory bfn))
+         (new-name (concat path "." name ".backup.txt")))
+    (when (f-exists? new-name)
+      (let ((backup-contents))
+       (save-window-excursion
+         (find-file new-name)
+         (setq backup-contents (buffer-string)))
+       (let ((inhibit-read-only t))
+         (erase-buffer)
+         (insert backup-contents))
+       (asm-blox--parse-saved-buffer)))))
+
 (defun asm-blox--backup-file-for-current-buffer ()
   "Create a backup file for the current buffer."
   (let* ((buffer-contents (buffer-string))

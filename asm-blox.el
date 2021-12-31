@@ -66,17 +66,12 @@ This was added for performance reasons.")
 
 (defun asm-blox--get-error-at-cell (row col)
   "Return the error at position ROW COL."
-  (let* ((err (if (and (eql asm-blox--display-mode 'execute)
-                       asm-blox-runtime-error
-                       (equal (list row col) (cdr asm-blox-runtime-error)))
-                  (car asm-blox-runtime-error)
-                (let ((err (assoc (list row col) asm-blox-parse-errors)))
-                  (cdr err)))))
-    (if err
-        (let ((err-text (truncate-string-to-width (nth 2 err) (1- asm-blox-box-width))))
-          (setf (nth 2 err) err-text)
-          err)
-      err)))
+  (if (and (eql asm-blox--display-mode 'execute)
+           asm-blox-runtime-error
+           (equal (list row col) (cdr asm-blox-runtime-error)))
+      (truncate-string-to-width (car asm-blox-runtime-error) (1- asm-blox-box-width) )
+    (let ((err (assoc (list row col) asm-blox-parse-errors)))
+      (cdr err))))
 
 ;;; Widget display ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1362,7 +1357,12 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   (setq-local truncate-lines 0)
   (set-syntax-table asm-blox-mode-syntax-table)
   (unless asm-blox--skip-initial-parsing
-    (asm-blox--parse-saved-buffer)
+    (condition-case nil
+        (asm-blox--parse-saved-buffer)
+      (error
+       (if (asm-blox--restore-backup)
+           (message "Save file corrupted, restoring from backup.")
+         (error "Save file corrupted (could not be parsed)"))))
     (let ((inhibit-read-only t))
       (asm-blox-redraw-game-board)))
   (unless asm-blox--show-pair-idle-timer
