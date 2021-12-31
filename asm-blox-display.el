@@ -61,12 +61,17 @@ This was added for performance reasons.")
 
 (defun asm-blox--get-error-at-cell (row col)
   "Return the error at position ROW COL."
-  (if (and (eql asm-blox--display-mode 'execute)
-           asm-blox-runtime-error
-           (equal (list row col) (cdr asm-blox-runtime-error)))
-      (car asm-blox-runtime-error)
-    (let ((err (assoc (list row col) asm-blox-parse-errors)))
-      (cdr err))))
+  (let* ((err (if (and (eql asm-blox--display-mode 'execute)
+                       asm-blox-runtime-error
+                       (equal (list row col) (cdr asm-blox-runtime-error)))
+                  (car asm-blox-runtime-error)
+                (let ((err (assoc (list row col) asm-blox-parse-errors)))
+                  (cdr err)))))
+    (if err
+        (let ((err-text (truncate-string-to-width (nth 2 err) (1- asm-blox-box-width))))
+          (setf (nth 2 err) err-text)
+          err)
+      err)))
 
 ;;; Widget display ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

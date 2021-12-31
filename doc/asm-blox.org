@@ -327,7 +327,7 @@ following code:
      |apiVersion: v1      |
      |kind: Stack         |
      |spec:               |
-     |  inputPort: down   |
+     |  inputPorts: [down]|
      |  outputPort: right |
      |  size: 20          |
      |                    |

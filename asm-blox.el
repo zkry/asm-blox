@@ -222,7 +222,9 @@ The format of the error is (list message row column).")
 
 (defun asm-blox--portp (x)
   "Return non-nil if X is a port direction."
-  (memq x '(UP DOWN LEFT RIGHT)))
+  (if (stringp x)
+      (memq (intern x) '(UP DOWN LEFT RIGHT))
+    (memq x '(UP DOWN LEFT RIGHT))))
 
 (defun asm-blox--code-node-validate (code-node)
   "Determine if CODE-NODE adheres to the corresponding specification."
@@ -463,9 +465,13 @@ cells have moved, the staging port becomes the current port."
 ;; TODO - consolidate this function with asm-blox--cell-at-moved-row-col
 (defun asm-blox--cell-at-row-col (row col)
   "Return the cell at index ROW COL from the gameboard."
-  (aref asm-blox--gameboard
-        (+ (* row asm-blox--gameboard-col-ct)
-           col)))
+  (if (and (>= 0 row (1- asm-blox--gameboard-row-ct))
+           (>= 0 col (1- asm-blox--gameboard-col-ct)))
+      (aref asm-blox--gameboard
+            (+ (* row asm-blox--gameboard-col-ct)
+               col))
+    ;; if reference to out of bounds, return empty cell runtime.
+    (asm-blox--cell-runtime-create)))
 
 (defun asm-blox--set-cell-at-row-col (row col cell-runtime)
   "Set board cell at ROW, COL to CELL-RUNTIME."
@@ -1737,16 +1743,20 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
 (defun asm-blox--create-yaml-code-node (row col code)
   "Create a runtime for the parsed CODE, located at ROW COL."
-  (let-alist (yaml-parse-string code :object-type 'alist)
-    ;; .apiVersion .kind .metadata .spec
-    (unless (equal "v1" .apiVersion)
-      (error "Unknown api version: %s" .apiVersion))
-    (pcase .kind
-      ("Stack" (asm-blox--yaml-create-stack row col .metadata .spec))
-      ("Controller" (asm-blox--yaml-create-controller row col .metadata .spec))
-      ("Container" (error "Container not implemented"))
-      ("Network" (error "Network not implemented"))
-      ("Heap" (asm-blox--yaml-create-heap row col .metadata .spec)))))
+  (catch 'error
+   (let-alist (yaml-parse-string code :object-type 'alist)
+     ;; .apiVersion .kind .metadata .spec
+     (unless (equal "v1" .apiVersion)
+       (throw 'error '(error 0 "bad api version")))
+     (when (or (not .spec) (eql .spec :null))
+       (throw 'error '(error 0 "must define spec")))
+     (pcase .kind
+       ("Stack" (asm-blox--yaml-create-stack row col .metadata .spec))
+       ("Controller" (asm-blox--yaml-create-controller row col .metadata .spec))
+       ("Container" (error "Container not implemented"))
+       ("Network" (error "Network not implemented"))
+       ("Heap" (asm-blox--yaml-create-heap row col .metadata .spec))
+       (_ (throw 'error '(error 0 "unknown kind")))))))
 
 (defun asm-blox--yaml-message-stack (cell-runtime)
   (let* ((state (asm-blox--cell-runtime-run-state cell-runtime))
@@ -1967,6 +1977,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 (defun asm-blox--yaml-create-stack (row col metadata spec)
   "Return a Stack runtime according to SPEC with METADATA at ROW COL."
   ;; .inputPorts .outputPort .sizePort .size .logLevel
+  (asm-blox--verify-stack spec)
   (asm-blox--cell-runtime-create
    :instructions nil
    :pc nil
@@ -1975,6 +1986,57 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
    :run-function #'asm-blox--yaml-step-stack
    :message-function #'asm-blox--yaml-message-stack
    :run-spec spec))
+
+(defun asm-blox--verify-port (name port)
+  "Throw error for PORT with NAME if not-empty and not a port. "
+  (when (and port (or (eql port ':null)
+                      (not (asm-blox--portp (upcase port)))))
+    (throw 'error `(error 0 ,(format "invalid %s" name)))))
+
+(defun asm-blox--verify-stack (spec)
+  (when (eql spec ':null)
+    (throw 'error '(error 0 "spec can't be empty")))
+  (let ((input-ports (cdr (assoc 'inputPorts spec)))
+        (output-port (cdr (assoc 'outputPort spec)))
+        (size-port (cdr (assoc 'sizePort spec)))
+        (size (cdr (assoc 'size spec))))
+    (when (not input-ports)
+      (throw 'error `(error 0 "missing inputPorts")))
+    (when (eql input-ports ':null)
+      (throw 'error `(error 0 "inputPorts is empty")))
+    
+    (when (not output-port)
+      (throw 'error `(error 0 "missing outputPort")))
+    (when (eql output-port ':null)
+      (throw 'error `(error 0 "outputPort is empty"))) ;; TODO: test this
+    
+    (when (and size-port (or (eql size-port ':null)
+                             (not (asm-blox--portp (upcase size-port)))))
+      (throw 'error `(error 0 "invalid sizePort")))
+
+    (when (and size (or (eql write-port ':null)
+                        (not (numberp size))))
+      (throw 'error '(error 0 "invalid size")))
+    (when (and size-port output-port (eql size-port output-port))
+      (error 'error `(error 0 "same OUT ports")))))
+
+(defun asm-blox--verify-controller (spec)
+  (when (eql spec ':null)
+    (throw 'error '(error 0 "spec can't be empty")))
+  (let ((input-port (cdr (assoc 'inputPort spec)))
+        (set-point-port (cdr (assoc 'setPointPort spec)))
+        (char-at-point (cdr (assoc 'charAtPoint spec)))
+        (point-port (cdr (assoc 'pointPort spec))))
+    
+    (asm-blox--verify-port "inputPort" input-port)
+    (asm-blox--verify-port "setPointPort" set-point-port)
+    (asm-blox--verify-port "charAtPoint" char-at-point)
+    (asm-blox--verify-port "pointPort" point-port)
+
+    (when (and input-port set-point-port (eql input-port set-point-port))
+      (throw 'error `(error 0 "same IN ports")))
+    (when (and char-at-port point-port (eql char-at-port point-port))
+      (throw 'error `(error 0 "same OUT ports")))))
 
 (defun asm-blox--yaml-create-controller (row col metadata spec)
   "Return a Controller runtime according to SPEC with METADATA at ROW COL."
@@ -1986,10 +2048,33 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
    :run-function #'asm-blox--yaml-step-controller
    :run-spec spec))
 
+(defun asm-blox--verify-heap (spec)
+  (when (eql spec ':null)
+    (throw 'error '(error 0 "spec can't be empty")))
+  (dolist (prop '(writePort seekPort setPort offsetPort peekPort readPort))
+    (let ((port (cdr (assoc prop spec))))
+      (asm-blox--verify-port prop port)))
+  (dolist (props '(("IN" writePort seekPort setPort) ("OUT" offsetPort peekPort readPort)))
+    (let ((type (car props))
+          (ports (seq-map
+                  (lambda (n) (intern n))
+                  (seq-filter
+                   #'stringp
+                   (seq-map (lambda (prop-name) (cdr (assoc prop-name spec))) (cdr props))))))
+      (while ports
+        (let ((top (car ports))
+              (rest (cdr ports)))
+          (when (and top (memq top rest))
+            (throw 'error `(error 0 ,(format "same port: %s" (symbol-name top))))))
+        (setq ports (cdr ports))))))
+
 (defun asm-blox--yaml-create-heap (row col metadata spec)
   "Return a Stack runtime according to SPEC with METADATA at ROW COL."
   ;; .size
+  (asm-blox--verify-heap spec)
   (let-alist spec
+    (when (and .size (>= 1 .size 999))
+      (throw 'error '(error 0 "invalid heap size")))
     (let ((data (make-vector (or .size 20) 0)))
       (cl-loop for elt across .data
                for i from 0
