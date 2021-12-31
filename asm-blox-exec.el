@@ -459,8 +459,8 @@ cells have moved, the staging port becomes the current port."
 ;; TODO - consolidate this function with asm-blox--cell-at-moved-row-col
 (defun asm-blox--cell-at-row-col (row col)
   "Return the cell at index ROW COL from the gameboard."
-  (if (and (>= 0 row (1- asm-blox--gameboard-row-ct))
-           (>= 0 col (1- asm-blox--gameboard-col-ct)))
+  (if (and (<= 0 row (1- asm-blox--gameboard-row-ct))
+           (<= 0 col (1- asm-blox--gameboard-col-ct)))
       (aref asm-blox--gameboard
             (+ (* row asm-blox--gameboard-col-ct)
                col))
