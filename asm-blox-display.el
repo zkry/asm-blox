@@ -1365,7 +1365,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
           (run-with-idle-timer 0.125 t 'asm-blox--highlight-pairs))))
 
 ;;;###autoload
-(add-to-list 'auto-mode-alist (cons "\\.gis\\'" 'asm-blox-mode))
+(add-to-list 'auto-mode-alist (cons "\\.asbx\\'" 'asm-blox-mode))
 
 ;;; Undo ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

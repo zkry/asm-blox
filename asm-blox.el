@@ -1647,7 +1647,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
                                      (string-prefix-p name file-name))
                                    dir-files))
          (new-idx (number-to-string (1+ (length puzzle-files)))))
-    (expand-file-name (concat name "-" new-idx ".gis")
+    (expand-file-name (concat name "-" new-idx ".asbx")
                       asm-blox-save-directory-name)))
 
 (defun asm-blox--parse-saved-buffer ()
@@ -1694,7 +1694,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
 (defun asm-blox--make-puzzle-idx-file-name (id idx)
   "Create a file name for puzzle with ID and IDX."
-  (expand-file-name (concat id "-" (number-to-string idx) ".gis")
+  (expand-file-name (concat id "-" (number-to-string idx) ".asbx")
                     asm-blox-save-directory-name))
 
 (defun asm-blox--win-file-for-current-buffer ()
