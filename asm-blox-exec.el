@@ -174,7 +174,7 @@ The format of the error is (list message row column).")
 
 (defconst asm-blox-command-specs
   '((SET integerp asm-blox--subexpressions)
-    (CLR) 
+    (CLR)
     (CONST integerp)
     (DUP asm-blox--subexpressions)
     (ABS asm-blox--subexpressions)
@@ -1243,6 +1243,7 @@ cell-runtime but rather the in-between row/col."
        (_ (throw 'error '(error 0 "unknown kind")))))))
 
 (defun asm-blox--yaml-message-stack (cell-runtime)
+  "Return message to disblay for CELL-RUNTIME of YAML Stack."
   (let* ((state (asm-blox--cell-runtime-run-state cell-runtime))
          (spec (asm-blox--cell-runtime-run-spec cell-runtime))
          (size (cdr (assoc 'size spec)))
@@ -1366,6 +1367,7 @@ cell-runtime but rather the in-between row/col."
            point))))))
 
 (defun asm-blox--yaml-message-heap (cell-runtime)
+  "Return message to display at bottom of CELL-RUNTIME of YAML Heap."
   (let* ((state (asm-blox--cell-runtime-run-state cell-runtime))
          (offset (car state))
          (data (cdr state)))
@@ -1413,7 +1415,7 @@ cell-runtime but rather the in-between row/col."
                (opposite-port (asm-blox--mirror-direction port-sym))
                (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
           (when (not (<= 0 offset (1- (length data))))
-            (throw 'runtime-error `(error "idx out of bounds" ,row ,col)))
+            (throw 'runtime-error `(error "Idx out of bounds" ,row ,col)))
           (when recieve-val
             (asm-blox--remove-value-from-direction from-cell opposite-port)
             (aset data offset recieve-val)
@@ -1472,12 +1474,13 @@ cell-runtime but rather the in-between row/col."
    :run-spec spec))
 
 (defun asm-blox--verify-port (name port)
-  "Throw error for PORT with NAME if not-empty and not a port. "
+  "Throw error for PORT with NAME if not-empty and not a port."
   (when (and port (or (eql port ':null)
                       (not (asm-blox--portp (upcase port)))))
     (throw 'error `(error 0 ,(format "invalid %s" name)))))
 
 (defun asm-blox--verify-stack (spec)
+  "Throw error if YAML box's SPEC is not a valid Stack."
   (when (eql spec ':null)
     (throw 'error '(error 0 "spec can't be empty")))
   (let ((input-ports (cdr (assoc 'inputPorts spec)))
@@ -1505,6 +1508,7 @@ cell-runtime but rather the in-between row/col."
       (error 'error `(error 0 "same OUT ports")))))
 
 (defun asm-blox--verify-controller (spec)
+  "Throw error if YAML box's SPEC is not a valid Controller."
   (when (eql spec ':null)
     (throw 'error '(error 0 "spec can't be empty")))
   (let ((input-port (cdr (assoc 'inputPort spec)))
@@ -1533,6 +1537,7 @@ cell-runtime but rather the in-between row/col."
    :run-spec spec))
 
 (defun asm-blox--verify-heap (spec)
+  "Throw error if YAML box's SPEC is not a valid Heap."
   (when (eql spec ':null)
     (throw 'error '(error 0 "spec can't be empty")))
   (dolist (prop '(writePort seekPort setPort offsetPort peekPort readPort))
@@ -1577,4 +1582,4 @@ cell-runtime but rather the in-between row/col."
 
 (provide 'asm-blox-exec)
 
-;;; asm-blox.el ends here
+;;; asm-blox-exec.el ends here

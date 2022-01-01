@@ -171,7 +171,7 @@ Send a number x which minimizes the equation
    :description "<editor> Write the string \"Hello World\" to the editor."))
 
 (defun asm-blox--problem--upcase ()
-  "generate a problem involving upcasing characters."
+  "Generate a problem involving upcasing characters."
   (let* ((input-1 (seq-map (lambda (_)
                              (+ (random 95) 32))
                            (make-list 40 nil)))

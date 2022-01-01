@@ -597,6 +597,7 @@ of the board or very right.  TYPE will either be source or sink."
       (asm-blox--propertize-errors))))
 
 (defun asm-blox--draw-win-message ()
+  "Display a message indicating that the user won the level on the gameboard."
   (when (and (eql asm-blox--display-mode 'execute)
              (eql 'win asm-blox--gameboard-state))
     (let ((inhibit-read-only t))
@@ -1210,7 +1211,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   "Syntax table for asm-blox mode.")
 
 (defun asm-blox--create-execution-buffer (box-contents extra-cells)
-  "Create a new uneditable gamebuffer for displaing execution of puzzles."
+  "Create a new un-editable gamebuffer for displaing execution of BOX-CONTENTS with EXTRA-CELLS."
   (let ((buffer (get-buffer-create "*asm-blox-execution*"))
         (origin-file-buffer (current-buffer)))
     (with-current-buffer buffer
@@ -1636,6 +1637,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   "Mode map for selecting a asm-blox puzzle.")
 
 (defun asm-blox--font-for-difficulty (difficulty)
+  "Return font color from DIFFICULTY symbol."
   (pcase difficulty
     ('tutorial "LavenderBlush2")
     ('easy "forest green")
@@ -1725,4 +1727,4 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
 
 (provide 'asm-blox)
 
-;;; asm-blox-display.el ends here
+;;; asm-blox.el ends here
