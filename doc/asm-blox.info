@@ -1,0 +1,705 @@
+This is asm-blox.info, produced by makeinfo version 4.8 from
+asm-blox.texi.
+
+
+File: asm-blox.info,  Node: Top,  Next: Introduction,  Up: (dir)
+
+Asm-Blox User Manual
+********************
+
+     Copyright (C) 2020-2021 Zachary Romero <zkry@posteo.org>
+
+     You can redistribute this document and/or modify it under the
+     terms of the GNU General Public License as published by the Free
+     Software Foundation, either version 3 of the License, or (at your
+     option) any later version.
+
+     This document is distributed in the hope that it will be useful,
+     but WITHOUT ANY WARRANTY; without even the implied warranty of
+     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+     General Public License for more details.
+
+
+* Menu:
+
+* Introduction::
+* Installation::
+* Getting Started::
+* Gameplay::
+* WAT Command Set::
+* YAML Blocks::
+* Editing Commands::
+
+--- The Detailed Node Listing ---
+
+Getting Started
+
+* Puzzle Selection::
+* Saved Puzzles and Backups::
+
+Gameplay
+
+* Overview::
+* Execution::
+
+WAT Command Set
+
+* Execution Model of WAT Cells::
+* Stack Commands::
+* Numeric Commands::
+* Boolean Operations::
+* Comparison Operations::
+* Other Operations::
+* Port Operations::
+* Blocks and Loops::
+
+YAML Blocks
+
+* Stack Cells::
+* Heap Cells::
+* Controller Cells and Editor Problems::
+
+Editing Commands
+
+* Undo and Redo::
+* Advanced editing::
+
+
+File: asm-blox.info,  Node: Introduction,  Next: Installation,  Prev: Top,  Up: Top
+
+1 Introduction
+**************
+
+Asm-Blox is an attempt to make Emacs more exciting by merging it with
+trendy topics, namely blocks (a la Minecraft), YAML (think Kubernetes,
+Helm, etc.), and WASM (have to mention Rust!).  Asm-blox is an attempt
+to combine all these elements together in a an exciting game package,
+taking inspiration from the budding genre of programming puzzle games.
+
+   The game tasks you with writing a program in an idealized version of
+WebAssembly Text to solve a simple programming puzzle.  Puzzles range
+in difficulty and at first you'll try to get use to the unusual
+instructions later using what you've learned in conjunction with
+pre-made utility components to solve even more complex problems.
+
+
+File: asm-blox.info,  Node: Installation,  Next: Getting Started,  Prev: Introduction,  Up: Top
+
+2 *TODO* Installation
+*********************
+
+The package is not yet available on MELPA.
+
+
+File: asm-blox.info,  Node: Getting Started,  Next: Gameplay,  Prev: Installation,  Up: Top
+
+3 Getting Started
+*****************
+
+* Menu:
+
+* Puzzle Selection::
+* Saved Puzzles and Backups::
+
+
+File: asm-blox.info,  Node: Puzzle Selection,  Next: Saved Puzzles and Backups,  Up: Getting Started
+
+3.1 Puzzle Selection
+====================
+
+By running `asm-blox' you can open the _puzzle selection page_.  On
+this page you can see a list of all of the puzzles with their
+difficulty and description.  You will also see the puzzles previously
+created on the right side of the screen. Pressing `RET' when the point
+is on any one of them will load said puzzle.
+
+
+File: asm-blox.info,  Node: Saved Puzzles and Backups,  Prev: Puzzle Selection,  Up: Getting Started
+
+3.2 Saved Puzzles and Backups
+=============================
+
+Puzzles are saved in the directory indicated by the variable
+`asm-blox-save-directory-name'.  Puzzles are saved as they are edited
+(ie 12 boxes with text in them).  In the case that the file is saved in
+a bad format it may become corrupted.  In this case there are backups
+saved each time the file is ran which end in `.backup.txt'.  When a
+puzzle is completed, a file with the extension `.win.txt' is saved.
+
+
+File: asm-blox.info,  Node: Gameplay,  Next: WAT Command Set,  Prev: Getting Started,  Up: Top
+
+4 Gameplay
+**********
+
+* Menu:
+
+* Overview::
+* Execution::
+
+
+File: asm-blox.info,  Node: Overview,  Next: Execution,  Up: Gameplay
+
+4.1 Overview
+============
+
+The gameboard consists of three rows and four columns in which the user
+will enter their solution.  Each box will be referred to as a _code
+cell_. Code cells can contain WAT or YAML.  The following is an example
+of a WAT cell:
+
+
+     +--------------------+
+     |(left)(ne (get 0)   |
+     |        (const ?<)) |
+     |(ne(get 0)          |
+     |   (const ?>))(and) |
+     |(block(block        |
+     |  (br_if 0)         |
+     |  (send down)(down) |
+     |  (br 1))           |
+     | (send right)       |
+     | (right))           |
+     |(clr)               |
+     |                    |
+     +--------------------+
+
+   In later sections, I will go over the meanings of the various
+commands.  Arrows entering the box are the box's _input ports_, The
+arrows goign out are the box's _output ports_.  On the edges of the
+gameboard you will see some labeled arrows.  The input of the puzzle
+will come through these ports.  Labeled arrows going out of a box is
+where you have to send your answer.
+
+   The following is an example of a YAML cell:
+
+     +--------------------+
+     |apiVersion: v1      |
+     |kind: Heap          |
+     |spec:               |
+     |  size: 100         |
+     |  setPort: up       |
+     |  seekPort: left    |
+     |  peekPort: up      |
+     |  offsetPort: left  |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     +--------------------+
+
+
+File: asm-blox.info,  Node: Execution,  Prev: Overview,  Up: Gameplay
+
+4.2 Execution
+=============
+
+By pressing `C-c C-c' (`asm-blox-start-execution') you can execute the
+current puzzle.  This opens up a new buffer where the puzzle's inputs
+and outputs will become visible.  The following keybindings will then
+be available to you in an execution buffer:
+
+   * `n' (`asm-blox-execution-next-command') will perform one step of
+     execution.
+
+   * `N' (`asm-blox--execution-next-multiple-commands') will perform
+     the number of steps defined by the variable.
+     `asm-blox-multi-step-ct'.
+
+   * `r' (`asm-blox--execution-run') will run the program until it
+     finishes, an error occurs, or is stopped.
+
+   * `q' (`quit-window') will stop execution.
+
+   Submitting the wrong answer will cause execution to stop as well as
+any runtime error.
+
+
+File: asm-blox.info,  Node: WAT Command Set,  Next: YAML Blocks,  Prev: Gameplay,  Up: Top
+
+5 WAT Command Set
+*****************
+
+The following is a complete description of all the available WAT
+commands in the game.  *Note_that the commands are case insensitive*
+
+* Menu:
+
+* Execution Model of WAT Cells::
+* Stack Commands::
+* Numeric Commands::
+* Boolean Operations::
+* Comparison Operations::
+* Other Operations::
+* Port Operations::
+* Blocks and Loops::
+
+
+File: asm-blox.info,  Node: Execution Model of WAT Cells,  Next: Stack Commands,  Up: WAT Command Set
+
+5.1 Execution Model of WAT Cells
+================================
+
+Cells run on a stack-based architecture.  Each command will consume
+zero to two items from the stack and push zero or one item.  Each cell
+has a stack size of four. Any element past that will cause a
+_stack-overflow error_.  If the stack doesn't have enough items, a
+_stack-underflow errors_ occurs.
+
+   Many commands can have nested operations.  These are indicated by a
+_..._ in the following sections.  When forms are nested, they will run
+before the parent item pushing their items onto the stack before the
+parent command is executed.  For example, the following instruction
+executes as would be expected in Lisp (`(+ 10 (- 20))'):
+
+   `(add (const 10) (neg (const 20)))'
+
+
+File: asm-blox.info,  Node: Stack Commands,  Next: Numeric Commands,  Prev: Execution Model of WAT Cells,  Up: WAT Command Set
+
+5.2 Stack Commands
+==================
+
+   * `const' _number_: Pushes _number_ onto the stack.
+
+   * `set' _stack-offset_: Sets the stack item at _stack-offset_ to the
+     value at the top of the stack, popping it.
+
+   * `inc' _stack-offset_ _..._: Increment the value on the stack at
+     _stack-offset_. *NOTE_* To increment the value at the top of the
+     stack use `(inc -1)'.
+
+   * `dec' _stack-offset_: Decrement the value of the stack at
+     _stack-offset_. *NOTE_* To decrement the value at the top of the
+     stack use `(dec -1)'.
+
+   * `clr': Clear the entire stack.
+
+   * `dup': Duplicate the stack. Note: this will overflow the stack if
+     there is more than two items on the stack.
+
+   * `drop' _..._: Pop the item off the top of the stack.
+
+
+File: asm-blox.info,  Node: Numeric Commands,  Next: Boolean Operations,  Prev: Stack Commands,  Up: WAT Command Set
+
+5.3 Numeric Commands
+====================
+
+   * `add' _..._: Remove the top two items on the stack, add them, and
+     push the result on the stack.
+
+   * `sub' _..._: Remove the top two items on the stack, subtract the
+     upper item from the lower one and add the item back on the stack.
+
+   * `mul' _..._: Remove the top two items on the stack, multiply them
+     and push the result on the stack.
+
+   * `div' _..._: Remove the top two items on the stack, divide the
+     lower item by the upper item and push the _quotient_ on the stack.
+
+   * `rem' _..._: Remove the top two items on the stack, divide the
+     lower item by the upper item and push the _remainder_ on the stack.
+
+   * `neg' _..._: Remove the top item from the stack and invert its
+     sign.
+
+
+File: asm-blox.info,  Node: Boolean Operations,  Next: Comparison Operations,  Prev: Numeric Commands,  Up: WAT Command Set
+
+5.4 Boolean Operations
+======================
+
+asm-blox has no notion of true or false.  The number 0 is used for
+false and any other number is true.
+
+   * `and' _..._: Remove the top two items on the stack, pushing 1 if
+     they are both true, 0 otherwise.
+
+   * `or' _..._: Remove the top two items on the stack, pushing 1 if
+     either of them is true, 0 otherwise.
+
+   * `not' _..._: Remove the top item from the stack and push its
+     inverted truth value onto the stack.
+
+
+File: asm-blox.info,  Node: Comparison Operations,  Next: Other Operations,  Prev: Boolean Operations,  Up: WAT Command Set
+
+5.5 Comparison Operations
+=========================
+
+Note that all comparison operations compare from bottom to top of the
+stack.  This means that an operation such as `(lt (const 1)    (const
+3))' will be true.
+
+   * `lt' _..._: Pop two items on stack and push 1 if the bottom item
+     is _less than_ the top, 0 otherwise.
+
+   * `gt' _..._: Pop two items on stack and push 1 if the bottom item
+     is _greater than_ the top, 0 otherwise.
+
+   * `ge' _..._: Pop two items on stack and push 1 if the bottom item
+     is _greater than or equal to_ the top, 0 otherwise.
+
+   * `le' _..._: Pop two items on stack and push 1 if the bottom item
+     is _less than or equal to_ the top, 0 otherwise.
+
+   * `eq' _..._: Pop two items on stack and push 1 if the bottom item
+     is _equal_ the top, 0 otherwise.
+
+   * `ne' _..._: Pop two items on stack and push 1 if the bottom item
+     is _not equal to_ the top, 0 otherwise.
+
+   * `lz' _..._: Pop one items on stack and push 1 if it is less than
+     zero, 0 otherwise.
+
+   * `gz' _..._: Pop one items on stack and push 1 if it is greater
+     than zero, 0 otherwise.
+
+
+File: asm-blox.info,  Node: Other Operations,  Next: Port Operations,  Prev: Comparison Operations,  Up: WAT Command Set
+
+5.6 Other Operations
+====================
+
+   * `nop': Do nothing
+
+
+File: asm-blox.info,  Node: Port Operations,  Next: Blocks and Loops,  Prev: Other Operations,  Up: WAT Command Set
+
+5.7 Port Operations
+===================
+
+The following commands are used to interact with the port network.
+Note that commands like `(up)' and `(down)' are given for convenience.
+
+   * `send' _port_ _..._: Send the item off the top of the stack to
+     _port_ if it empty.  If the port is full, block.
+
+   * `get' _port_: Push the item from _port_ onto the stack.
+
+   * `up': Push the item from the _up_ port onto the stack.
+
+   * `down': Push the item from the _down_ port onto the stack.
+
+   * `left': Push the item from the _left_ port onto the stack.
+
+   * `right': Push the item from the _right_ port onto the stack.
+
+
+File: asm-blox.info,  Node: Blocks and Loops,  Prev: Port Operations,  Up: WAT Command Set
+
+5.8 Blocks and Loops
+====================
+
+WAT cells come with two methods of control-flow: `loop' and `block'.
+If you're familiar with WAT the logic works similar.
+
+   The commands `br' and `br_if' are the two commands to work with
+`block' and `loop'.  A `br' command will either skip to the end of a
+`block' or loop to the top of a `loop'.  A `br' must specify which
+block or loop it is referring to via a number.  Consider the following
+example:
+
+     (block   ; 2
+      (block  ; 1
+       (block ; 0
+        (br <block ID>))))
+
+   The <block ID> above can be either 0, 1, or 2 since it is contained
+in three nested blocks.  If <block ID> was set to 1, then control flow
+would jump past the middle block.  If <block ID> was 2 then the control
+would pass all of the blocks.
+
+   Let's consider another example with `loop'.  Suppose we want to send
+the numbers from 0 to 10 to the down port.  We could write the
+following code:
+
+     (const 0) ; 1
+     (loop     ; 2
+      (send down (get 0)) ; 3
+      (set 0 (add (get 0)
+                  (const 1))) ; 4
+      (ne (get 0) (const 10)) ; 5
+      (br_if 0))              ; 6
+
+  1. Initialize the top of the stack to 0.
+
+  2. Setup a loop
+
+  3. Send the value at the bottom of the stack down.
+
+  4. Set the value at the bottom of the stack to be 1 plus its current
+     value.
+
+  5. Push 1 if the item at the bottom of the stack is not equal to zero
+
+  6. If true (ie 1) is on the top of the stack, jump to the loop.
+
+   `block', `loop', `br' and `br_if' can be combined to create a wide
+variety of constructs.
+
+   Commands:
+
+   * `block': Setup a block. Any `br' command pointing to this block
+     will jump past the end of the block.
+
+   * `loop': Setup a block. Any `br' command pointing to this block
+     will jump to the beginning of this block.
+
+   * `br': Unconditionally jump to a block.
+
+   * `br_if': Consume the top item of the stack, jumping if true,
+     continuing if false.
+
+
+File: asm-blox.info,  Node: YAML Blocks,  Next: Editing Commands,  Prev: WAT Command Set,  Up: Top
+
+6 YAML Blocks
+*************
+
+YAML cells can be constructed in addition to WAT blocks to add pre-made
+processes which add essential functionality to solve some problems.
+The current available types of YAML blocks includes: Stack, Heap, and
+Controller.
+
+   YAML blocks written using YAML similar to that of the extremely
+popular Kubernetes and are detailed in the following sections.  The top
+level items in a yaml block are `apiVersion', `kind', and `spec'.
+`apiVersion' will always be the value "v1".
+
+* Menu:
+
+* Stack Cells::
+* Heap Cells::
+* Controller Cells and Editor Problems::
+
+
+File: asm-blox.info,  Node: Stack Cells,  Next: Heap Cells,  Up: YAML Blocks
+
+6.1 Stack Cells
+===============
+
+When the `kind' of a YAML cell is "Stack", a Stack is created.  A stack
+reads data from an input source, adding it to an internal data store,
+and makes it available to an external port.  The following is an
+example of a stack.
+
+
+     +--------------------+
+     |apiVersion: v1      |
+     |kind: Stack         |
+     |spec:               |
+     |  inputPorts: [down]|
+     |  outputPort: right |
+     |  size: 20          |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     +--------------------+
+
+   The following are spec properties of a YAML stack:
+
+   * `inputPort': any value sent here will be added to the top of the
+     stack.
+
+   * `outputPort': if another cell reads from here, it will be popped
+     off the stack.
+
+   * `size': the maximum amount of elements that can be on the stack
+     before a stack-overflow error occurs.  The maximum size of a stack
+     is 999.
+
+   * `size-port': the port to which the current amount of elements on
+     the stack is written to.
+
+
+File: asm-blox.info,  Node: Heap Cells,  Next: Controller Cells and Editor Problems,  Prev: Stack Cells,  Up: YAML Blocks
+
+6.2 Heap Cells
+==============
+
+Heap cells are created by setting the `kind' property of a YAML cell to
+Heap.  Heaps provide you with an array of memory for your cells to read
+and write to.  The following is an example of a heap cell:
+
+
+     +--------------------+
+     |apiVersion: v1      |
+     |kind: Heap          |
+     |spec:               |
+     |  readPort: down    |
+     |  writePort: down   |
+     |  seekPort: left    |
+     |  offsetPort: left  |
+     |  setPort: up       |
+     |  peekPort: up      |
+     |                    |
+     |                    |
+     |                    |
+     +--------------------+
+
+
+File: asm-blox.info,  Node: Controller Cells and Editor Problems,  Prev: Heap Cells,  Up: YAML Blocks
+
+6.3 Controller Cells and Editor Problems
+========================================
+
+Some problems require the special Asm-blox Editor integration.  These
+problems, when executed, will show an editor with the expected output
+under it.  Your goal in these problems is to get the editor to match
+the target text.  You can interact with the editor via Controller
+cells.  A controller cell is a YAML cell with a value of "Controller"
+for the `kind' property.  By configuring the ports on the Controller
+cell you can move the point and insert text, sort of like how you would
+in Emacs itself.  You can have multiple controllers in a game.
+
+   The following is an example of a controller cell:
+
+     +--------------------+
+     |apiVersion: v1      |
+     |kind: Controller    |
+     |spec:               |
+     |  inputPort: left   |
+     |  setPointPort:     |
+     |    down            |
+     |  pointPort:up      |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     +--------------------+
+
+   Controller cells allow you to set the following properties on the
+`spec':
+
+   * `inputPort': Data sent to this input point will be written to the
+     buffer at the current point.  ASCII characters with a value of 32
+     through 126 can be printed. You may also send ASCII 10 (?) for a
+     newline, 8 (?) or -1 for a backwards delete and -2 for a forwards
+     delete.
+
+   * `setPointPort': Data sent to this input port will set the position
+     of the port.  A value past the bounds of the buffer will bring the
+     point to the beginning (position 1) or the end of the buffer.
+
+   * `charAtPort': This output port will contain the character in front
+     of the point.
+
+   * `pointPort': This output port will contain the current point
+     position.
+
+
+File: asm-blox.info,  Node: Editing Commands,  Prev: YAML Blocks,  Up: Top
+
+7 Editing Commands
+******************
+
+The following commands may be helpful when editing asm-blox code:
+
+   * `asm-blox-start-execution' (bound `C-c C-c'): compile the code
+     cells and create an execution buffer.
+
+   * `asm-blox-move-beginning-of-line' (bound `C-a'): Move the point to
+     the beginning of a code cell line if in a cell, to the beginning
+     of the line otherwise.
+
+   * `asm-blox-move-end-of-line' (bound `C-e'): Move the point to the
+     end of a code cell line if in a cell, to the end of the buffers
+     line otherwise.
+
+   * `asm-blox-beginning-of-buffer' (bound `M-<'): Move the point to
+     the end of a code cell if in a cell, to the end of the buffer
+     otherwise.
+
+   * `asm-blox-end-of-buffer' (bound `M->'): Move the point to the end
+     of a code cell if in a cell, to the end of the buffer otherwise.
+
+   * `asm-blox-next-cell' (bound `<tab>'): Move the point to the end of
+     the next code cell.
+
+   * `asm-blox-prev-cell' (bound `<backtab>'): Move the point to the
+     end of the previous code cell.
+
+* Menu:
+
+* Undo and Redo::
+* Advanced editing::
+
+
+File: asm-blox.info,  Node: Undo and Redo,  Next: Advanced editing,  Up: Editing Commands
+
+7.1 Undo and Redo
+=================
+
+Asm-blox support undo and redo on a per-cell basis.
+
+   * `asm-blox-undo' (bound `s-z'): undo a previous action in the
+     current code cell.
+
+   * `asm-blox-redo' (bound `s-y'): redo a previous undo in the current
+     code cell.
+
+
+File: asm-blox.info,  Node: Advanced editing,  Prev: Undo and Redo,  Up: Editing Commands
+
+7.2 Advanced editing
+====================
+
+   * `asm-blox-shift-box-up' (bound `<s-up>'): Swap the current code
+     cell with the one above the current one.
+
+   * `asm-blox-shift-box-down' (bound `<s-down>'): Swap the current
+     code cell with the one below the current one.
+
+   * `asm-blox-shift-box-left' (bound `<s-left>'): Swap the current
+     code cell with the one to the left of the current one.
+
+   * `asm-blox-shift-box-right' (bound `<s-right>'): Swap the current
+     code cell with the one to the right of the current one.
+
+   * `asm-blox-kill-region' (bound `<C-w>'): kill the highlighted
+     region of the current code cell.  Note that the two ends of the
+     region must be in the same code cell.
+
+   * `asm-blox-copy-region' (bound `<M-w>'): copy the highlighted
+     region of the current code cell.  Note that the two ends of the
+     region must be in the same code cell.
+
+   * `asm-blox-yank' (bound `C-y'); paste the yanked region to the
+     current code cell.
+
+
+
+Tag Table:
+Node: Top77
+Node: Introduction1371
+Node: Installation2180
+Node: Getting Started2368
+Node: Puzzle Selection2561
+Node: Saved Puzzles and Backups3025
+Node: Gameplay3600
+Node: Overview3758
+Node: Execution5297
+Node: WAT Command Set6146
+Node: Execution Model of WAT Cells6606
+Node: Stack Commands7456
+Node: Numeric Commands8346
+Node: Boolean Operations9232
+Node: Comparison Operations9840
+Node: Other Operations11080
+Node: Port Operations11271
+Node: Blocks and Loops12013
+Node: YAML Blocks14048
+Node: Stack Cells14734
+Node: Heap Cells15954
+Node: Controller Cells and Editor Problems16708
+Node: Editing Commands18654
+Node: Undo and Redo19830
+Node: Advanced editing20193
+
+End Tag Table
