@@ -3,9 +3,9 @@
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "25.1") (yaml "0.3.4"))
+;; Package-Requires: ((emacs "26.1") (yaml "0.3.4"))
 ;; Homepage: https://github.com/zkry/asm-blox
-;; Keywords: game
+;; Keywords: games
 
 ;; This file is not part of GNU Emacs
 
@@ -285,7 +285,7 @@ of the board or very right.  TYPE will either be source or sink."
     (setq asm-blox--end-of-box-points (make-hash-table :test 'equal)))
   (when (not (hash-table-p asm-blox--beginning-of-box-points))
     (setq asm-blox--beginning-of-box-points (make-hash-table :test 'equal)))
-  (let* ((display-mode 'edit) ;; TODO - finalize where this comes from. can be 'edit or 'execute
+  (let* ((display-mode 'edit)
          (arrow-up "↑")
          (arrow-down "↓")
          (arrow-right "→")
@@ -769,7 +769,7 @@ This was added for performance reasons.")
          (new-line)
          (new-col)
          (new-text))
-    (with-current-buffer (get-buffer-create asm-blox--mirror-buffer-name) ;; TODO: use temp buffer?
+    (with-current-buffer (get-buffer-create asm-blox--mirror-buffer-name)
       (erase-buffer)
       (insert text)
       (goto-char (point-min))
@@ -948,8 +948,10 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                do (cond
                    ((= line-1 i line-2)
                     (let ((line-part
-                           (concat (substring line 0 (min (length line) line-col-1))
-                                   (substring line (min (length line) line-col-2))))
+                           (concat (substring line 0 (min (length line)
+                                                          line-col-1))
+                                   (substring line (min (length line)
+                                                        line-col-2))))
                           (kill-part
                            (substring line
                                       (min (length line) line-col-1)
@@ -1093,7 +1095,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                 (not (bobp)))
       (forward-char -1))
     (when (bobp)
-      (asm-blox--move-to-box (1- asm-blox--gameboard-row-ct) (1- asm-blox--gameboard-col-ct)))
+      (asm-blox--move-to-box (1- asm-blox--gameboard-row-ct)
+                             (1- asm-blox--gameboard-col-ct)))
     (asm-blox-next-cell)))
 
 ;; TODO: DRY this and next-cell up.
@@ -1106,7 +1109,9 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
              (col (cadr box-id))
              (next-col (if (= col 0) (1- asm-blox-column-ct) (1- col)))
              (next-row (if (= col 0) (1- row) row))
-             (next-row (if (= next-row -1) (1- asm-blox--gameboard-row-ct) next-row)))
+             (next-row (if (= next-row -1)
+                           (1- asm-blox--gameboard-row-ct)
+                         next-row)))
         (asm-blox--move-to-box next-row next-col)
         (asm-blox--move-point-to-end-of-box-content))
     (while (and (not (asm-blox-in-box-p))
@@ -1130,7 +1135,6 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (define-key map (kbd "DEL") #'asm-blox-backward-delete-char)
       (define-key map (kbd "SPC") #'asm-blox-self-insert-command)
       (define-key map (kbd "RET") #'asm-blox--newline)
-      (define-key map (kbd "C-c C-g") #'asm-blox--refresh-contents)
       (define-key map (kbd "C-c C-c") #'asm-blox-start-execution)
       (define-key map (kbd "M-d") #'asm-blox-kill-word)
       (define-key map (kbd "C-k") #'asm-blox-kill-line)
@@ -1470,14 +1474,15 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                   (box-row (asm-blox--undo-state-box-row next-redo))
                   (box-col (asm-blox--undo-state-box-col next-redo)))
               (asm-blox--set-box-content row col text)
-              (let ((inhibit-read-only t)) ;; code-smell: always inhibiting read only
+              (let ((inhibit-read-only t))
                 (asm-blox-redraw-game-board))
               (asm-blox--move-to-box-point box-row box-col))))))))
 
 
 ;;; Parenthesis match code ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar asm-blox-pair-overlays nil "List of overlays used to highlight parenthesis pairs.")
+(defvar asm-blox-pair-overlays nil
+  "List of overlays used to highlight parenthesis pairs.")
 
 (defun asm-blox--find-closing-match ()
   "Find the closing paren match of point."
@@ -1586,7 +1591,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                         (let ((end-point (point)))
                           (asm-blox--pair-create-overlays start-point end-point)))
                     (when asm-blox-pair-overlays
-                      (asm-blox--pair-delete-overlays))))) ;; TODO: should display red match instead
+                       ;; TODO: should display red match instead
+                      (asm-blox--pair-delete-overlays)))))
                (asm-blox-pair-overlays
                 (asm-blox--pair-delete-overlays))))))
       (when asm-blox-pair-overlays
@@ -1599,7 +1605,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   (let ((puzzle (asm-blox--get-puzzle-by-id id)))
     (unless puzzle
       (error "No puzzle found with id %s" id))
-    (let ((buffer (get-buffer-create "*asm-blox*"))  ;; TODO: allow for 1+ puzzles at once
+      ;; TODO: allow for 1+ puzzles at once
+    (let ((buffer (get-buffer-create "*asm-blox*"))
           (file-name (asm-blox--generate-new-puzzle-filename id)))
       (switch-to-buffer buffer)
       (let ((inhibit-read-only t)
@@ -1712,7 +1719,11 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   (setq mode-name "asm-blox-puzzle-selection"
         buffer-read-only t)
   (setq header-line-format
-        (format "     %-8s %-25s %-60s   %s" "STRAIN" "PUZZLE NAME" "DESCRIPTION" "SAVED FILES"))
+        (format "     %-8s %-25s %-60s   %s"
+                "STRAIN"
+                "PUZZLE NAME"
+                "DESCRIPTION"
+                "SAVED FILES"))
   (setq-local truncate-lines 0)
   (hl-line-mode t))
 

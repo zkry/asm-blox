@@ -66,14 +66,17 @@
      :name "Indentation I"
      :difficulty 'medium
      :sinks
-     (list (asm-blox--cell-sink-create :row 2
-                                      :col 4
-                                      :expected-data expected-output
-                                      :idx 0
-                                      :name "O"
-                                      :default-editor-text "func main () {\nfmt.Println(\"hello world\")\nreturn\n}"
-                                      :editor-point 1
-                                      :expected-text "func main () {\n  fmt.Println(\"hello world\")\n  return\n}"))
+     (list (asm-blox--cell-sink-create
+            :row 2
+            :col 4
+            :expected-data expected-output
+            :idx 0
+            :name "O"
+            :default-editor-text
+            "func main () {\nfmt.Println(\"hello world\")\nreturn\n}"
+            :editor-point 1
+            :expected-text
+            "func main () {\n  fmt.Println(\"hello world\")\n  return\n}"))
      :description "<editor> Edit text to match the target.")))
 
 (defun asm-blox--problem--number-sum ()
@@ -103,9 +106,10 @@ from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
 (defun asm-blox--problem--meeting-point ()
   "Generate a problem of finding the point that minimizes movement."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
-         (expected-output (list (cl-loop for i from 1 to 1000
-                                         minimize (cl-loop for d in input
-                                                           sum (abs (- i d)))))))
+         (expected-output
+          (list (cl-loop for i from 1 to 1000
+                         minimize (cl-loop for d in input
+                                           sum (abs (- i d)))))))
     (asm-blox--problem-spec-create
      :name "Meeting point"
      :difficulty 'hard
@@ -151,7 +155,8 @@ Send a number x which minimizes the equation
                                       :editor-point 1
                                       :expected-text expected-text))
      :description
-     "<editor> Read a number from A, draw a line with that many '#' characters.")))
+     "<editor> Read a number from A,
+ draw a line with that many '#' characters.")))
 
 (defun asm-blox--problem--hello-world ()
   "Generate a problem involving writing Hello World to the srceen."
@@ -227,9 +232,12 @@ ex. 1  2  0  5  6  4
 (defun asm-blox--problem--tax ()
   "Generate a simple tax problem."
   (let* ((high-start-ct (random 20))
-         (start-seq (seq-map (lambda (_) (random 999)) (make-list high-start-ct nil)))
-         (high-seq (seq-map (lambda (_) (+ 500 (random 499))) (make-list 12 nil)))
-         (rest-seq (seq-map (lambda (_) (random 999)) (make-list (- 40 high-start-ct 12) nil)))
+         (start-seq (seq-map (lambda (_) (random 999))
+                             (make-list high-start-ct nil)))
+         (high-seq (seq-map (lambda (_) (+ 500 (random 499)))
+                            (make-list 12 nil)))
+         (rest-seq (seq-map (lambda (_) (random 999))
+                            (make-list (- 40 high-start-ct 12) nil)))
          (input-1 (append start-seq high-seq rest-seq))
          (expected (cdr (seq-reduce (lambda (acc x)
                                       (if (listp acc)
@@ -257,7 +265,8 @@ ex. 1  2  0  5  6  4
                                       :idx 0
                                       :name "O"))
      :description
-     "Read values from I. After the 12th consecutive value is greater than or equal to 500, return that 12th value divided by 40.")))
+     "Read values from I. After the 12th consecutive value is greater than
+or equal to 500, return that 12th value divided by 40.")))
 
 (defun asm-blox--problem--list-reverse ()
   "Generate a simple addition problem."
@@ -312,7 +321,8 @@ Read a list from L, reverse it, and send it to R (terminating it with 0).")))
                                       :expected-data lengths
                                       :idx 0
                                       :name "O"))
-     :description "Lists are 0 terminated. Read a list from I, calculate its length and send it to O.")))
+     :description "Lists are 0 terminated. Read a list from I,
+calculate its length and send it to O.")))
 
 (defun asm-blox--problem--turing ()
   "Generate a simple Brain****-like puzzle."
@@ -461,11 +471,15 @@ Write the current time to T for every time you move the current time.")))
      "Take input from A, B, and C, add the three together, and send it to S.")))
 
 (defun asm-blox--problem--number-sorter ()
-  "Generate problem for comparing two numbers and sending them in different places."
-  (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
-         (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
-         (expected-1 (seq-mapn (lambda (a b) (if (> a b) a 0)) input-1 input-2))
-         (expected-2 (seq-mapn (lambda (a b) (if (> b a) b 0)) input-1 input-2)))
+  "Generate problem of comparing two numbers, send them in different places."
+  (let* ((input-1 (seq-map (lambda (_) (random 10))
+                           (make-list 40 nil)))
+         (input-2 (seq-map (lambda (_) (random 10))
+                           (make-list 40 nil)))
+         (expected-1 (seq-mapn (lambda (a b) (if (> a b) a 0))
+                               input-1 input-2))
+         (expected-2 (seq-mapn (lambda (a b) (if (> b a) b 0))
+                               input-1 input-2)))
     (asm-blox--problem-spec-create
      :name "Number Chooser"
      :difficulty 'easy
@@ -526,7 +540,8 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
                                       :expected-data expected
                                       :idx 0
                                       :name "X"))
-     :description "Take an input from the input X and send it to the output X.")))
+     :description
+     "Take an input from the input X and send it to the output X.")))
 
 (defvar asm-blox-puzzles (list
                          #'asm-blox--problem--indentation

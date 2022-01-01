@@ -1,6 +1,12 @@
 ;;; asm-blox-el.el --- Grided Intelligence System -*- lexical-binding: t -*-
 
 ;; Author: Zachary Romero
+;; Maintainer: Zachary Romero
+;; Version: 0.0.1
+;; Package-Requires: ((emacs "26.1") (yaml "0.3.4"))
+;; Homepage: https://github.com/zkry/asm-blox
+;; Keywords: games
+
 
 ;; This file is not part of GNU Emacs
 
@@ -79,91 +85,103 @@ The format of the error is (list message row column).")
     (insert code)
     (goto-char (point-min))
     (cl-labels
-        ((whitespace-p (c)
-                       (or (eql c ?\s)
-                           (eql c ?\t)
-                           (eql c ?\n)))
-         (current-char ()
-                       (char-after (point)))
-         (consume-space ()
-                        (while (and (whitespace-p (current-char))
-                                    (not (eobp)))
-                          (forward-char)))
-         (symbol-char-p (c)
-                        (or (<= ?a c ?z)
-                            (<= ?A c ?Z)
-                            (= ?_ c)))
+        ((whitespace-p
+          (c)
+          (or (eql c ?\s)
+              (eql c ?\t)
+              (eql c ?\n)))
+         (current-char
+          ()
+          (char-after (point)))
+         (consume-space
+          ()
+          (while (and (whitespace-p (current-char))
+                      (not (eobp)))
+            (forward-char)))
+         (symbol-char-p
+          (c)
+          (or (<= ?a c ?z)
+              (<= ?A c ?Z)
+              (= ?_ c)))
          (digit-char-p (c) (<= ?0 c ?9))
-         (parse-element (&optional top-level)
-                        (let ((elements '()))
-                          (catch 'end
-                            (while t
-                              (consume-space)
-                              (if (eobp)
-                                  (if top-level
-                                      (throw 'end nil)
-                                    (throw 'error `(error ,(point) "SYNTAX ERROR")))
-                                (let ((at-char (current-char)))
-                                  (cond
-                                   ;; Start of children list
-                                   ((eql at-char ?\()
-                                    (let ((start (point)))
-                                      (forward-char 1)
-                                      (let* ((children (parse-element))
-                                             (node (asm-blox--code-node-create :children children
-                                                                              :start-pos start
-                                                                              :end-pos (point))))
-                                        (push node elements))))
-                                   ;; End of children list
-                                   ((eql at-char ?\) )
-                                    (if top-level
-                                        (throw 'error `(error ,(point) "SYNTAX ERROR"))
-                                      (forward-char 1)
-                                      (throw 'end nil)))
-                                   ((eql at-char ?\?)
-                                    (forward-char 1)
-                                    (let ((c))
-                                      (if (looking-at "\\\\")
-                                          (progn
-                                            (forward-char 1)
-                                            (let ((escape-c (char-after (point))))
-                                              (pcase escape-c
-                                                (?n (setq c ?\n))
-                                                (?s (setq c ?\s))
-                                                (?b (setq c ?\b))
-                                                (_ (throw 'error `(error ,(point) "BAD ESCAPE CODE"))))))
-                                        (setq c (char-after (point)))
-                                        (when (or (= c ?\s) (= c ?\n))
-                                          (_ (throw 'error `(error ,(point) "INVALID CHAR")))))
-                                      (forward-char 1)
-                                      (push c elements)))
-                                   ;; Symbol
-                                   ((symbol-char-p at-char)
-                                    (let ((start (point)))
-                                      (forward-char 1)
-                                      (while (and (not (eobp))
-                                                  (symbol-char-p (current-char)))
-                                        (forward-char 1))
-                                      (let ((symbol (intern (upcase (buffer-substring-no-properties start (point))))))
-                                        (push symbol elements))))
+         (parse-element
+          (&optional top-level)
+          (let ((elements '()))
+            (catch 'end
+              (while t
+                (consume-space)
+                (if (eobp)
+                    (if top-level
+                        (throw 'end nil)
+                      (throw 'error `(error ,(point) "SYNTAX ERROR")))
+                  (let ((at-char (current-char)))
+                    (cond
+                     ;; Start of children list
+                     ((eql at-char ?\()
+                      (let ((start (point)))
+                        (forward-char 1)
+                        (let* ((children (parse-element))
+                               (node (asm-blox--code-node-create
+                                      :children children
+                                      :start-pos start
+                                      :end-pos (point))))
+                          (push node elements))))
+                     ;; End of children list
+                     ((eql at-char ?\) )
+                      (if top-level
+                          (throw 'error `(error ,(point) "SYNTAX ERROR"))
+                        (forward-char 1)
+                        (throw 'end nil)))
+                     ((eql at-char ?\?)
+                      (forward-char 1)
+                      (let ((c))
+                        (if (looking-at "\\\\")
+                            (progn
+                              (forward-char 1)
+                              (let ((escape-c (char-after (point))))
+                                (pcase escape-c
+                                  (?n (setq c ?\n))
+                                  (?s (setq c ?\s))
+                                  (?b (setq c ?\b))
+                                  (_ (throw 'error `(error ,(point) "BAD ESCAPE CODE"))))))
+                          (setq c (char-after (point)))
+                          (when (or (= c ?\s) (= c ?\n))
+                            (_ (throw 'error `(error ,(point) "INVALID CHAR")))))
+                        (forward-char 1)
+                        (push c elements)))
+                     ;; Symbol
+                     ((symbol-char-p at-char)
+                      (let ((start (point)))
+                        (forward-char 1)
+                        (while (and (not (eobp))
+                                    (symbol-char-p (current-char)))
+                          (forward-char 1))
+                        (let ((symbol (intern (upcase
+                                               (buffer-substring-no-properties
+                                                start
+                                                (point))))))
+                          (push symbol elements))))
 
-                                   ;; digit
-                                   ((or (digit-char-p at-char) (eql at-char ?-))
-                                    (let ((start (point)))
-                                      (forward-char 1)
-                                      (while (and (not (eobp))
-                                                  (digit-char-p (current-char)))
-                                        (forward-char 1))
-                                      (let ((number (string-to-number (buffer-substring-no-properties start (point)))))
-                                        (when (< number -999)
-                                          (throw 'error `(error ,(point) "TOO LOW NUMBER")))
-                                        (when (> number 999)
-                                          (throw 'error `(error ,(point) "TOO HIGH NUMBER")))
-                                        (push number elements))))
+                     ;; digit
+                     ((or (digit-char-p at-char) (eql at-char ?-))
+                      (let ((start (point)))
+                        (forward-char 1)
+                        (while (and (not (eobp))
+                                    (digit-char-p (current-char)))
+                          (forward-char 1))
+                        (let ((number (string-to-number
+                                       (buffer-substring-no-properties
+                                        start
+                                        (point)))))
+                          (when (< number -999)
+                            (throw 'error `(error ,(point) "TOO LOW NUMBER")))
+                          (when (> number 999)
+                            (throw 'error `(error ,(point) "TOO HIGH NUMBER")))
+                          (push number elements))))
 
-                                   ;; Unknown character
-                                   (t (throw 'error `(error ,(point) "unexpected character"))))))))
-                          (reverse elements))))
+                     ;; Unknown character
+                     (t (throw 'error `(error ,(point) "unexpected character"))))))))
+            (reverse elements))))
       (catch 'error (parse-element t)))))
 
 (defconst asm-blox-base-operations
@@ -1331,7 +1349,7 @@ cell-runtime but rather the in-between row/col."
           (when recieve-val
             (asm-blox--remove-value-from-direction from-cell opposite-port)
             (asm-blox--cell-sink-move-point sink recieve-val))))
-      
+
       ;; Next consume inputPort
       (when .inputPort
         (let* ((port-sym (intern (upcase .inputPort)))
@@ -1354,7 +1372,7 @@ cell-runtime but rather the in-between row/col."
            cell-runtime
            (intern (upcase .charAtPort))
            (aref text (1- point)))))
-      
+
       (when .pointPort
         (let* ((port-sym (intern (upcase .pointPort)))
                (val (asm-blox--get-value-from-direction cell-runtime port-sym))
@@ -1491,12 +1509,12 @@ cell-runtime but rather the in-between row/col."
       (throw 'error `(error 0 "missing inputPorts")))
     (when (eql input-ports ':null)
       (throw 'error `(error 0 "inputPorts is empty")))
-    
+
     (when (not output-port)
       (throw 'error `(error 0 "missing outputPort")))
     (when (eql output-port ':null)
       (throw 'error `(error 0 "outputPort is empty"))) ;; TODO: test this
-    
+
     (when (and size-port (or (eql size-port ':null)
                              (not (asm-blox--portp (upcase size-port)))))
       (throw 'error `(error 0 "invalid sizePort")))
@@ -1515,7 +1533,7 @@ cell-runtime but rather the in-between row/col."
         (set-point-port (cdr (assoc 'setPointPort spec)))
         (char-at-point (cdr (assoc 'charAtPoint spec)))
         (point-port (cdr (assoc 'pointPort spec))))
-    
+
     (asm-blox--verify-port "inputPort" input-port)
     (asm-blox--verify-port "setPointPort" set-point-port)
     (asm-blox--verify-port "charAtPoint" char-at-point)
