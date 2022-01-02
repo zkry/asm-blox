@@ -1934,13 +1934,13 @@ of the board or very right.  TYPE will either be source or sink."
                      (progn
                        (insert (propertize (char-to-string box-top-left)
                                            'font-lock-face
-                                           '(:foreground "red")))
+                                           'asm-blox-error-face))
                        (insert (propertize box-line-top-bottom
                                            'font-lock-face
-                                           '(:foreground "red")))
+                                           'asm-blox-error-face))
                        (insert (propertize (char-to-string box-top-right)
                                            'font-lock-face
-                                           '(:foreground "red"))))
+                                           'asm-blox-error-face)))
                    (insert box-top-left)
                    (insert box-line-top-bottom)
                    (insert box-top-right))
@@ -1958,13 +1958,13 @@ of the board or very right.  TYPE will either be source or sink."
                  (if err
                      (progn (insert (propertize (char-to-string box-bottom-left)
                                                 'font-lock-face
-                                                '(:foreground "red")))
+                                                'asm-blox-error-face))
                             (insert (propertize box-line-top-bottom
                                                 'font-lock-face
-                                                '(:foreground "red")))
+                                                'asm-blox-error-face))
                             (insert (propertize (char-to-string box-bottom-right)
                                                 'font-lock-face
-                                                '(:foreground "red"))))
+                                                'asm-blox-error-face)))
                    (insert box-bottom-left)
                    (insert box-line-top-bottom)
                    (insert box-bottom-right))
@@ -2033,7 +2033,7 @@ of the board or very right.  TYPE will either be source or sink."
                  (if err
                      (insert (propertize (char-to-string box-vertical)
                                          'font-lock-face
-                                         '(:foreground "red")))
+                                         'asm-blox-error-face))
                    (insert box-vertical))
                  (when (= box-row 0)
                    (puthash (list row col)
@@ -2073,14 +2073,14 @@ of the board or very right.  TYPE will either be source or sink."
                                                    'asm-blox-text-type
                                                    `(box-end ,row ,col)
                                                    'font-lock-face
-                                                   '(:foreground "red"))
+                                                   'asm-blox-error-face)
                                      (propertize (char-to-string box-vertical)
                                                  'asm-blox-text-type
                                                  `(box-end ,row ,col))))
                                   (err
                                    (propertize (char-to-string box-vertical)
                                                'font-lock-face
-                                               '(:foreground "red")))
+                                               'asm-blox-error-face))
                                   (t
                                    (char-to-string box-vertical)))))
                    (insert pipe-str)))
@@ -2272,7 +2272,7 @@ of the board or very right.  TYPE will either be source or sink."
           (put-text-property (point)
                              (1+ (point))
                              'font-lock-face
-                             'asm-blox-error-face))))))
+                             '(:underline (:color "red" :style wave))))))))
 
 (defun asm-blox-redraw-game-board ()
   "Erase the buffer and redraw it."
