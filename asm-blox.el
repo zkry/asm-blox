@@ -1691,13 +1691,13 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                                  (truncate-string-to-width description 60
                                                            nil nil t))))
           (insert (propertize line-str 'asm-blox-puzzle-selection-id name))
-          (let ((saved-file-ct (asm-blox--saved-puzzle-ct-by-id name)))
-            (dotimes (i saved-file-ct)
+          (let ((saved-file-ids (asm-blox--saved-puzzle-ct-ids name)))
+            (dolist (i saved-file-ids)
               (insert
-               (propertize (format "[%d]" (1+ i))
+               (propertize (format "[%d]" i)
                            'asm-blox-puzzle-selection-id name
                            'asm-blox-puzzle-selection-filename
-                           (asm-blox--make-puzzle-idx-file-name name (1+ i))))
+                           (asm-blox--make-puzzle-idx-file-name name i)))
               (insert (propertize " " 'asm-blox-puzzle-selection-id name)))))
         (insert "\n")))))
 

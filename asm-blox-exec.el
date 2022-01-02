@@ -1129,7 +1129,8 @@ cell-runtime but rather the in-between row/col."
          (puzzle-files (seq-filter (lambda (file-name)
                                      (string-prefix-p name file-name))
                                    dir-files))
-         (new-idx (number-to-string (1+ (length puzzle-files)))))
+         (last-id (car (reverse (asm-blox--saved-puzzle-ct-ids name))))
+         (new-idx (number-to-string (1+ last-id))))
     (expand-file-name (concat name "-" new-idx ".asbx")
                       asm-blox-save-directory-name)))
 
@@ -1169,11 +1170,14 @@ cell-runtime but rather the in-between row/col."
           (error "No puzzle with name %s found" puzzle))
         (setq asm-blox--extra-gameboard-cells (funcall puzzle))))))
 
-(defun asm-blox--saved-puzzle-ct-by-id (id)
-  "Return the number of saved puzzles that start with the puzzle ID."
-  (length (seq-filter (lambda (file-name)
-                        (string-prefix-p id file-name))
-                      (directory-files asm-blox-save-directory-name))))
+(defun asm-blox--saved-puzzle-ct-ids (id)
+  "Return saved puzzle ids that start with the puzzle ID."
+  (let ((ids))
+    (dolist (file-name (directory-files asm-blox-save-directory-name))
+      (when (string-match (concat "\\`" (regexp-quote id) "-\\([0-9]+\\)") file-name)
+        (let ((id-val (string-to-number (match-string 1 file-name))))
+          (setq ids (cons id-val ids)))))
+    (sort ids #'<)))
 
 (defun asm-blox--make-puzzle-idx-file-name (id idx)
   "Create a file name for puzzle with ID and IDX."

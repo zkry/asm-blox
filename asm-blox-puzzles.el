@@ -56,28 +56,103 @@
                            0)
                        (setq switched nil)
                        a))
-                   nums breaks)))
+              nums breaks)))
 
-(defun asm-blox--problem--indentation ()
-  "Generate a problem of indenting a code sequence properly."
-  (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 40 nil)))
-         (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
+(defun asm-blox--problem--triangle-area ()
+  "Generate a problem of determining area of triangle."
+  (let* ((bases (seq-map (lambda (_) (* (1+ (random 10)) 2)) (make-list 40 nil)))
+         (heights (seq-map (lambda (_) (1+ (random 20))) (make-list 40 nil)))
+         (areas (seq-mapn (lambda (b h) (/ (* b h) 2)) bases heights)))
     (asm-blox--problem-spec-create
-     :name "Indentation I"
-     :difficulty 'medium
+     :name "Triangle Area"
+     :difficulty 'easy
+     :sources (list (asm-blox--cell-source-create :row 3
+                                                  :col 2
+                                                  :data bases
+                                                  :idx 0
+                                                  :name "B")
+                    (asm-blox--cell-source-create :row 1
+                                                  :col 4
+                                                  :data heights
+                                                  :idx 0
+                                                  :name "H"))
      :sinks
      (list (asm-blox--cell-sink-create
-            :row 2
-            :col 4
-            :expected-data expected-output
+            :row -1
+            :col 1
+            :expected-data areas
+            :idx 0
+            :name "A"))
+     :description "Read base and height of a right-triangle
+from B and H respectively.  Send the area of right-triangle to A")))
+
+(defun asm-blox--problem--delete-word ()
+  "Generate a problem of deleting a word."
+  (let* ((words '("chair" "pen" "book" "camera" "note" "printer" "cable"
+                  "square" "thought" "mouse" "alarm" "case" "lamp" "bed"))
+         (word-ct (length words))
+         (random-line (lambda ()
+                        ))
+         (l1 (string-join (list (nth (random word-ct) words)
+                                           (nth (random word-ct) words)
+                                           (nth (random word-ct) words)) " "))
+         (l2 (string-join (list (nth (random word-ct) words)
+                                           (nth (random word-ct) words)
+                                           (nth (random word-ct) words)) " "))
+         (l3 (string-join (list (nth (random word-ct) words)
+                                           (nth (random word-ct) words)
+                                           (nth (random word-ct) words)) " "))
+         (text (string-join (list l1 l2 l3) "\n"))
+         (del-idx (random 9))
+         (new-text (with-temp-buffer
+                     (insert text)
+                     (goto-char (point-min))
+                     (dotimes (_ del-idx)
+                       (forward-word 1)
+                       (forward-char 1))
+                     (kill-word 1)
+                     (buffer-string))))
+    (asm-blox--problem-spec-create
+     :name "Delete Word"
+     :difficulty 'hard
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 3
+                                                  :data (list del-idx)
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create
+            :row 1
+            :col 5
+            :expected-data nil
             :idx 0
             :name "O"
-            :default-editor-text
-            "func main () {\nfmt.Println(\"hello world\")\nreturn\n}"
-            :editor-point 1
+            :default-editor-text text
+            :editor-point 0
             :expected-text
-            "func main () {\n  fmt.Println(\"hello world\")\n  return\n}"))
-     :description "<editor> Edit text to match the target.")))
+            new-text))
+     :description "<editor> Read 0-based index from I. Delete
+that number word in the text.")))
+
+;; TODO: give different inputs
+(defun asm-blox--problem--indentation ()
+  "Generate a problem of indenting a code sequence properly."
+  (asm-blox--problem-spec-create
+   :name "Indentation I"
+   :difficulty 'medium
+   :sinks
+   (list (asm-blox--cell-sink-create
+          :row 1
+          :col 5
+          :expected-data nil
+          :idx 0
+          :name "O"
+          :default-editor-text
+          "func main () {\nfmt.Println(\"hello world\")\nreturn\n}"
+          :editor-point 1
+          :expected-text
+          "func main () {\n  fmt.Println(\"hello world\")\n  return\n}"))
+   :description "<editor> Edit text to match the target."))
 
 (defun asm-blox--problem--number-sum ()
   "Generate a problem of calculating y=x(x+1)/2."
@@ -226,8 +301,8 @@ upcasing it if it is a lowercase letter.")))
                                       :name "O"))
      :description
      "Return the number of times subsequent values of I increase.
-ex. 1  2  0  5  6  4
-     +  -  +  +  -     3 increses")))
+ex. 1 2 0 5 6 4
+     + - + + -     3 increses")))
 
 (defun asm-blox--problem--tax ()
   "Generate a simple tax problem."
@@ -561,7 +636,9 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
                          #'asm-blox--problem--hello-world
                          #'asm-blox--problem--simple-graph
                          #'asm-blox--problem--meeting-point
-                         #'asm-blox--problem--turing))
+                         #'asm-blox--problem--turing
+                         #'asm-blox--problem--delete-word
+                         #'asm-blox--problem--triangle-area))
 
 (defun asm-blox--get-puzzle-by-id (name)
   "Given a puzzle NAME, return tis puzzle generation function."
