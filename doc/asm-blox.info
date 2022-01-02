@@ -260,7 +260,9 @@ File: asm-blox.info,  Node: Stack Commands,  Next: Numeric Commands,  Prev: Exec
 5.2 Stack Commands
 ==================
 
-   * `const' _number_: Pushes _number_ onto the stack.
+   * `const' _number_: Pushes _number_ onto the stack.  Note that
+     numbers may be in the form of a ASCII character (ex. `?a' for the
+     character a)
 
    * `set' _stack-offset_: Sets the stack item at _stack-offset_ to the
      value at the top of the stack, popping it.
@@ -688,18 +690,18 @@ Node: Execution5297
 Node: WAT Command Set6146
 Node: Execution Model of WAT Cells6606
 Node: Stack Commands7456
-Node: Numeric Commands8346
-Node: Boolean Operations9232
-Node: Comparison Operations9840
-Node: Other Operations11080
-Node: Port Operations11271
-Node: Blocks and Loops12013
-Node: YAML Blocks14048
-Node: Stack Cells14734
-Node: Heap Cells15954
-Node: Controller Cells and Editor Problems16708
-Node: Editing Commands18654
-Node: Undo and Redo19830
-Node: Advanced editing20193
+Node: Numeric Commands8446
+Node: Boolean Operations9332
+Node: Comparison Operations9940
+Node: Other Operations11180
+Node: Port Operations11371
+Node: Blocks and Loops12113
+Node: YAML Blocks14148
+Node: Stack Cells14834
+Node: Heap Cells16054
+Node: Controller Cells and Editor Problems16808
+Node: Editing Commands18754
+Node: Undo and Redo19930
+Node: Advanced editing20293
 
 End Tag Table

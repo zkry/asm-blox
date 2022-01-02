@@ -150,7 +150,9 @@ General Public License for more details.
 
 ** Stack Commands
 
-   - ~const~ /number/: Pushes /number/ onto the stack.
+   - ~const~ /number/: Pushes /number/ onto the stack.  Note that
+     numbers may be in the form of a ASCII character (ex. ~?a~ for the
+     character a)
 
    - ~set~ /stack-offset/: Sets the stack item at /stack-offset/ to
      the value at the top of the stack, popping it.
