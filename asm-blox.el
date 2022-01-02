@@ -33,7 +33,7 @@
 
 (require 'cl-lib)
 (require 'seq)
-(require 'asm-blox-exec)
+(require 'yaml)
 (require 'asm-blox-puzzles)
 
 (defconst asm-blox-box-height 12
@@ -118,7 +118,6 @@ The format of the error is (list message row column).")
           (or (<= ?a c ?z)
               (<= ?A c ?Z)
               (= ?_ c)))
-         (digit-char-p (c) (<= ?0 c ?9))
          (parse-element
           (&optional top-level)
           (let ((elements '()))
@@ -178,11 +177,11 @@ The format of the error is (list message row column).")
                           (push symbol elements))))
 
                      ;; digit
-                     ((or (digit-char-p at-char) (eql at-char ?-))
+                     ((or (cl-digit-char-p at-char) (eql at-char ?-))
                       (let ((start (point)))
                         (forward-char 1)
                         (while (and (not (eobp))
-                                    (digit-char-p (current-char)))
+                                    (cl-digit-char-p (current-char)))
                           (forward-char 1))
                         (let ((number (string-to-number
                                        (buffer-substring-no-properties
@@ -415,10 +414,22 @@ The format of the error is (list message row column).")
 
              (t `(error ,start-pos ,(format "Bad cmd: %s " first-child)))))))))))
 
+(defun asm-blox--flatten-list (tree)
+  "Return a \"flattened\" copy of TREE. Copied from Emacs 27.1."
+  (let (elems)
+    (while (consp tree)
+      (let ((elem (pop tree)))
+        (while (consp elem)
+          (push (cdr elem) tree)
+          (setq elem (car elem)))
+        (if elem (push elem elems))))
+    (if tree (push tree elems))
+    (nreverse elems)))
+
 (defun asm-blox--parse-tree-to-asm (parse)
   "Generate game bytecode from tree of PARSE, resolving labels."
   (catch 'error
-    (let ((asm (flatten-list (asm-blox--parse-tree-to-asm* parse))))
+    (let ((asm (asm-blox--flatten-list (asm-blox--parse-tree-to-asm* parse))))
       (asm-blox--resolve-labels asm)
       asm)))
 
@@ -3336,6 +3347,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
     (asm-blox-puzzle-selection-mode)
     (asm-blox-puzzle-selection-prepare-buffer)
     (goto-char (point-min))))
+
+(require 'asm-blox-puzzles)
 
 (provide 'asm-blox)
 

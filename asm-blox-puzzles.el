@@ -24,8 +24,6 @@
 
 ;;; Code:
 
-(require 'asm-blox-exec)
-
 (defun asm-blox-puzzles-list-of-lists-to-lisp (lists)
   "Return a list of LISTS from 0-terminated list of number lists."
   (thread-last (list '() '())
