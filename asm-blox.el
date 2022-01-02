@@ -957,9 +957,9 @@ This logic  is needed to display current command properly."
   "Return the register value for the DIRECTION registers at ROW, COL.
 ROW and COL here do not refer to the coordinates of a
 cell-runtime but rather the in-between row/col."
-  (assert (or (eql 'LEFT direction) (eql 'RIGHT direction)))
-  (assert (<= 0 row (1- asm-blox--gameboard-row-ct)))
-  (assert (<= 0 col asm-blox--gameboard-col-ct))
+  (cl-assert (or (eql 'LEFT direction) (eql 'RIGHT direction)))
+  (cl-assert (<= 0 row (1- asm-blox--gameboard-row-ct)))
+  (cl-assert (<= 0 col asm-blox--gameboard-col-ct))
   (let ((cell-col (if (eql 'RIGHT direction) (1- col) col)))
     (cond
      ;; outputs are never displayed on the board
@@ -980,9 +980,9 @@ cell-runtime but rather the in-between row/col."
   "Return the register value for the DIRECTION registers at ROW, COL.
 ROW and COL here do not refer to the coordinates of a
 cell-runtime but rather the in-between row/col."
-  (assert (or (eql 'UP direction) (eql 'DOWN direction)))
-  (assert (<= 0 row asm-blox--gameboard-row-ct))
-  (assert (<= 0 col (1- asm-blox--gameboard-col-ct)))
+  (cl-assert (or (eql 'UP direction) (eql 'DOWN direction)))
+  (cl-assert (<= 0 row asm-blox--gameboard-row-ct))
+  (cl-assert (<= 0 col (1- asm-blox--gameboard-col-ct)))
   (let ((cell-row (if (eql 'DOWN direction) (1- row) row)))
     (cond
      ((or (and (= row 0) (eql direction 'UP))
@@ -1653,12 +1653,6 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
 ;;; Display Code ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defface asm-blox-error-face
-  '((((class color) (background light)) (:foreground "DarkGoldenrod4"))
-    (((class color) (background dark))  (:foreground "DarkGoldenrod1")))
-  "?"
-  :group 'asm-blox)
-
 (defface asm-blox-show-paren-match-face
   '((t (:inherit show-paren-match)))
   "`asm-blox-mode' face used for a matching paren pair."
@@ -1667,6 +1661,16 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
 (defface asm-blox-region-face
   '((t (:inherit region)))
   "`asm-blox-mode' face used for a matching paren pair."
+  :group 'asm-blox)
+
+(defface asm-blox-highlight-face
+  '((t (:inherit underline)))
+  "`asm-blox-mode' face used for highlighting executing code."
+  :group 'asm-blox)
+
+(defface asm-blox-error-face
+  '((t (:inherit error)))
+  "`asm-blox-mode' face used for displaying errors."
   :group 'asm-blox)
 
 (defvar asm-blox--widget-row-idx nil)
@@ -2268,7 +2272,7 @@ of the board or very right.  TYPE will either be source or sink."
           (put-text-property (point)
                              (1+ (point))
                              'font-lock-face
-                             '(:underline (:color "red" :style wave))))))))
+                             'asm-blox-error-face))))))
 
 (defun asm-blox-redraw-game-board ()
   "Erase the buffer and redraw it."
@@ -2771,7 +2775,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (define-key map (kbd "<s-down>") #'asm-blox-shift-box-down)
       (define-key map (kbd "<s-left>") #'asm-blox-shift-box-left)
       (define-key map (kbd "<s-right>") #'asm-blox-shift-box-right)
-      (define-key map [remap undo] #'asm-blox--undo)
+      (define-key map [remap undo] #'asm-blox-undo)
       (define-key map (kbd "C-w") #'asm-blox-kill-region)
       (define-key map (kbd "M-w") #'asm-blox-copy-region)
       (define-key map (kbd "C-y") #'asm-blox-yank))))
@@ -2865,7 +2869,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                    (hl-lines (split-string hl-text "\n")))
               (while hl-lines
                 (put-text-property (point) (+ (point) (length (car hl-lines)))
-                                   'font-lock-face '(:background "#555"))
+                                   'font-lock-face 'asm-blox-highlight-face)
                 (let ((at-col (current-column)))
                   (forward-line 1)
                   (move-to-column at-col)
@@ -2941,7 +2945,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                (row (car coords))
                (col (cadr coords))
                (asm (cdr parse)))
-          (assert (numberp col))
+          (cl-assert (numberp col))
           (asm-blox--set-cell-asm-at-row-col row col asm)))
       (asm-blox--backup-file-for-current-buffer)
       (asm-blox--reset-extra-gameboard-cells-state)
