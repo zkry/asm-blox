@@ -205,7 +205,7 @@ This should normally be called when the point is at the end of the display."
   "Set the contents of each cell to the empty string."
   (setq asm-blox-box-contents (make-hash-table :test 'equal))
   (dotimes (row 3)
-    (dotimes (col asm-blox-column-ct)
+    (dotimes (col asm-blox--gameboard-col-ct)
       (puthash (list row col) "" asm-blox-box-contents))))
 
 (defun asm-blox--swap-box-contents (row-1 col-1 row-2 col-2)
@@ -305,7 +305,7 @@ of the board or very right.  TYPE will either be source or sink."
              "Draw the  ┌───┐┌───┐┌───┐┌───┐ part of the board."
              (insert space-start)
              (insert space-between)
-             (dotimes (col asm-blox-column-ct)
+             (dotimes (col asm-blox--gameboard-col-ct)
                (let ((err (asm-blox--get-error-at-cell row col)))
                  (if err
                      (progn
@@ -330,7 +330,7 @@ of the board or very right.  TYPE will either be source or sink."
              "Draw the  └───┘└───┘└───┘└───┘ part of the board. "
              (insert space-start)
              (insert space-between)
-             (dotimes (col asm-blox-column-ct)
+             (dotimes (col asm-blox--gameboard-col-ct)
                (let ((err (asm-blox--get-error-at-cell row col)))
                  (if err
                      (progn (insert (propertize (char-to-string box-bottom-left)
@@ -358,7 +358,7 @@ of the board or very right.  TYPE will either be source or sink."
                      (1+ (- (length box-line-top-bottom) 2 left-of-arrows-len))))
                (insert space-start)
                (insert space-between)
-               (dotimes (col asm-blox-column-ct)
+               (dotimes (col asm-blox--gameboard-col-ct)
                  (insert (make-string left-of-arrows-len ?\s))
                  (let ((sink-char (asm-blox--row-arrow-label-display position
                                                                     'sink
@@ -405,7 +405,7 @@ of the board or very right.  TYPE will either be source or sink."
                  (insert display)))
               (t (insert space-between)))
              ;; Draw each box column
-             (dotimes (col asm-blox-column-ct)
+             (dotimes (col asm-blox--gameboard-col-ct)
                (let ((err (asm-blox--get-error-at-cell row col)))
                  (if err
                      (insert (propertize (char-to-string box-vertical)
@@ -461,7 +461,7 @@ of the board or very right.  TYPE will either be source or sink."
                                   (t
                                    (char-to-string box-vertical)))))
                    (insert pipe-str)))
-               (when (< col (1- asm-blox-column-ct))
+               (when (< col (1- asm-blox--gameboard-col-ct))
                  (cond
                   ((= 4 box-row)
                    (let ((display (asm-blox--col-register-display row
@@ -482,7 +482,7 @@ of the board or very right.  TYPE will either be source or sink."
              (cond
               ((= 4 box-row)
                (let ((display (asm-blox--col-register-display row
-                                                             asm-blox-column-ct
+                                                             asm-blox--gameboard-col-ct
                                                              'RIGHT)))
                  (insert display)))
               ((= 5 box-row)
@@ -505,7 +505,7 @@ of the board or very right.  TYPE will either be source or sink."
                      (insert "  ")))))
               ((= 8 box-row)
                (let ((display (asm-blox--col-register-display row
-                                                             asm-blox-column-ct
+                                                             asm-blox--gameboard-col-ct
                                                              'LEFT)))
                  (insert display)))
               (t
@@ -528,7 +528,7 @@ of the board or very right.  TYPE will either be source or sink."
                                                       ?\s)))
                (insert space-start)
                (insert space-between)
-               (dotimes (col asm-blox-column-ct)
+               (dotimes (col asm-blox--gameboard-col-ct)
                  (insert padding-space-left)
                  ;; logic to display arrow and contnents
                  (let* ((up-arrow-display
@@ -1086,8 +1086,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
              (row (car box-id))
              (col (cadr box-id))
-             (next-col (if (= col (1- asm-blox-column-ct)) 0 (1+ col)))
-             (next-row (if (= col (1- asm-blox-column-ct)) (1+ row) row))
+             (next-col (if (= col (1- asm-blox--gameboard-col-ct)) 0 (1+ col)))
+             (next-row (if (= col (1- asm-blox--gameboard-col-ct)) (1+ row) row))
              (next-row (if (= next-row asm-blox--gameboard-row-ct) 0 next-row)))
         (asm-blox--move-to-box next-row next-col)
         (asm-blox--move-point-to-end-of-box-content))
@@ -1107,7 +1107,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
              (row (car box-id))
              (col (cadr box-id))
-             (next-col (if (= col 0) (1- asm-blox-column-ct) (1- col)))
+             (next-col (if (= col 0) (1- asm-blox--gameboard-col-ct) (1- col)))
              (next-row (if (= col 0) (1- row) row))
              (next-row (if (= next-row -1)
                            (1- asm-blox--gameboard-row-ct)
@@ -1385,14 +1385,14 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
 (cl-defstruct (asm-blox--undo-state
                (:constructor asm-blox--undo-state-create)
                (:copier nil))
-  "Struct representing a undo-state."
+  "Struct representing an undo-state."
   text box-row box-col redo-list)
 
 (defun asm-blox--initialize-undo-stacks ()
   "Initialize all undo-stacks to be empty."
   (setq asm-blox--undo-stacks (make-hash-table :test 'equal))
   (dotimes (row 3)
-    (dotimes (col asm-blox-column-ct)
+    (dotimes (col asm-blox--gameboard-col-ct)
       (let* ((current-value (asm-blox--get-box-content row col)))
         (puthash (list row col)
                  (list (asm-blox--undo-state-create :text current-value

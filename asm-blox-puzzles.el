@@ -26,7 +26,7 @@
 
 (require 'asm-blox-exec)
 
-(defun asm-blox--problem-list-of-lists-to-lisp (lists)
+(defun asm-blox-puzzles-list-of-lists-to-lisp (lists)
   "Return a list of LISTS from 0-terminated list of number lists."
   (thread-last (list '() '())
     (seq-reduce (lambda (acc x)
@@ -39,7 +39,7 @@
     (car)
     (reverse)))
 
-(defun asm-blox--problem-random-list-of-lists ()
+(defun asm-blox-puzzles-random-list-of-lists ()
   "Generate list of 0-terminated lists as helper."
   (let* ((nums (seq-map (lambda (_) (random 999)) (make-list 40 nil)))
          (breaks (seq-map (lambda (_) (random 5)) (make-list 40 nil)))
@@ -58,7 +58,7 @@
                        a))
               nums breaks)))
 
-(defun asm-blox--problem--triangle-area ()
+(defun asm-blox-puzzles--triangle-area ()
   "Generate a problem of determining area of triangle."
   (let* ((bases (seq-map (lambda (_) (* (1+ (random 10)) 2)) (make-list 40 nil)))
          (heights (seq-map (lambda (_) (1+ (random 20))) (make-list 40 nil)))
@@ -86,7 +86,7 @@
      :description "Read base and height of a right-triangle
 from B and H respectively.  Send the area of right-triangle to A")))
 
-(defun asm-blox--problem--delete-word ()
+(defun asm-blox-puzzles--delete-word ()
   "Generate a problem of deleting a word."
   (let* ((words '("chair" "pen" "book" "camera" "note" "printer" "cable"
                   "square" "thought" "mouse" "alarm" "case" "lamp" "bed"))
@@ -135,7 +135,7 @@ from B and H respectively.  Send the area of right-triangle to A")))
 that number word in the text.")))
 
 ;; TODO: give different inputs
-(defun asm-blox--problem--indentation ()
+(defun asm-blox-puzzles--indentation ()
   "Generate a problem of indenting a code sequence properly."
   (asm-blox--problem-spec-create
    :name "Indentation I"
@@ -154,7 +154,7 @@ that number word in the text.")))
           "func main () {\n  fmt.Println(\"hello world\")\n  return\n}"))
    :description "<editor> Edit text to match the target."))
 
-(defun asm-blox--problem--number-sum ()
+(defun asm-blox-puzzles--number-sum ()
   "Generate a problem of calculating y=x(x+1)/2."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 40 nil)))
          (expected-output (seq-map (lambda (x) (/ (* x (+ 1 x)) 2))input)))
@@ -178,7 +178,7 @@ that number word in the text.")))
      :description "Read a number from I, send to O the sum of numbers
 from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
 
-(defun asm-blox--problem--meeting-point ()
+(defun asm-blox-puzzles--meeting-point ()
   "Generate a problem of finding the point that minimizes movement."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
          (expected-output
@@ -207,7 +207,7 @@ Send a number x which minimizes the equation
 (cl-loop for n in N
          sum (abs (- n x)))")))
 
-(defun asm-blox--problem--simple-graph ()
+(defun asm-blox-puzzles--simple-graph ()
   "Generate a problem for the user to draw a simple graph."
   (let* ((input (seq-map (lambda (_) (+ 1 (random 10))) (make-list 10 nil)))
          (expected-text (string-join
@@ -233,7 +233,7 @@ Send a number x which minimizes the equation
      "<editor> Read a number from A,
  draw a line with that many '#' characters.")))
 
-(defun asm-blox--problem--hello-world ()
+(defun asm-blox-puzzles--hello-world ()
   "Generate a problem involving writing Hello World to the srceen."
   (asm-blox--problem-spec-create
    :name "Editor Basics"
@@ -250,7 +250,7 @@ Send a number x which minimizes the equation
                                     :expected-text "Hello World"))
    :description "<editor> Write the string \"Hello World\" to the editor."))
 
-(defun asm-blox--problem--upcase ()
+(defun asm-blox-puzzles--upcase ()
   "Generate a problem involving upcasing characters."
   (let* ((input-1 (seq-map (lambda (_)
                              (+ (random 95) 32))
@@ -273,7 +273,7 @@ Send a number x which minimizes the equation
      :description "Read a character from C and send it to O,
 upcasing it if it is a lowercase letter.")))
 
-(defun asm-blox--problem--inc-ct ()
+(defun asm-blox-puzzles--inc-ct ()
   "Generate a simple addition problem."
   (let* ((input-1 (append (seq-map (lambda (_)
                                      (random 999))
@@ -304,7 +304,7 @@ upcasing it if it is a lowercase letter.")))
 ex. 1 2 0 5 6 4
      + - + + -     3 increses")))
 
-(defun asm-blox--problem--tax ()
+(defun asm-blox-puzzles--tax ()
   "Generate a simple tax problem."
   (let* ((high-start-ct (random 20))
          (start-seq (seq-map (lambda (_) (random 999))
@@ -343,10 +343,10 @@ ex. 1 2 0 5 6 4
      "Read values from I. After the 12th consecutive value is greater than
 or equal to 500, return that 12th value divided by 40.")))
 
-(defun asm-blox--problem--list-reverse ()
+(defun asm-blox-puzzles--list-reverse ()
   "Generate a simple addition problem."
-  (let* ((input-1 (asm-blox--problem-random-list-of-lists))
-         (lists (asm-blox--problem-list-of-lists-to-lisp input-1))
+  (let* ((input-1 (asm-blox-puzzles-random-list-of-lists))
+         (lists (asm-blox-puzzles-list-of-lists-to-lisp input-1))
          (expected (flatten-list (seq-map (lambda (l)
                                        (append (reverse l) (list 0)))
                                      lists))))
@@ -368,7 +368,7 @@ or equal to 500, return that 12th value divided by 40.")))
      "Lists are 0 terminated.
 Read a list from L, reverse it, and send it to R (terminating it with 0).")))
 
-(defun asm-blox--problem--list-length ()
+(defun asm-blox-puzzles--list-length ()
   "Generate a simple addition problem."
   (let* ((nums)
          (lengths))
@@ -399,7 +399,7 @@ Read a list from L, reverse it, and send it to R (terminating it with 0).")))
      :description "Lists are 0 terminated. Read a list from I,
 calculate its length and send it to O.")))
 
-(defun asm-blox--problem--turing ()
+(defun asm-blox-puzzles--turing ()
   "Generate a simple Brain****-like puzzle."
   (let* ((input-1 (list ?> ?> ?> ?+ ?+ ?. ?. ?< ?+ ?. ?> ?. ?+ ?. ?> ?> ?.))
          (expected (list 2 2 1 2 3 0)))
@@ -429,7 +429,7 @@ NOTE The head will go no more than +-10 spaces
      from where the head starts off.")))
 
 
-(defun asm-blox--problem--merge-step ()
+(defun asm-blox-puzzles--merge-step ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-sort #'< (seq-map (lambda (_) (random 100))
                                          (make-list 20 nil))))
@@ -458,7 +458,7 @@ NOTE The head will go no more than +-10 spaces
      :description "Numbers in A and B are sorted. Read numbers from A and B,
 combine them sorted and send it them to C.")))
 
-(defun asm-blox--problem--filter ()
+(defun asm-blox-puzzles--filter ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 100)) (make-list 40 nil)))
          (expected (seq-map (lambda (x)
@@ -483,7 +483,7 @@ combine them sorted and send it them to C.")))
      :description
      "Read a value from I. If it is even send 0 to O, else send the value.")))
 
-(defun asm-blox--problem--clock ()
+(defun asm-blox-puzzles--clock ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 24)) (make-list 40 nil)))
          (expected (cdr (seq-reverse
@@ -512,7 +512,7 @@ that value to the current time which starts at 0.
 
 Write the current time to T for every time you move the current time.")))
 
-(defun asm-blox--problem--add ()
+(defun asm-blox-puzzles--add ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
@@ -545,7 +545,7 @@ Write the current time to T for every time you move the current time.")))
      :description
      "Take input from A, B, and C, add the three together, and send it to S.")))
 
-(defun asm-blox--problem--number-sorter ()
+(defun asm-blox-puzzles--number-sorter ()
   "Generate problem of comparing two numbers, send them in different places."
   (let* ((input-1 (seq-map (lambda (_) (random 10))
                            (make-list 40 nil)))
@@ -582,7 +582,7 @@ Write the current time to T for every time you move the current time.")))
      :description "Take an input from A and B. If A>B then send A to L, 0 to R;
 If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
-(defun asm-blox--problem--constant ()
+(defun asm-blox-puzzles--constant ()
   "Generate a simple addition problem."
   (let* ((expected (make-list 40 1)))
     (asm-blox--problem-spec-create
@@ -597,7 +597,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
                                       :name "N"))
      :description "Repeatedly send the number 1 to N. There are no inputs.")))
 
-(defun asm-blox--problem--identity ()
+(defun asm-blox-puzzles--identity ()
   "Generate a simple addition problem."
   (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (expected input-1))
@@ -619,26 +619,27 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      "Take an input from the input X and send it to the output X.")))
 
 (defvar asm-blox-puzzles (list
-                         #'asm-blox--problem--indentation
-                         #'asm-blox--problem--constant
-                         #'asm-blox--problem--identity
-                         #'asm-blox--problem--add
-                         #'asm-blox--problem--filter
-                         #'asm-blox--problem--number-sum
-                         #'asm-blox--problem--number-sorter
-                         #'asm-blox--problem--clock
-                         #'asm-blox--problem--tax
-                         #'asm-blox--problem--list-length
-                         #'asm-blox--problem--list-reverse
-                         #'asm-blox--problem--inc-ct
-                         #'asm-blox--problem--upcase
-                         #'asm-blox--problem--merge-step
-                         #'asm-blox--problem--hello-world
-                         #'asm-blox--problem--simple-graph
-                         #'asm-blox--problem--meeting-point
-                         #'asm-blox--problem--turing
-                         #'asm-blox--problem--delete-word
-                         #'asm-blox--problem--triangle-area))
+                         #'asm-blox-puzzles--indentation
+                         #'asm-blox-puzzles--constant
+                         #'asm-blox-puzzles--identity
+                         #'asm-blox-puzzles--add
+                         #'asm-blox-puzzles--filter
+                         #'asm-blox-puzzles--number-sum
+                         #'asm-blox-puzzles--number-sorter
+                         #'asm-blox-puzzles--clock
+                         #'asm-blox-puzzles--tax
+                         #'asm-blox-puzzles--list-length
+                         #'asm-blox-puzzles--list-reverse
+                         #'asm-blox-puzzles--inc-ct
+                         #'asm-blox-puzzles--upcase
+                         #'asm-blox-puzzles--merge-step
+                         #'asm-blox-puzzles--hello-world
+                         #'asm-blox-puzzles--simple-graph
+                         #'asm-blox-puzzles--meeting-point
+                         #'asm-blox-puzzles--turing
+                         #'asm-blox-puzzles--delete-word
+                         #'asm-blox-puzzles--triangle-area)
+  "List of puzzles to be loaded on puzzle selection page.")
 
 (defun asm-blox--get-puzzle-by-id (name)
   "Given a puzzle NAME, return tis puzzle generation function."

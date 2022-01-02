@@ -34,29 +34,42 @@
 (require 'seq)
 (require 'yaml)
 
-(defconst asm-blox-box-height 12)
-(defconst asm-blox-column-ct 4)
-(defconst asm-blox-box-width 20)
-(defconst asm-blox--gameboard-col-ct 4)
-(defconst asm-blox--gameboard-row-ct 3)
+(defconst asm-blox-box-height 12
+  "Height of an individual code block.")
+(defconst asm-blox-box-width 20
+  "Width of an individual code block.")
+(defconst asm-blox--gameboard-col-ct 4
+  "Amount of columns on a Asm-blox gameboard.")
+(defconst asm-blox--gameboard-row-ct 3
+  "Amount of rows on a Asm-blox gameboard.")
 
-(defvar-local asm-blox-box-contents nil)
-(defvar asm-blox--gameboard nil)
-(defvar-local asm-blox--extra-gameboard-cells nil)
+(defvar-local asm-blox-box-contents nil
+  "Hashtable containing the textual contents of the gameboard.
+Keys are in the form '(ROW COL).")
+
+(defvar asm-blox--gameboard nil
+  "Vector of combiled code-cells.")
+(defvar-local asm-blox--extra-gameboard-cells nil
+  "List of sources (ie puzzle input) and sinks (ie win conditions) of a game.")
 (defvar asm-blox--gameboard-state nil
   "Contains the state of the board whether it be victory or error.")
-(defvar asm-blox--parse-depth nil)
-(defvar asm-blox--branch-labels nil)
+
+(defvar asm-blox--parse-depth nil
+  "Dynamic variable used when parsing WAT to determine label references.")
+(defvar asm-blox--branch-labels nil
+  "Dynamic variable to store where lables which labels refer to which depths.")
 
 (defvar asm-blox-runtime-error nil
   "If non-nil, contains the runtime error encountered.
 The format of the error is (list message row column).")
 
-(defvar-local asm-blox-execution-origin-buffer nil)
+(defvar-local asm-blox-execution-origin-buffer nil
+  "The buffer where the execution buffer was created from.")
 
 (cl-defstruct (asm-blox-code-node
                (:constructor asm-blox--code-node-create)
                (:copier nil))
+  "Parsed sexp of code.  Used to keep track of start and end position in text."
   children start-pos end-pos)
 
 (defun asm-blox--parse-error-p (err)
@@ -1003,11 +1016,21 @@ cell-runtime but rather the in-between row/col."
 (cl-defstruct (asm-blox--cell-source
                (:constructor asm-blox--cell-source-create)
                (:copier nil))
+  "A provider of data to the gameboard.
+ROW and COL are expected to be off the board (ie less than 0 or
+greater than max).  DATA contains the numbers that will be feeded
+to the neighboring cell and IDX contains which datum is to be
+sent next.  NAME contains the letter that will be displayd on the board."
   row col data idx name)
 
 (cl-defstruct (asm-blox--cell-sink
                (:constructor asm-blox--cell-sink-create)
                (:copier nil))
+  "A consumber of data to detirmine winstate.
+A normal sink contains expected-data while an editor sink contains
+editor- values (and no data).  ERR-VAL is the incorrect value that was fed
+into the sink.  EDITOR-TEXT and EXPECTED-TEXT is the current text and target
+text respectively."
   row col expected-data idx name err-val
   default-editor-text
   editor-text editor-point expected-text)
@@ -1015,6 +1038,9 @@ cell-runtime but rather the in-between row/col."
 (cl-defstruct (asm-blox--problem-spec
                (:constructor asm-blox--problem-spec-create)
                (:copier nil))
+  "An entire definition of a gameboard.
+SOURCES and SINKS are the input and output of the game respectively.  NAME,
+DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   sources sinks name description difficulty)
 
 (defun asm-blox--reset-extra-gameboard-cells-state ()
