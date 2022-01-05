@@ -25,10 +25,4 @@
   created.  Back on the puzzle selection screen, you can view and open
   up saved files by pressing <kbd>RET</kbd> on the `[1]`-like text.
 
-  For the rest, you'll have to look at [the manual](./doc/asm-blox.pdf).
-
-
-# Configuration
-
-  - `asm-blox-save-directory-name`: the directory in which all puzzles
-    will be saved.
+  For the rest, you'll have to read [the manual](./doc/asm-blox.pdf).

@@ -1,5 +1,7 @@
 ;;; asm-blox.el --- Display code for asm-blox Game -*- lexical-binding: t -*-
 
+;; Copyright © 2021-2022 Zachary Romero <zkry@posteo.net>
+
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.0.1
@@ -42,6 +44,17 @@
 (require 'seq)
 (require 'yaml)
 (require 'asm-blox-puzzles)
+
+
+(defgroup asm-blox nil
+  "Programming game involving tiled WAT and YAML code cells."
+  :prefix "asm-blox-"
+  :group 'games)
+
+(defcustom asm-blox-save-directory-name (expand-file-name ".asm-blox" user-emacs-directory)
+  "The directory in which all puzzles will be saved and searched for."
+  :group 'asm-blox
+  :type 'directory)
 
 (defconst asm-blox-box-height 12
   "Height of an individual code block.")
@@ -1162,9 +1175,6 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
     top))
 
 ;;; File Saving ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defconst asm-blox-save-directory-name
-  (expand-file-name ".asm-blox" user-emacs-directory))
 
 (defun asm-blox--generate-new-puzzle-filename (name)
   "For puzzle NAME, determine the name for a new puzzle."
@@ -2955,18 +2965,19 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
         (asm-blox--create-execution-buffer box-contents extra-cells)
         (goto-char (point-min))))))
 
-(defun asm-blox-execution-mode ()
-  "Activate asm-blox execution mod."
-  (kill-all-local-variables)
-  (use-local-map asm-blox-execution-mode-map)
-  (setq mode-name "asm-blox-execution"
-        buffer-read-only t)
+(define-derived-mode asm-blox-execution-mode fundamental-mode "asm-blox-execution"
+  "Major mode for viewing the execution of an asm blox puzzle.
+
+The follwoing commadns are defined:
+
+\\{asm-blox-execution-mode-map}"
+  :syntax-table asm-blox-mode-syntax-table
+  (setq buffer-read-only t)
   (setq-local truncate-lines 0
               asm-blox--display-mode 'execute)
   (setq header-line-format "ASM-BLOX EXECUTION")
   (setq asm-blox-runtime-error nil)
-  (setq asm-blox--gameboard-state nil)
-  (set-syntax-table asm-blox-mode-syntax-table))
+  (setq asm-blox--gameboard-state nil))
 
 (defvar asm-blox--skip-initial-parsing nil
   "When non-nil, don't parse the initial gameboard.")
@@ -2974,16 +2985,21 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
 (defvar asm-blox--show-pair-idle-timer nil
   "Idle-timer for showing matching parenthesis.")
 
-(defun asm-blox-mode ()
-  "Activate asm-blox editing mode."
-  (interactive)
-  (kill-all-local-variables)
-  (use-local-map asm-blox-mode-map)
-  (setq mode-name "asm-blox"
-        buffer-read-only t)
+(define-derived-mode asm-blox-mode fundamental-mode "asm-blox"
+  "Major mode for editing asm-blox puzzles.
+
+This mode provides capabilities for editing asm-blox code.  Since
+asm-blox code is split into multiple cells, this mode in
+necessary to be able to edit such cells.  The mode defines
+editing functions as well as a function to compile and run the puzzle.
+
+The following commands are available:
+
+\\{asm-blox-mode-map}"
+  :syntax-table asm-blox-mode-syntax-table
+  (setq buffer-read-only t)
   (setq asm-blox-parse-errors nil)
   (setq-local truncate-lines 0)
-  (set-syntax-table asm-blox-mode-syntax-table)
   (unless asm-blox--skip-initial-parsing
     (condition-case nil
         (asm-blox--parse-saved-buffer)

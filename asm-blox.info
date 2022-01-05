@@ -29,6 +29,7 @@ Asm-Blox User Manual
 * WAT Command Set::
 * YAML Blocks::
 * Editing Commands::
+* Customizations::
 
 --- The Detailed Node Listing ---
 
@@ -596,7 +597,7 @@ in Emacs itself.  You can have multiple controllers in a game.
      position.
 
 
-File: asm-blox.info,  Node: Editing Commands,  Prev: YAML Blocks,  Up: Top
+File: asm-blox.info,  Node: Editing Commands,  Next: Customizations,  Prev: YAML Blocks,  Up: Top
 
 7 Editing Commands
 ******************
@@ -675,33 +676,47 @@ File: asm-blox.info,  Node: Advanced editing,  Prev: Undo and Redo,  Up: Editing
    * `asm-blox-yank' (bound `C-y'); paste the yanked region to the
      current code cell.
 
+
+File: asm-blox.info,  Node: Customizations,  Prev: Editing Commands,  Up: Top
+
+8 Customizations
+****************
+
+The following customization options exist
+
+   * `asm-blox-save-directory-name': The name of the directory in which
+     all puzzles will be saved.  Note that you can effectively start
+     from scratch, clearing your progress, by setting this to a new,
+     empty directory.
+
 
 
 Tag Table:
 Node: Top77
-Node: Introduction1371
-Node: Installation2180
-Node: Getting Started2368
-Node: Puzzle Selection2561
-Node: Saved Puzzles and Backups3025
-Node: Gameplay3600
-Node: Overview3758
-Node: Execution5297
-Node: WAT Command Set6146
-Node: Execution Model of WAT Cells6606
-Node: Stack Commands7456
-Node: Numeric Commands8446
-Node: Boolean Operations9332
-Node: Comparison Operations9940
-Node: Other Operations11180
-Node: Port Operations11371
-Node: Blocks and Loops12113
-Node: YAML Blocks14148
-Node: Stack Cells14834
-Node: Heap Cells16054
-Node: Controller Cells and Editor Problems16808
-Node: Editing Commands18754
-Node: Undo and Redo19930
-Node: Advanced editing20293
+Node: Introduction1390
+Node: Installation2199
+Node: Getting Started2387
+Node: Puzzle Selection2580
+Node: Saved Puzzles and Backups3044
+Node: Gameplay3619
+Node: Overview3777
+Node: Execution5316
+Node: WAT Command Set6165
+Node: Execution Model of WAT Cells6625
+Node: Stack Commands7475
+Node: Numeric Commands8465
+Node: Boolean Operations9351
+Node: Comparison Operations9959
+Node: Other Operations11199
+Node: Port Operations11390
+Node: Blocks and Loops12132
+Node: YAML Blocks14167
+Node: Stack Cells14853
+Node: Heap Cells16073
+Node: Controller Cells and Editor Problems16827
+Node: Editing Commands18773
+Node: Undo and Redo19972
+Node: Advanced editing20335
+Node: Customizations21418
 
 End Tag Table

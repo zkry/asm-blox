@@ -482,3 +482,12 @@ following code:
      region must be in the same code cell.
    - ~asm-blox-yank~ (bound ~C-y~); paste the yanked region to the
      current code cell.
+
+* Customizations
+
+  The following customization options exist
+
+  - ~asm-blox-save-directory-name~: The name of the directory in which
+    all puzzles will be saved.  Note that you can effectively start
+    from scratch, clearing your progress, by setting this to a new,
+    empty directory.
