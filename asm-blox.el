@@ -1186,7 +1186,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
                                      (string-prefix-p name file-name))
                                    dir-files))
          (last-id (car (reverse (asm-blox--saved-puzzle-ct-ids name))))
-         (new-idx (number-to-string (1+ last-id))))
+         (new-idx (number-to-string (1+ (or last-id 0)))))
     (expand-file-name (concat name "-" new-idx ".asbx")
                       asm-blox-save-directory-name)))
 
