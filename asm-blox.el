@@ -43,8 +43,6 @@
 (require 'cl-lib)
 (require 'seq)
 (require 'yaml)
-(require 'asm-blox-puzzles)
-
 
 (defgroup asm-blox nil
   "Programming game involving tiled WAT and YAML code cells."
