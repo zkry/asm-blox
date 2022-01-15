@@ -97,7 +97,7 @@ The format of the error is (list message row column).")
   (and (listp err) (eql 'error (car err))))
 
 (defun asm-blox--parse-cell (coords code)
-  "Parse a the CODE of a text box at COORDS.  This may be YAML or WAT."
+  "Parse a the CODE of a text box at COORDS, returning a cell runtime."
   (let* ((first-char
           (and (not (string-empty-p (string-trim code)))
                (substring-no-properties (string-trim-left code) 0 1)))
@@ -108,7 +108,18 @@ The format of the error is (list message row column).")
                     (string= first-char ")")
                     (string= first-char ";"))))
     (if wat-p
-        (asm-blox--parse-assembly code)
+        (let ((parse-tree (asm-blox--parse-assembly code)))
+          (if (asm-blox--parse-error-p parse-tree)
+              parse-tree
+            (let ((row (car coords))
+                  (col (cadr coords))
+                  (asm (asm-blox--parse-tree-to-asm parse-tree)))
+              (asm-blox--cell-runtime-create
+               :instructions asm
+               :pc 0
+               :stack '()
+               :row row
+               :col col))))
       (asm-blox--create-yaml-code-node (car coords) (cadr coords) code))))
 
 (defun asm-blox--parse-assembly (code)
@@ -537,21 +548,6 @@ cells have moved, the staging port becomes the current port."
                        nil)))
   (setf (aref asm-blox--gameboard (+ (* row asm-blox--gameboard-col-ct) col))
         cell-runtime))
-
-(defun asm-blox--set-cell-asm-at-row-col (row col asm)
-  "Create a runtime from ASM at set board cell at ROW, COL to it."
-  (let* ((asm (if (not (listp asm)) (list asm) asm))
-         (runtime (asm-blox--cell-runtime-create
-                   :instructions asm
-                   :pc 0
-                   :stack '()
-                   :row row
-                   :col col
-                   :up nil
-                   :down nil
-                   :left nil
-                   :right nil)))
-    (asm-blox--set-cell-at-row-col row col runtime)))
 
 (defun asm-blox--cell-at-moved-row-col (row col dir)
   "Return the item at the cell in the gameboard at position DIR from ROW,COL."
@@ -2854,7 +2850,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   "Syntax table for asm-blox mode.")
 
 (defun asm-blox--create-execution-buffer (box-contents extra-cells)
-  "Create a new un-editable gamebuffer for displaing execution of BOX-CONTENTS with EXTRA-CELLS."
+  "Create new gamebuffer to display execution of BOX-CONTENTS with EXTRA-CELLS."
   (let ((buffer (get-buffer-create "*asm-blox-execution*"))
         (origin-file-buffer (current-buffer)))
     (with-current-buffer buffer
@@ -2933,8 +2929,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   ;; parse the current buffer to make sure that the text we are
   ;; running is the actual text of the buffer.
   (setq asm-blox-parse-errors nil)
-  (let ((parse-errors)
-        (parses))
+  (let ((parse-errors))
     (maphash
      (lambda (coords code-text)
        (let ((parse-result (asm-blox--parse-cell coords code-text)))
@@ -2943,10 +2938,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
            (setq parse-errors (cons (cons coords parse-result) parse-errors)))
           ((asm-blox--cell-runtime-p parse-result)
            (asm-blox--set-cell-at-row-col (car coords) (cadr coords) parse-result))
-          (t (let ((asm (asm-blox--parse-tree-to-asm parse-result)))
-               (if (asm-blox--parse-error-p asm)
-                   (setq parse-errors (cons (cons coords asm) parse-errors)))
-               (setq parses (cons (cons coords asm) parses)))))))
+          (t (error "Unknown result from asm-blox--parse-cell %s" parse-result)))))
      asm-blox-box-contents)
     (if parse-errors
         (progn
@@ -2956,13 +2948,6 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (setq asm-blox-parse-errors nil)
       (let ((inhibit-read-only t))
         (asm-blox-redraw-game-board))
-      (dolist (parse parses)
-        (let* ((coords (car parse))
-               (row (car coords))
-               (col (cadr coords))
-               (asm (cdr parse)))
-          (cl-assert (numberp col))
-          (asm-blox--set-cell-asm-at-row-col row col asm)))
       (asm-blox--backup-file-for-current-buffer)
       (asm-blox--reset-extra-gameboard-cells-state)
       (asm-blox--create-widges-from-gameboard)
