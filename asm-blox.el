@@ -1913,106 +1913,125 @@ of the board or very right.  TYPE will either be source or sink."
                  (asm-blox--get-sink-name-at-position row col))))
     (or name " ")))
 
-(defun asm-blox-display-game-board ()
-  "Insert the characters of the board to the buffer."
-  (setq asm-blox--widget-row-idx 0)
-  (when (not (hash-table-p asm-blox--end-of-box-points))
-    (setq asm-blox--end-of-box-points (make-hash-table :test 'equal)))
-  (when (not (hash-table-p asm-blox--beginning-of-box-points))
-    (setq asm-blox--beginning-of-box-points (make-hash-table :test 'equal)))
-  (let* ((display-mode 'edit)
-         (arrow-up "↑")
-         (arrow-down "↓")
-         (arrow-right "→")
-         (arrow-left "←")
-         (box-horizontal ?─)
-         (box-vertical ?│)
-         (box-top-left ?┌)
-         (box-top-right ?┐)
-         (box-bottom-right ?┘)
-         (box-bottom-left ?└)
-         (space-start (make-string 6 ?\s))
-         (space-between (make-string 5 ?\s))
-         (box-line-top-bottom (make-string asm-blox-box-width box-horizontal))
-         (box-inside (make-string asm-blox-box-width ?\s)))
-    (let ((insert-row-top
-           (lambda (row)
-             "Draw the  ┌───┐┌───┐┌───┐┌───┐ part of the board."
-             (insert space-start)
-             (insert space-between)
-             (dotimes (col asm-blox--gameboard-col-ct)
-               (let ((err (asm-blox--get-error-at-cell row col)))
-                 (if err
-                     (progn
-                       (insert (propertize (char-to-string box-top-left)
-                                           'font-lock-face
-                                           'asm-blox-error-face))
-                       (insert (propertize box-line-top-bottom
-                                           'font-lock-face
-                                           'asm-blox-error-face))
-                       (insert (propertize (char-to-string box-top-right)
-                                           'font-lock-face
-                                           'asm-blox-error-face)))
-                   (insert box-top-left)
-                   (insert box-line-top-bottom)
-                   (insert box-top-right))
-                 (insert space-between)))
-             (when (eql asm-blox--display-mode 'execute)
-               (asm-blox--display-widget))
-             (insert "\n")))
-          (insert-row-bottom
-           (lambda (row)
-             "Draw the  └───┘└───┘└───┘└───┘ part of the board. "
-             (insert space-start)
-             (insert space-between)
-             (dotimes (col asm-blox--gameboard-col-ct)
-               (let ((err (asm-blox--get-error-at-cell row col)))
-                 (if err
-                     (progn (insert (propertize (char-to-string box-bottom-left)
-                                                'font-lock-face
-                                                'asm-blox-error-face))
-                            (insert (propertize box-line-top-bottom
-                                                'font-lock-face
-                                                'asm-blox-error-face))
-                            (insert (propertize (char-to-string box-bottom-right)
-                                                'font-lock-face
-                                                'asm-blox-error-face)))
-                   (insert box-bottom-left)
-                   (insert box-line-top-bottom)
-                   (insert box-bottom-right))
-                 (insert space-between)))
-             (when (eql asm-blox--display-mode 'execute)
-               (asm-blox--display-widget))
-             (insert "\n")))
-          (insert-v-border
-           (lambda (position)
-             "Draw the very top and very bottom lines."
-             (let* ((left-of-arrows-len
-                     (1+ (- (/ (length box-line-top-bottom) 2) 1)))
-                    (right-of-arrows-len
-                     (1+ (- (length box-line-top-bottom) 2 left-of-arrows-len))))
-               (insert space-start)
-               (insert space-between)
-               (dotimes (col asm-blox--gameboard-col-ct)
-                 (insert (make-string left-of-arrows-len ?\s))
-                 (let ((sink-char (asm-blox--row-arrow-label-display position
-                                                                    'sink
-                                                                    col))
-                       (source-char (asm-blox--row-arrow-label-display position
-                                                                      'source
-                                                                      col)))
-                   (if (eql position 'top)
-                       (insert (format "%s %s" sink-char source-char))
-                     (insert (format "%s %s" source-char sink-char))))
-                 (insert (make-string right-of-arrows-len ?\s))
-                 (insert space-between)))
-             (when (eql asm-blox--display-mode 'execute)
-               (asm-blox--display-widget))
-             (insert "\n")))
-          (insert-row-middle
-           (lambda (row box-row)
-             "Draw the ⇋|   |⇋|   |⇋|   |⇋|   |⇋ part of the board."
-             (insert space-start)
+;;; Display constants
+(defconst asm-blox-display-chars
+  (let ((hash (make-hash-table)))
+    (prog1 hash
+      (puthash :box-horizontal ?─ hash)
+      (puthash :box-vertical ?│ hash)
+      (puthash :box-top-left ?┌ hash)
+      (puthash :box-top-right ?┐ hash)
+      (puthash :box-bottom-right ?┘ hash)
+      (puthash :box-bottom-left ?└ hash))))
+
+(defconst asm-blox-display--arrow-up "↑")
+(defconst asm-blox-display--arrow-down "↓")
+(defconst asm-blox-display--arrow-right "→")
+(defconst asm-blox-display--arrow-left "←")
+(defconst asm-blox-display--space-start (make-string 6 ?\s))
+(defconst asm-blox-display--space-between (make-string 5 ?\s))
+(defconst asm-blox-display--box-line-top-bottom
+  (make-string asm-blox-box-width
+               (gethash :box-horizontal asm-blox-display-chars)))
+(defconst asm-blox-display--box-inside (make-string asm-blox-box-width ?\s))
+
+
+(defun asm-blox-display--insert-row-top (row)
+  "Draw the  ┌───┐┌───┐┌───┐┌───┐ part of the board for ROW."
+  (insert asm-blox-display--space-start)
+  (insert asm-blox-display--space-between)
+  (dotimes (col asm-blox--gameboard-col-ct)
+    (let ((err (asm-blox--get-error-at-cell row col)))
+      (if err
+          (progn
+            (insert
+             (propertize (char-to-string
+                          (gethash :box-top-left asm-blox-display-chars))
+                         'font-lock-face
+                         'asm-blox-error-face))
+            (insert
+             (propertize asm-blox-display--box-line-top-bottom
+                         'font-lock-face
+                         'asm-blox-error-face))
+            (insert
+             (propertize (char-to-string
+                          (gethash :box-top-right asm-blox-display-chars))
+                         'font-lock-face
+                         'asm-blox-error-face)))
+        (insert (gethash :box-top-left asm-blox-display-chars))
+        (insert asm-blox-display--box-line-top-bottom)
+        (insert (gethash :box-top-right asm-blox-display-chars)))
+      (insert asm-blox-display--space-between)))
+  (when (eql asm-blox--display-mode 'execute)
+    (asm-blox--display-widget))
+  (insert "\n"))
+
+(defun asm-blox-display--insert-row-bottom (row)
+  "Draw the  └───┘└───┘└───┘└───┘ part of the board for ROW."
+  (insert asm-blox-display--space-start)
+  (insert asm-blox-display--space-between)
+  (dotimes (col asm-blox--gameboard-col-ct)
+    (let ((err (asm-blox--get-error-at-cell row col)))
+      (if err
+          (progn (insert
+                  (propertize (gethash :box-bottom-left asm-blox-display-chars)
+                              'font-lock-face
+                              'asm-blox-error-face))
+                 (insert
+                  (propertize asm-blox-display--box-line-top-bottom
+                              'font-lock-face
+                              'asm-blox-error-face))
+                 (insert
+                  (propertize (gethash :box-bottom-right asm-lox-display-chars)
+                              'font-lock-face
+                              'asm-blox-error-face)))
+        (insert (gethash :box-bottom-left asm-blox-display-chars))
+        (insert asm-blox-display--box-line-top-bottom)
+        (insert (gethash :box-bottom-right asm-blox-display-chars)))
+      (insert asm-blox-display--space-between)))
+  (when (eql asm-blox--display-mode 'execute)
+    (asm-blox--display-widget))
+  (insert "\n"))
+
+(defun asm-blox-display--insert-v-border (position)
+  "Draw the very top line if POSITION equals `top', the bottom line otherwise."
+  (let* ((left-of-arrows-len
+          (1+ (- (/ (length asm-blox-display--box-line-top-bottom) 2) 1)))
+         (right-of-arrows-len
+          (1+ (- (length asm-blox-display--box-line-top-bottom)
+                 2
+                 left-of-arrows-len))))
+    (insert asm-blox-display--space-start)
+    (insert asm-blox-display--space-between)
+    (dotimes (col asm-blox--gameboard-col-ct)
+      (insert (make-string left-of-arrows-len ?\s))
+      (let ((sink-char (asm-blox--row-arrow-label-display position
+                                                          'sink
+                                                          col))
+            (source-char (asm-blox--row-arrow-label-display position
+                                                            'source
+                                                            col)))
+        (if (eql position 'top)
+            (insert (format "%s %s" sink-char source-char))
+          (insert (format "%s %s" source-char sink-char))))
+      (insert (make-string right-of-arrows-len ?\s))
+      (insert asm-blox-display--space-between)))
+  (when (eql asm-blox--display-mode 'execute)
+    (asm-blox--display-widget))
+  (insert "\n"))
+
+(defun asm-blox-display--insert-row-middle (row box-row)
+  "Draw the ⇋|   |⇋|   |⇋|   |⇋|   |⇋ part of the board.
+
+ROW is the global board row.  BOX-ROW is the row number of the
+individual box."
+  (let ((box-vertical (gethash :box-vertical asm-blox-display-chars))
+        (space-start asm-blox-display--space-start)
+        (space-between asm-blox-display--space-between)
+        (box-inside asm-blox-display--box-inside)
+        (arrow-right asm-blox-display--arrow-right)
+        (arrow-left asm-blox-display--arrow-left))
+    (insert space-start)
              (cond
               ((= 4 box-row)
                ;; NOTE: capital LEFT indicates arrow direction
@@ -2148,88 +2167,101 @@ of the board or very right.  TYPE will either be source or sink."
              (when (eql asm-blox--display-mode 'execute)
                (asm-blox--display-widget))
              (insert "\n")))
-          (insert-middle-row-space
-           (lambda (row)
-             "Draw the  ↑↓    ↑↓    ↑↓    ↑↓ part of the board."
-             (let* ((left-of-arrows-len (1+ (- (/ (length box-line-top-bottom)
-                                                  2)
-                                               1)))
-                    (right-of-arrows-len (1+ (- (length box-line-top-bottom)
-                                                2
-                                                left-of-arrows-len)))
-                    (padding-space-left (make-string (- left-of-arrows-len 5)
-                                                     ?\s))
-                    (padding-space-right (make-string (- right-of-arrows-len 5)
-                                                      ?\s)))
-               (insert space-start)
-               (insert space-between)
-               (dotimes (col asm-blox--gameboard-col-ct)
-                 (insert padding-space-left)
-                 ;; logic to display arrow and contnents
-                 (let* ((up-arrow-display
-                         (asm-blox--row-register-display row col 'UP))
-                        (down-arrow-display
-                         (asm-blox--row-register-display row col 'DOWN))
-                        (label-position (cond ((= 0 row) 'top)
-                                              ((= 3 row) 'bottom)
-                                              (t nil)))
-                        (source-label
-                         (and label-position
-                              (asm-blox--row-arrow-label-display
-                               label-position
-                               (if (eql label-position 'top)
-                                   'source 'sink)
-                               col)))
-                        (sink-label
-                         (and label-position
-                              (asm-blox--row-arrow-label-display
-                               label-position
-                               (if (eql label-position 'top)
-                                   'sink 'source)
-                               col))))
-                   (insert up-arrow-display)
-                   (insert " ")
-                   (if (and label-position
-                            (or (not sink-label) (equal sink-label " ")))
-                       (insert " ")
-                     (insert arrow-up))
-                   (insert ?\s)
-                   (if (and label-position
-                            (or (not source-label) (equal source-label " ")))
-                       (insert " ")
-                     (insert arrow-down))
-                   (insert " ")
-                   (insert down-arrow-display))
-                 (insert padding-space-right)
-                 (insert space-between))
-               (when (eql asm-blox--display-mode 'execute)
-                 (asm-blox--display-widget))
-               (insert "\n")))))
-      (funcall insert-v-border 'top)
-      (funcall insert-middle-row-space 0)
-      (dotimes (row 3)
-        (funcall insert-row-top row)
-        (dotimes (box-row asm-blox-box-height)
-          (funcall insert-row-middle row box-row))
-        (funcall insert-row-bottom row)
-        (when (not (= 2 row))
-          (funcall insert-middle-row-space (1+ row))))
-      (funcall insert-middle-row-space 3)
-      (funcall insert-v-border 'bottom)
 
-      (insert "\n\n")
-      (let ((name
-             (asm-blox--problem-spec-name asm-blox--extra-gameboard-cells))
-            (description
-             (asm-blox--problem-spec-description asm-blox--extra-gameboard-cells)))
-        (insert name ":\n")
-        (insert description "\n"))
-      (when (and (eql asm-blox--display-mode 'execute) asm-blox-runtime-error)
-        (insert (format "\nERROR: %s at cell (%d, %d)\n"
-                        (car asm-blox-runtime-error)
-                        (cadr asm-blox-runtime-error)
-                        (caddr asm-blox-runtime-error))))
-      (asm-blox--propertize-errors))))
+(defun asm-blox-display--insert-middle-row-space (row)
+  "Draw the  ↑↓    ↑↓    ↑↓    ↑↓ part of the board for ROW."
+  (let ((box-line-top-bottom asm-blox-display--box-line-top-bottom)
+        (arrow-up asm-blox-display--arrow-up)
+        (arrow-down asm-blox-display--arrow-down)
+        (space-start asm-blox-display--space-start)
+        (space-between asm-blox-display--space-between))
+    (let* ((left-of-arrows-len (1+ (- (/ (length box-line-top-bottom)
+                                         2)
+                                      1)))
+           (right-of-arrows-len (1+ (- (length box-line-top-bottom)
+                                       2
+                                       left-of-arrows-len)))
+           (padding-space-left (make-string (- left-of-arrows-len 5)
+                                            ?\s))
+           (padding-space-right (make-string (- right-of-arrows-len 5)
+                                             ?\s)))
+      (insert space-start)
+      (insert space-between)
+      (dotimes (col asm-blox--gameboard-col-ct)
+        (insert padding-space-left)
+        ;; logic to display arrow and contnents
+        (let* ((up-arrow-display
+                (asm-blox--row-register-display row col 'UP))
+               (down-arrow-display
+                (asm-blox--row-register-display row col 'DOWN))
+               (label-position (cond ((= 0 row) 'top)
+                                     ((= 3 row) 'bottom)
+                                     (t nil)))
+               (source-label
+                (and label-position
+                     (asm-blox--row-arrow-label-display
+                      label-position
+                      (if (eql label-position 'top)
+                          'source 'sink)
+                      col)))
+               (sink-label
+                (and label-position
+                     (asm-blox--row-arrow-label-display
+                      label-position
+                      (if (eql label-position 'top)
+                          'sink 'source)
+                      col))))
+          (insert up-arrow-display)
+          (insert " ")
+          (if (and label-position
+                   (or (not sink-label) (equal sink-label " ")))
+              (insert " ")
+            (insert arrow-up))
+          (insert ?\s)
+          (if (and label-position
+                   (or (not source-label) (equal source-label " ")))
+              (insert " ")
+            (insert arrow-down))
+          (insert " ")
+          (insert down-arrow-display))
+        (insert padding-space-right)
+        (insert space-between))
+      (when (eql asm-blox--display-mode 'execute)
+        (asm-blox--display-widget))
+      (insert "\n"))))
+
+(defun asm-blox-display-game-board ()
+  "Insert the characters of the board to the buffer."
+  (setq asm-blox--widget-row-idx 0)
+  (when (not (hash-table-p asm-blox--end-of-box-points))
+    (setq asm-blox--end-of-box-points (make-hash-table :test 'equal)))
+  (when (not (hash-table-p asm-blox--beginning-of-box-points))
+    (setq asm-blox--beginning-of-box-points (make-hash-table :test 'equal)))
+  (let* ((display-mode 'edit))
+    (asm-blox-display--insert-v-border 'top)
+    (asm-blox-display--insert-middle-row-space 0)
+    (dotimes (row 3)
+      (asm-blox-display--insert-row-top row)
+      (dotimes (box-row asm-blox-box-height)
+        (asm-blox-display--insert-row-middle row box-row))
+      (asm-blox-display--insert-row-bottom row)
+      (when (not (= 2 row))
+        (asm-blox-display--insert-middle-row-space (1+ row))))
+    (asm-blox-display--insert-middle-row-space 3)
+    (asm-blox-display--insert-v-border 'bottom)
+    (insert "\n\n")
+    (let ((name
+           (asm-blox--problem-spec-name asm-blox--extra-gameboard-cells))
+          (description
+           (asm-blox--problem-spec-description asm-blox--extra-gameboard-cells)))
+      (insert name ":\n")
+      (insert description "\n"))
+    (when (and (eql asm-blox--display-mode 'execute) asm-blox-runtime-error)
+      (insert (format "\nERROR: %s at cell (%d, %d)\n"
+                      (car asm-blox-runtime-error)
+                      (cadr asm-blox-runtime-error)
+                      (caddr asm-blox-runtime-error))))
+    (asm-blox--propertize-errors)))
 
 (defun asm-blox--draw-win-message ()
   "Display a message indicating that the user won the level on the gameboard."
