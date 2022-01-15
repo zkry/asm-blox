@@ -1,0 +1,20 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: purcell/setup-emacs@master
+      with:
+        version: 26.3
+    - uses: actions/checkout@v2
+    - name: Run tests
+      run: |
+        emacs -Q --batch -L . -l *-tests.el -f ert-run-tests-batch-and-exit
+    - uses: purcell/setup-emacs@master
+      with:
+        version: 25.1
+    - name: Run tests
+      run: |
+        emacs -Q --batch -L . -l *-tests.el -f ert-run-tests-batch-and-exit
