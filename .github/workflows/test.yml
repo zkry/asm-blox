@@ -11,10 +11,4 @@ jobs:
     - uses: actions/checkout@v2
     - name: Run tests
       run: |
-        emacs -Q --batch -L . -l *-tests.el -f ert-run-tests-batch-and-exit
-    - uses: purcell/setup-emacs@master
-      with:
-        version: 25.1
-    - name: Run tests
-      run: |
-        emacs -Q --batch -L . -l *-tests.el -f ert-run-tests-batch-and-exit
+        emacs -Q --eval "(progn (require 'package) (push '(\"melpa\" . \"https://melpa.org/packages/\") package-archives) (package-initialize) (package-refresh-contents) (package-install 'yaml))" --batch -L . -l *-tests.el -f ert-run-tests-batch-and-exit
