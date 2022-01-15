@@ -1578,7 +1578,9 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
       (throw 'error `(error 0 "invalid sizePort")))
 
     (when (and size (or (eql write-port ':null)
-                        (not (numberp size))))
+                        (not (numberp size))
+                        (<= size-port 0)
+                        (<= 999 size-port)))
       (throw 'error '(error 0 "invalid size")))
     (when (and size-port output-port (eql size-port output-port))
       (error 'error `(error 0 "same OUT ports")))))
@@ -1631,7 +1633,13 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
               (rest (cdr ports)))
           (when (and top (memq top rest))
             (throw 'error `(error 0 ,(format "same port: %s" (symbol-name top))))))
-        (setq ports (cdr ports))))))
+        (setq ports (cdr ports)))))
+  (let ((size-port (cdr (assoc 'size spec))))
+    (when (and size-port (or (eql size-port ':null)
+                             (not (numberp size-port))
+                             (<= size-port 0)
+                             (<= 999 size-port)))
+      (throw 'error `(error 0 "invalid sizePort")))))
 
 (defun asm-blox--yaml-create-heap (row col metadata spec)
   "Return a Stack runtime according to SPEC with METADATA at ROW COL."
