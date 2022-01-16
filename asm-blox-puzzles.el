@@ -1,4 +1,4 @@
-;;; asm-blox-puzzles.el --- Puzzle definitions for asm-blox -*- lexical-binding: t -*-
+;;; asm-blox-puzzles.el --- Puzzle Definitions for asm-blox -*- lexical-binding: t -*-
 
 ;; Author: Zachary Romero
 
@@ -20,9 +20,15 @@
 
 ;;; Commentary:
 
-;; This file contains puzzle definitions for asm-blox.
+;; This file contains the definitions of the various game puzzles.
 
 ;;; Code:
+
+(defvar asm-blox-puzzles)
+(declare-function asm-blox--problem-spec-create "asm-blox")
+(declare-function asm-blox--cell-source-create "asm-blox")
+(declare-function asm-blox--cell-sink-create "asm-blox")
+(declare-function asm-blox--problem-spec-name "asm-blox")
 
 (defun asm-blox-puzzles-list-of-lists-to-lisp (lists)
   "Return a list of LISTS from 0-terminated list of number lists."
@@ -89,8 +95,6 @@ from B and H respectively.  Send the area of right-triangle to A")))
   (let* ((words '("chair" "pen" "book" "camera" "note" "printer" "cable"
                   "square" "thought" "mouse" "alarm" "case" "lamp" "bed"))
          (word-ct (length words))
-         (random-line (lambda ()
-                        ))
          (l1 (string-join (list (nth (random word-ct) words)
                                            (nth (random word-ct) words)
                                            (nth (random word-ct) words)) " "))
@@ -616,36 +620,29 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :description
      "Take an input from the input X and send it to the output X.")))
 
-(defvar asm-blox-puzzles (list
-                         #'asm-blox-puzzles--indentation
-                         #'asm-blox-puzzles--constant
-                         #'asm-blox-puzzles--identity
-                         #'asm-blox-puzzles--add
-                         #'asm-blox-puzzles--filter
-                         #'asm-blox-puzzles--number-sum
-                         #'asm-blox-puzzles--number-sorter
-                         #'asm-blox-puzzles--clock
-                         #'asm-blox-puzzles--tax
-                         #'asm-blox-puzzles--list-length
-                         #'asm-blox-puzzles--list-reverse
-                         #'asm-blox-puzzles--inc-ct
-                         #'asm-blox-puzzles--upcase
-                         #'asm-blox-puzzles--merge-step
-                         #'asm-blox-puzzles--hello-world
-                         #'asm-blox-puzzles--simple-graph
-                         #'asm-blox-puzzles--meeting-point
-                         #'asm-blox-puzzles--turing
-                         #'asm-blox-puzzles--delete-word
-                         #'asm-blox-puzzles--triangle-area)
-  "List of puzzles to be loaded on puzzle selection page.")
-
-(defun asm-blox--get-puzzle-by-id (name)
-  "Given a puzzle NAME, return tis puzzle generation function."
-  (seq-find (lambda (puzzle-fn)
-              (let ((n (asm-blox--problem-spec-name (funcall puzzle-fn))))
-                (equal name n)))
-            asm-blox-puzzles))
+(setq asm-blox-puzzles
+      (list
+       #'asm-blox-puzzles--indentation
+       #'asm-blox-puzzles--constant
+       #'asm-blox-puzzles--identity
+       #'asm-blox-puzzles--add
+       #'asm-blox-puzzles--filter
+       #'asm-blox-puzzles--number-sum
+       #'asm-blox-puzzles--number-sorter
+       #'asm-blox-puzzles--clock
+       #'asm-blox-puzzles--tax
+       #'asm-blox-puzzles--list-length
+       #'asm-blox-puzzles--list-reverse
+       #'asm-blox-puzzles--inc-ct
+       #'asm-blox-puzzles--upcase
+       #'asm-blox-puzzles--merge-step
+       #'asm-blox-puzzles--hello-world
+       #'asm-blox-puzzles--simple-graph
+       #'asm-blox-puzzles--meeting-point
+       #'asm-blox-puzzles--turing
+       #'asm-blox-puzzles--delete-word
+       #'asm-blox-puzzles--triangle-area))
 
 (provide 'asm-blox-puzzles)
 
-;;; asm-blox-puzzles.el ends here
+;;; asm-blox-puzzle.el ends here
