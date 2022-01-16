@@ -493,7 +493,7 @@ example of a stack.
      |apiVersion: v1      |
      |kind: Stack         |
      |spec:               |
-     |  inputPorts: [down]|
+     |  inputPort: down   |
      |  outputPort: right |
      |  size: 20          |
      |                    |

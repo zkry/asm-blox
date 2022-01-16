@@ -1324,7 +1324,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
       (setq state (cons val state)))
     (if (= 0 (length state))
         "empty stack"
-      (format "top:%d size:%d/%d" (car state) (length state) size))))
+      (format "top:%d size:%d/%d" (car state) (length state) (or size 20)))))
 
 (defun asm-blox--yaml-step-stack (cell-runtime)
   "Perform the step operation for the CELL-RUNTIME of kind Stack."
@@ -1333,7 +1333,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
         (spec (asm-blox--cell-runtime-run-spec cell-runtime))
         (state (asm-blox--cell-runtime-run-state cell-runtime)))
     (let-alist spec
-      ;; .inputPorts .outputPort .sizePort .size .logLevel
+      ;; .inputPort .outputPort .sizePort .size .logLevel
       ;; First put port back on the stack
       (let* ((port-sym (intern (upcase .outputPort)))
              (size-port-sym (and .sizePort (intern (upcase .sizePort))))
@@ -1345,20 +1345,17 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
           (asm-blox--remove-value-from-direction cell-runtime size-port-sym)))
 
       ;; Then add new values to stack
-      (seq-do
-       (lambda (port)
-         (let* ((port-sym (intern (upcase port)))
-                (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
-                (opposite-port (asm-blox--mirror-direction port-sym))
-                (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
-           (when recieve-val
-             (asm-blox--remove-value-from-direction from-cell opposite-port)
-             (setq state (cons recieve-val state))
-             (when (> (length state) (or .size 20)) ;; TODO: find a good way of setting defualts.
-               (setf (asm-blox--cell-runtime-run-state cell-runtime) state)
-               (throw 'runtime-error `(error ,(format "Stack overflow %d/%d" (length state) (or .size 20))
-                                             ,row ,col))))))
-       .inputPorts)
+      (let* ((port-sym (intern (upcase .inputPort)))
+             (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
+             (opposite-port (asm-blox--mirror-direction port-sym))
+             (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
+        (when recieve-val
+          (asm-blox--remove-value-from-direction from-cell opposite-port)
+          (setq state (cons recieve-val state))
+          (when (> (length state) (or .size 20)) ;; TODO: find a good way of setting defualts.
+            (setf (asm-blox--cell-runtime-run-state cell-runtime) state)
+            (throw 'runtime-error `(error ,(format "Stack overflow %d/%d" (length state) (or .size 20))
+                                          ,row ,col)))))
 
       ;; Add size to sizePort
       (when .sizePort
@@ -1533,7 +1530,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
 
 (defun asm-blox--yaml-create-stack (row col _ spec)
   "Return a Stack runtime according to SPEC with METADATA at ROW COL."
-  ;; .inputPorts .outputPort .sizePort .size .logLevel
+  ;; .inputPort .outputPort .sizePort .size .logLevel
   (asm-blox--verify-stack spec)
   (asm-blox--cell-runtime-create
    :instructions nil
@@ -1554,14 +1551,12 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   "Throw error if YAML box's SPEC is not a valid Stack."
   (when (eql spec ':null)
     (throw 'error '(error 0 "spec can't be empty")))
-  (let ((input-ports (cdr (assoc 'inputPorts spec)))
+  (let ((input-port (cdr (assoc 'inputPort spec)))
         (output-port (cdr (assoc 'outputPort spec)))
         (size-port (cdr (assoc 'sizePort spec)))
         (size (cdr (assoc 'size spec))))
-    (when (not input-ports)
-      (throw 'error `(error 0 "missing inputPorts")))
-    (when (eql input-ports ':null)
-      (throw 'error `(error 0 "inputPorts is empty")))
+    (when (not input-port)
+      (throw 'error `(error 0 "missing inputPort")))
 
     (when (not output-port)
       (throw 'error `(error 0 "missing outputPort")))
@@ -1571,6 +1566,10 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
     (when (and size-port (or (eql size-port ':null)
                              (not (asm-blox--portp (upcase size-port)))))
       (throw 'error `(error 0 "invalid sizePort")))
+
+    (when (or (eql input-port ':null)
+              (not (asm-blox--portp (upcase input-port))))
+      (throw 'error `(error 0 "invalid inputPort")))
 
     (when (and size (or (eql size ':null)
                         (not (numberp size))
@@ -1584,20 +1583,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   "Throw error if YAML box's SPEC is not a valid Controller."
   (when (eql spec ':null)
     (throw 'error '(error 0 "spec can't be empty")))
-  (let ((input-port (cdr (assoc 'inputPort spec)))
-        (set-point-port (cdr (assoc 'setPointPort spec)))
-        (char-at-port (cdr (assoc 'charAtPoint spec)))
-        (point-port (cdr (assoc 'pointPort spec))))
-
-    (asm-blox--verify-port "inputPort" input-port)
-    (asm-blox--verify-port "setPointPort" set-point-port)
-    (asm-blox--verify-port "charAtPoint" char-at-port)
-    (asm-blox--verify-port "pointPort" point-port)
-
-    (when (and input-port set-point-port (eql input-port set-point-port))
-      (throw 'error `(error 0 "same IN ports")))
-    (when (and char-at-port point-port (eql char-at-port point-port))
-      (throw 'error `(error 0 "same OUT ports")))))
+  )
 
 (defun asm-blox--yaml-create-controller (row col _ spec)
   "Return a Controller runtime according to SPEC with METADATA at ROW COL."
@@ -1971,7 +1957,7 @@ of the board or very right.  TYPE will either be source or sink."
     (let ((err (asm-blox--get-error-at-cell row col)))
       (if err
           (progn (insert
-                  (propertize (gethash :box-bottom-left asm-blox-display-chars)
+                  (propertize (char-to-string (gethash :box-bottom-leftxoasm-blox-display-chars))
                               'font-lock-face
                               'asm-blox-error-face))
                  (insert
@@ -1979,7 +1965,7 @@ of the board or very right.  TYPE will either be source or sink."
                               'font-lock-face
                               'asm-blox-error-face))
                  (insert
-                  (propertize (gethash :box-bottom-right asm-blox-display-chars)
+                  (propertize (char-to-string (gethash :box-bottom-right asm-blox-display-chars))
                               'font-lock-face
                               'asm-blox-error-face)))
         (insert (gethash :box-bottom-left asm-blox-display-chars))
@@ -2320,13 +2306,12 @@ individual box."
         (at-col (current-column))
         (prev-text (buffer-string)))
     (erase-buffer)
-    (condition-case err
-        (asm-blox-display-game-board)
-      (error
-       (erase-buffer)
-       (insert prev-text)
-       (asm-blox--parse-saved-buffer)
-       (signal (car err) (cdr err))))
+    (asm-blox-display-game-board)
+    ;; (error
+    ;;  (erase-buffer)
+    ;;  (insert prev-text)
+    ;;  (asm-blox--parse-saved-buffer)
+    ;;  (signal (car err) (cdr err)))
     (goto-char (point-min))
     (forward-line (1- at-row))
     (forward-char at-col)))

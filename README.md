@@ -17,7 +17,7 @@
   The game is still in progress but you can install it by adding the
   files in your load path and calling `(require 'asm-blox)`.
 
-# Usage
+# Selecting a Puzzle
 
   You can initialize a game with the command <kbd>M-x asm-blox</kbd>.
   This will open up a menu with a list of puzzles to choose from.  By
@@ -32,7 +32,7 @@
   syntax is low-level assembly instructions written as s-expression.
   Each instruction manipulates a tiny stack related to the current
   cell.  For example the command `(const 10)` will push the number 10
-  onto the stack.
+  onto the stack.  To run your program, press <kbd>C-c C-c</kbd>.
 
   Reading the prompt, your goal is to send particular values to the
   output port (arrow going out of the game grid), most of the time
@@ -82,3 +82,25 @@
   one cell, try splitting it into multiple cells.
 
   For more information please refer to [the manual](./doc/asm-blox.pdf).
+
+## YAML Blocks
+
+  Aside from ASM you can define a cell to be a stack or heap.  You can
+  use as many stacks or heaps as you want in order to solve your
+  problem, beware though that you only have a total of 12 cells to
+  solve the puzzle.  The three top-level objects to define are
+  `apiVersion`, `kind`, and `spec`.  `apiVersion` should always be
+  "v1", `kind` can be either `Stack`, `Heap`, or `Controller`
+  (controller is used for special types of puzzles).  The `spec` field
+  varies by the kind.  For example, the following is a definition of a stack:
+
+  ```yaml
+  apiVersion: v1
+  kind: Stack
+  spec:
+    size: 10
+    inputPorts:
+      - left
+    outputPort:
+      right
+  ```
