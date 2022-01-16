@@ -189,7 +189,7 @@ The format of the error is (list message row column).")
                                   (_ (throw 'error `(error ,(point) "BAD ESCAPE CODE"))))))
                           (setq c (char-after (point)))
                           (when (or (= c ?\s) (= c ?\n))
-                            (_ (throw 'error `(error ,(point) "INVALID CHAR")))))
+                            (throw 'error `(error ,(point) "INVALID CHAR"))))
                         (forward-char 1)
                         (push c elements)))
                      ;; Symbol
@@ -285,7 +285,7 @@ The format of the error is (list message row column).")
   "Determine if CODE-NODE adheres to the corresponding specification."
   (let* ((children (asm-blox-code-node-children code-node))
          (start-pos (asm-blox-code-node-start-pos code-node))
-         (end-pos (asm-blox-code-node-end-pos code-node))
+         ;; (end-pos (asm-blox-code-node-end-pos code-node))
          (first-child (car children))
          (cmd-spec (assoc first-child asm-blox-command-specs)))
     (cond
@@ -699,9 +699,7 @@ If the port does't have a value, set staging to nil."
 
 (defun asm-blox--binary-operation (cell-runtime function)
   "Perform binary operation FUNCTION on the top two items of CELL-RUNTIME."
-  (let* ((row (asm-blox--cell-runtime-row cell-runtime))
-         (col (asm-blox--cell-runtime-col cell-runtime))
-         (v1 (asm-blox--cell-runtime-pop cell-runtime))
+  (let* ((v1 (asm-blox--cell-runtime-pop cell-runtime))
          (v2 (asm-blox--cell-runtime-pop cell-runtime))
          (res (funcall function v2 v1)))
     (when (> res 999)
@@ -1175,11 +1173,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   ;; TODO: This work when deleting puzzles.
   (ignore-errors
     (make-directory asm-blox-save-directory-name))
-  (let* ((dir-files (directory-files asm-blox-save-directory-name))
-         (puzzle-files (seq-filter (lambda (file-name)
-                                     (string-prefix-p name file-name))
-                                   dir-files))
-         (last-id (car (reverse (asm-blox--saved-puzzle-ct-ids name))))
+  (let* ((last-id (car (reverse (asm-blox--saved-puzzle-ct-ids name))))
          (new-idx (number-to-string (1+ (or last-id 0)))))
     (expand-file-name (concat name "-" new-idx ".asbx")
                       asm-blox-save-directory-name)))
@@ -1256,7 +1250,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
 
 (defun asm-blox--restore-backup ()
   "Create a backup file for the current buffer."
-  (let* ((buffer-contents (buffer-string))
+  (let* (;; (buffer-contents (buffer-string))
          (bfn (buffer-file-name))
          (name (file-name-nondirectory bfn))
          (path (file-name-directory bfn))
@@ -1379,9 +1373,9 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
       ;; Persist state for next rount
       (setf (asm-blox--cell-runtime-run-state cell-runtime) state))))
 
-(defun asm-blox--yaml-get-editor-sink (cell-runtime)
+(defun asm-blox--yaml-get-editor-sink (_)
   "Return the sink corresponding to CELL-RUNTIME."
-  ;; For now there will only be one editor.
+  ;; For now there will only be one editor. If more use parameter passed.
   (car (asm-blox--problem-spec-sinks asm-blox--extra-gameboard-cells)))
 
 (defun asm-blox--yaml-step-controller (cell-runtime)
@@ -1389,7 +1383,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   (let ((row (asm-blox--cell-runtime-row cell-runtime))
         (col (asm-blox--cell-runtime-col cell-runtime))
         (spec (asm-blox--cell-runtime-run-spec cell-runtime))
-        (state (asm-blox--cell-runtime-run-state cell-runtime))
+        ;; (state (asm-blox--cell-runtime-run-state cell-runtime))
         (sink (asm-blox--yaml-get-editor-sink cell-runtime)))
     (let-alist spec
       ;; .inputPort  .setPointPort
@@ -1532,7 +1526,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
            datum)))
       (setf (asm-blox--cell-runtime-run-state cell-runtime) (cons offset data)))))
 
-(defun asm-blox--yaml-create-stack (row col metadata spec)
+(defun asm-blox--yaml-create-stack (row col _ spec)
   "Return a Stack runtime according to SPEC with METADATA at ROW COL."
   ;; .inputPorts .outputPort .sizePort .size .logLevel
   (asm-blox--verify-stack spec)
@@ -1600,7 +1594,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
     (when (and char-at-port point-port (eql char-at-port point-port))
       (throw 'error `(error 0 "same OUT ports")))))
 
-(defun asm-blox--yaml-create-controller (row col metadata spec)
+(defun asm-blox--yaml-create-controller (row col _ spec)
   "Return a Controller runtime according to SPEC with METADATA at ROW COL."
   (asm-blox--cell-runtime-create
    :instructions nil
@@ -1618,8 +1612,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
     (let ((port (cdr (assoc prop spec))))
       (asm-blox--verify-port prop port)))
   (dolist (props '(("IN" writePort seekPort setPort) ("OUT" offsetPort peekPort readPort)))
-    (let ((type (car props))
-          (ports (seq-map
+    (let ((ports (seq-map
                   (lambda (n) (intern n))
                   (seq-filter
                    #'stringp
@@ -1637,7 +1630,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
                         (<= 999 size)))
       (throw 'error `(error 0 "invalid sizePort")))))
 
-(defun asm-blox--yaml-create-heap (row col metadata spec)
+(defun asm-blox--yaml-create-heap (row col _ spec)
   "Return a Stack runtime according to SPEC with METADATA at ROW COL."
   ;; .size
   (asm-blox--verify-heap spec)
@@ -1763,8 +1756,7 @@ This was added for performance reasons.")
 
 (defun asm-blox--make-editor-widget (sink)
   "Return a widget displaying a SINK as an editor."
-  (let ((width 32)
-        (sink-widget-offset-ct 2))
+  (let ((width 32))
     (lambda (msg)
       (pcase msg
         ('width width)
@@ -1772,7 +1764,7 @@ This was added for performance reasons.")
          (let* ((box-top (concat "┌" (make-string 30 ?─) "┐"))
                 (box-bottom (concat "└" (make-string 30 ?─) "┘"))
                 (spacing (make-string 32 ?\s))
-                (data (asm-blox--cell-sink-expected-data sink))
+                ;; (data (asm-blox--cell-sink-expected-data sink))
                 (text (asm-blox--cell-sink-editor-text sink))
                 (expected-text (asm-blox--cell-sink-expected-text sink))
                 (point (1- (asm-blox--cell-sink-editor-point sink))))
@@ -2237,31 +2229,30 @@ individual box."
     (setq asm-blox--end-of-box-points (make-hash-table :test 'equal)))
   (when (not (hash-table-p asm-blox--beginning-of-box-points))
     (setq asm-blox--beginning-of-box-points (make-hash-table :test 'equal)))
-  (let* ((display-mode 'edit))
-    (asm-blox-display--insert-v-border 'top)
-    (asm-blox-display--insert-middle-row-space 0)
-    (dotimes (row 3)
-      (asm-blox-display--insert-row-top row)
-      (dotimes (box-row asm-blox-box-height)
-        (asm-blox-display--insert-row-middle row box-row))
-      (asm-blox-display--insert-row-bottom row)
-      (when (not (= 2 row))
-        (asm-blox-display--insert-middle-row-space (1+ row))))
-    (asm-blox-display--insert-middle-row-space 3)
-    (asm-blox-display--insert-v-border 'bottom)
-    (insert "\n\n")
-    (let ((name
-           (asm-blox--problem-spec-name asm-blox--extra-gameboard-cells))
-          (description
-           (asm-blox--problem-spec-description asm-blox--extra-gameboard-cells)))
-      (insert name ":\n")
-      (insert description "\n"))
-    (when (and (eql asm-blox--display-mode 'execute) asm-blox-runtime-error)
-      (insert (format "\nERROR: %s at cell (%d, %d)\n"
-                      (car asm-blox-runtime-error)
-                      (cadr asm-blox-runtime-error)
-                      (caddr asm-blox-runtime-error))))
-    (asm-blox--propertize-errors)))
+  (asm-blox-display--insert-v-border 'top)
+  (asm-blox-display--insert-middle-row-space 0)
+  (dotimes (row 3)
+    (asm-blox-display--insert-row-top row)
+    (dotimes (box-row asm-blox-box-height)
+      (asm-blox-display--insert-row-middle row box-row))
+    (asm-blox-display--insert-row-bottom row)
+    (when (not (= 2 row))
+      (asm-blox-display--insert-middle-row-space (1+ row))))
+  (asm-blox-display--insert-middle-row-space 3)
+  (asm-blox-display--insert-v-border 'bottom)
+  (insert "\n\n")
+  (let ((name
+         (asm-blox--problem-spec-name asm-blox--extra-gameboard-cells))
+        (description
+         (asm-blox--problem-spec-description asm-blox--extra-gameboard-cells)))
+    (insert name ":\n")
+    (insert description "\n"))
+  (when (and (eql asm-blox--display-mode 'execute) asm-blox-runtime-error)
+    (insert (format "\nERROR: %s at cell (%d, %d)\n"
+                    (car asm-blox-runtime-error)
+                    (cadr asm-blox-runtime-error)
+                    (caddr asm-blox-runtime-error))))
+  (asm-blox--propertize-errors))
 
 (defun asm-blox--draw-win-message ()
   "Display a message indicating that the user won the level on the gameboard."
@@ -2405,14 +2396,14 @@ This was added for performance reasons.")
          (box-id (get-text-property (point) 'asm-blox-box-id))
          (row (nth 0 box-id))
          (col (nth 1 box-id))
-         (line (nth 2 box-id))
+         ;; (line (nth 2 box-id))
          (at-line-no 0)
          (start-line-col (current-column)))
     (asm-blox--beginning-of-box)
     (while (asm-blox-in-box-p)
       (let* ((at-line (or (car lines) ""))
              (padding (make-string (- asm-blox-box-width (length at-line)) ?\s)))
-        (delete-forward-char asm-blox-box-width)
+        (delete-char asm-blox-box-width)
         (insert (propertize (concat at-line padding)
                             'asm-blox-box-id
                             (list row col at-line-no)))
@@ -2440,7 +2431,7 @@ This was added for performance reasons.")
       (erase-buffer)
       (insert text)
       (goto-char (point-min))
-      (goto-line (1+ line))
+      (forward-line line)
       (move-to-column line-col)
       (funcall func)
       (if (or (> (length (buffer-substring-no-properties
@@ -2522,16 +2513,16 @@ This was added for performance reasons.")
   (interactive)
   (if (asm-blox-in-box-p)
       (asm-blox--in-buffer
-       (beginning-of-buffer))
-    (beginning-of-buffer)))
+       (goto-char (point-min)))
+    (goto-char (point-min))))
 
 (defun asm-blox-end-of-buffer ()
   "Move the point to the end of the buffer."
   (interactive)
   (if (asm-blox-in-box-p)
       (asm-blox--in-buffer
-       (end-of-buffer))
-    (end-of-buffer)))
+       (goto-char (point-max)))
+    (goto-char (point-max))))
 
 (defun asm-blox--newline ()
   "Insert a new line."
@@ -2608,7 +2599,6 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
     (let* ((text (asm-blox--get-box-content row-1 col-1))
            (new-text "")
            (kill-text "")
-           (line-no 0)
            (lines (split-string text "\n")))
       (cl-loop for i from 0
                for line in lines
@@ -2917,7 +2907,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                 (let ((at-col (current-column)))
                   (forward-line 1)
                   (move-to-column at-col)
-                  (while (not (looking-back "│"))
+                  (while (not (looking-back "│" nil))
                     (forward-char -1)))
                 (setq hl-lines (cdr hl-lines))))))))))
 
@@ -2932,7 +2922,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
           (while stack
             (let ((stack-top (car stack)))
               (forward-char -4)
-              (delete-forward-char 4)
+              (delete-char 4)
               (if stack-top
                   (insert (format "%4d" stack-top))
                 (insert "    "))
@@ -3229,7 +3219,7 @@ The following commands are available:
           (save-match-data
             (while-no-input
               (cond
-               ((looking-back ")")
+               ((looking-back ")" nil)
                 (let* ((start-point (1- (point)))
                        (opening-match-coords (asm-blox--find-opening-match))
                        (d-row (car opening-match-coords))
