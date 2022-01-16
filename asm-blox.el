@@ -1244,6 +1244,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
     (save-window-excursion
       (let ((inhibit-read-only t))
         (find-file new-name)
+        (erase-buffer)
         (insert buffer-contents)
         (save-buffer)
         (kill-buffer)))))
