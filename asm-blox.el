@@ -2321,6 +2321,7 @@ individual box."
       (error
        (erase-buffer)
        (insert prev-text)
+       (asm-blox--parse-saved-buffer)
        (signal (car err) (cdr err))))
     (goto-char (point-min))
     (forward-line (1- at-row))
