@@ -79,5 +79,6 @@
 
   Using these constructs, arbitrarily complex control flow can be
   formed.  Remember that if you can't fit all the logic you want into
-  one cell, try splitting it into multiple cells.  For more
-  information please refer to the documentation.
+  one cell, try splitting it into multiple cells.
+
+  For more information please refer to [the manual](./doc/asm-blox.pdf).

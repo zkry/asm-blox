@@ -545,6 +545,30 @@ and write to.  The following is an example of a heap cell:
      |                    |
      +--------------------+
 
+   * `readPort' (out): from this port you can read the value at the
+     current address.  By reading this value, the current address will
+     increase by one.  Note that end of file is indicated by the value
+     -999.
+
+   * `writePort' (in): writing a value to this port will store a value
+     at the current address.  After writing a value, the current
+     address will increase by one.
+
+   * `offsetPort' (out): from this port you can read the current offset
+     into memory.
+
+   * `seekPort' (in): by writing a value to this port, you can set the
+     offset into memory.
+
+   * `peekPort' (out): this port will have the data at the current
+     offset.  Reading from this port will not move the offset.
+
+   * `setPort' (in): this port will set the data at the current offset.
+     Writing to this port will not move the offset
+
+   * `size': You may configure the size of the heap with this variable.
+     The maximum size allowed is 999.
+
 
 File: asm-blox.info,  Node: Controller Cells and Editor Problems,  Prev: Heap Cells,  Up: YAML Blocks
 
@@ -713,10 +737,10 @@ Node: Blocks and Loops12132
 Node: YAML Blocks14167
 Node: Stack Cells14853
 Node: Heap Cells16073
-Node: Controller Cells and Editor Problems16827
-Node: Editing Commands18773
-Node: Undo and Redo19972
-Node: Advanced editing20335
-Node: Customizations21418
+Node: Controller Cells and Editor Problems17775
+Node: Editing Commands19721
+Node: Undo and Redo20920
+Node: Advanced editing21283
+Node: Customizations22366
 
 End Tag Table
