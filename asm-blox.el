@@ -1299,7 +1299,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
 (defun asm-blox--create-yaml-code-node (row col code)
   "Create a runtime for the parsed CODE, located at ROW COL."
   (catch 'error
-   (let-alist (yaml-parse-string code :object-type 'alist)
+   (let-alist (yaml-parse-string code :object-type 'alist :sequence-type 'list)
      ;; .apiVersion .kind .metadata .spec
      (unless (equal "v1" .apiVersion)
        (throw 'error '(error 0 "bad api version")))
@@ -1334,6 +1334,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
         (state (asm-blox--cell-runtime-run-state cell-runtime)))
     (let-alist spec
       ;; .inputPort .outputPort .sizePort .size .logLevel
+      ;; .inputPorts
       ;; First put port back on the stack
       (let* ((port-sym (intern (upcase .outputPort)))
              (size-port-sym (and .sizePort (intern (upcase .sizePort))))
@@ -1345,17 +1346,20 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
           (asm-blox--remove-value-from-direction cell-runtime size-port-sym)))
 
       ;; Then add new values to stack
-      (let* ((port-sym (intern (upcase .inputPort)))
-             (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
-             (opposite-port (asm-blox--mirror-direction port-sym))
-             (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
-        (when recieve-val
-          (asm-blox--remove-value-from-direction from-cell opposite-port)
-          (setq state (cons recieve-val state))
-          (when (> (length state) (or .size 20)) ;; TODO: find a good way of setting defualts.
-            (setf (asm-blox--cell-runtime-run-state cell-runtime) state)
-            (throw 'runtime-error `(error ,(format "Stack overflow %d/%d" (length state) (or .size 20))
-                                          ,row ,col)))))
+      (seq-do
+       (lambda (port)
+         (let* ((port-sym (intern (upcase port)))
+                (from-cell (asm-blox--cell-at-moved-row-col row col port-sym))
+                (opposite-port (asm-blox--mirror-direction port-sym))
+                (recieve-val (asm-blox--get-value-from-direction from-cell opposite-port)))
+           (when recieve-val
+             (asm-blox--remove-value-from-direction from-cell opposite-port)
+             (setq state (cons recieve-val state))
+             (when (> (length state) (or .size 20)) ;; TODO: find a good way of setting defualts.
+               (setf (asm-blox--cell-runtime-run-state cell-runtime) state)
+               (throw 'runtime-error `(error ,(format "Stack overflow %d/%d" (length state) (or .size 20))
+                                             ,row ,col))))))
+       (if .inputPorts .inputPorts (list .inputPort)))
 
       ;; Add size to sizePort
       (when .sizePort
@@ -1551,11 +1555,13 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   "Throw error if YAML box's SPEC is not a valid Stack."
   (when (eql spec ':null)
     (throw 'error '(error 0 "spec can't be empty")))
-  (let ((input-port (cdr (assoc 'inputPort spec)))
-        (output-port (cdr (assoc 'outputPort spec)))
-        (size-port (cdr (assoc 'sizePort spec)))
-        (size (cdr (assoc 'size spec))))
-    (when (not input-port)
+  (let* ((input-port (cdr (assoc 'inputPort spec)))
+         (input-ports (cdr (assoc 'inputPorts spec)))
+         (input-ports (or input-ports (list input-port)))
+         (output-port (cdr (assoc 'outputPort spec)))
+         (size-port (cdr (assoc 'sizePort spec)))
+         (size (cdr (assoc 'size spec))))
+    (when (or (= (length input-ports) 0) (not (car input-ports)))
       (throw 'error `(error 0 "missing inputPort")))
 
     (when (not output-port)
@@ -1567,9 +1573,10 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
                              (not (asm-blox--portp (upcase size-port)))))
       (throw 'error `(error 0 "invalid sizePort")))
 
-    (when (or (eql input-port ':null)
-              (not (asm-blox--portp (upcase input-port))))
-      (throw 'error `(error 0 "invalid inputPort")))
+    (dolist (input-port input-ports)
+      (when (or (eql input-port ':null)
+                (not (asm-blox--portp (upcase input-port))))
+        (throw 'error `(error 0 "invalid inputPort"))))
 
     (when (and size (or (eql size ':null)
                         (not (numberp size))

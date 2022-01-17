@@ -353,6 +353,8 @@ following code:
    The following are spec properties of a YAML stack:
 
    - ~inputPort~: any value sent here will be added to the top of the stack.
+   - ~inputPorts~: multiple input port specifications.  Can not be
+     used with ~inputPort~.
    - ~outputPort~: if another cell reads from here, it will be popped
      off the stack.
    - ~size~: the maximum amount of elements that can be on the stack

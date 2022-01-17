@@ -509,6 +509,9 @@ example of a stack.
    * `inputPort': any value sent here will be added to the top of the
      stack.
 
+   * `inputPorts': multiple input port specifications.  Can not be used
+     with `inputPort'.
+
    * `outputPort': if another cell reads from here, it will be popped
      off the stack.
 
@@ -736,11 +739,11 @@ Node: Port Operations11390
 Node: Blocks and Loops12132
 Node: YAML Blocks14167
 Node: Stack Cells14853
-Node: Heap Cells16073
-Node: Controller Cells and Editor Problems17775
-Node: Editing Commands19721
-Node: Undo and Redo20920
-Node: Advanced editing21283
-Node: Customizations22366
+Node: Heap Cells16169
+Node: Controller Cells and Editor Problems17871
+Node: Editing Commands19817
+Node: Undo and Redo21016
+Node: Advanced editing21379
+Node: Customizations22462
 
 End Tag Table

@@ -62,6 +62,49 @@
                        a))
               nums breaks)))
 
+(defun asm-blox-puzzles--stack-machine-solver (args ops)
+  (let ((args (seq-reverse args))
+        (result))
+    (dolist (op ops)
+      (pcase op
+        (0 (setq result (append result (list (car args))))
+           (setq args (cdr args)))
+        (1 (setq args (cons (+ (car args) (cadr args)) (cddr args))))
+        (2 (setq args (cons (- (car args)) (cdr args))))))
+    result))
+
+(defun asm-blox-puzzles--stack-machine ()
+  "Generate a problem for simulating a simple stack machine."
+  (let* ((args (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (ops (append (seq-map (lambda (_) (random 3)) (make-list 10 nil)) (list 0)))
+         (result (asm-blox-puzzles--stack-machine-solver args ops)))
+    (asm-blox--problem-spec-create
+     :name "Stack Machine"
+     :difficulty 'hard
+     :sources (list (asm-blox--cell-source-create :row 0
+                                                  :col -1
+                                                  :data ops
+                                                  :idx 0
+                                                  :name "O")
+                    (asm-blox--cell-source-create :row 0
+                                                  :col 4
+                                                  :data args
+                                                  :idx 0
+                                                  :name "A"))
+     :sinks
+     (list (asm-blox--cell-sink-create
+            :row 3
+            :col 1
+            :expected-data result
+            :idx 0
+            :name "T"))
+     :description "Read all 40 values from A, pushing them on a
+stack so that the last number in A is at the top of the stack.
+One by one, read an operation from O and do the following based on it's value:
+0 -> send the top value of the stack to T.
+1 -> pop the top two values of the stack, add them, and push the result onto the stack
+2 -> inverse the value of the item on the top of the stack.")))
+
 (defun asm-blox-puzzles--triangle-area ()
   "Generate a problem of determining area of triangle."
   (let* ((bases (seq-map (lambda (_) (* (1+ (random 10)) 2)) (make-list 40 nil)))
@@ -640,6 +683,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
        #'asm-blox-puzzles--simple-graph
        #'asm-blox-puzzles--meeting-point
        #'asm-blox-puzzles--turing
+       #'asm-blox-puzzles--stack-machine
        #'asm-blox-puzzles--delete-word
        #'asm-blox-puzzles--triangle-area))
 
