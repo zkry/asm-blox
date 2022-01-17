@@ -1,4 +1,4 @@
-;;; asm-blox.el --- Display code for asm-blox Game -*- lexical-binding: t -*-
+;;; asm-blox.el --- Programming game involving WAT and YAML -*- lexical-binding: t -*-
 
 ;; Copyright © 2021-2022 Zachary Romero <zkry@posteo.net>
 
