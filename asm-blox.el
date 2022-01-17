@@ -1260,7 +1260,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
          (name (file-name-nondirectory bfn))
          (path (file-name-directory bfn))
          (new-name (concat path "." name ".backup.txt")))
-    (when (f-exists? new-name)
+    (when (file-exists-p new-name)
       (let ((backup-contents))
        (save-window-excursion
          (find-file new-name)
@@ -2009,6 +2009,10 @@ of the board or very right.  TYPE will either be source or sink."
     (asm-blox--display-widget))
   (insert "\n"))
 
+(defvar asm-blox--beginning-of-box-points nil
+  "Contains a hashmap of the points where each box begins.
+This was added for performance reasons.")
+
 (defun asm-blox-display--insert-row-middle (row box-row)
   "Draw the ⇋|   |⇋|   |⇋|   |⇋|   |⇋ part of the board.
 
@@ -2357,10 +2361,6 @@ individual box."
   "Move poin to the end of the box at ROW COL."
   (let ((end-pos (gethash (list row col) asm-blox--end-of-box-points)))
       (goto-char end-pos)))
-
-(defvar asm-blox--beginning-of-box-points nil
-  "Contains a hashmap of the points where each box begins.
-This was added for performance reasons.")
 
 (defun asm-blox--move-to-box (row col)
   "Move point to the point at ROW COL."
