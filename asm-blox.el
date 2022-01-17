@@ -1573,8 +1573,8 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
 
     (when (and size (or (eql size ':null)
                         (not (numberp size))
-                        (<= size-port 0)
-                        (<= 999 size-port)))
+                        (<= size 0)
+                        (<= 999 size)))
       (throw 'error '(error 0 "invalid size")))
     (when (and size-port output-port (eql size-port output-port))
       (error 'error `(error 0 "same OUT ports")))))
