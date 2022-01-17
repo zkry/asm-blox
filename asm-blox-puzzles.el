@@ -102,8 +102,8 @@
 stack so that the last number in A is at the top of the stack.
 One by one, read an operation from O and do the following based on it's value:
 0 -> send the top value of the stack to T.
-1 -> pop the top two values of the stack, add them, and push the result onto the stack
-2 -> inverse the value of the item on the top of the stack.")))
+1 -> pop the top two values of the stack, add them, and push onto the stack
+2 -> pop the top value of the stack, multiply it by -1, and push onto the stack.")))
 
 (defun asm-blox-puzzles--triangle-area ()
   "Generate a problem of determining area of triangle."
