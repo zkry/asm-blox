@@ -1964,7 +1964,7 @@ of the board or very right.  TYPE will either be source or sink."
     (let ((err (asm-blox--get-error-at-cell row col)))
       (if err
           (progn (insert
-                  (propertize (char-to-string (gethash :box-bottom-leftxoasm-blox-display-chars))
+                  (propertize (char-to-string (gethash :box-bottom-left asm-blox-display-chars))
                               'font-lock-face
                               'asm-blox-error-face))
                  (insert
@@ -2313,12 +2313,13 @@ individual box."
         (at-col (current-column))
         (prev-text (buffer-string)))
     (erase-buffer)
-    (asm-blox-display-game-board)
-    ;; (error
-    ;;  (erase-buffer)
-    ;;  (insert prev-text)
-    ;;  (asm-blox--parse-saved-buffer)
-    ;;  (signal (car err) (cdr err)))
+    (condition-case err
+        (asm-blox-display-game-board)
+      (error
+       (erase-buffer)
+       (insert prev-text)
+       (asm-blox--parse-saved-buffer)
+       (signal (car err) (cdr err))))
     (goto-char (point-min))
     (forward-line (1- at-row))
     (forward-char at-col)))
