@@ -1,6 +1,11 @@
 ;;; asm-blox-puzzles.el --- Puzzle Definitions for asm-blox -*- lexical-binding: t -*-
 
 ;; Author: Zachary Romero
+;; Maintainer: Zachary Romero
+;; Version: 0.0.1
+;; Package-Requires: ((emacs "26.1"))
+;; Homepage: https://github.com/zkry/asm-blox
+;; Keywords: games
 
 ;; This file is not part of GNU Emacs
 
@@ -29,6 +34,7 @@
 (declare-function asm-blox--cell-source-create "asm-blox")
 (declare-function asm-blox--cell-sink-create "asm-blox")
 (declare-function asm-blox--problem-spec-name "asm-blox")
+(declare-function asm-blox--flatten-list "asm-blox")
 
 (defun asm-blox-puzzles-list-of-lists-to-lisp (lists)
   "Return a list of LISTS from 0-terminated list of number lists."
@@ -392,7 +398,7 @@ or equal to 500, return that 12th value divided by 40.")))
   "Generate a simple addition problem."
   (let* ((input-1 (asm-blox-puzzles-random-list-of-lists))
          (lists (asm-blox-puzzles-list-of-lists-to-lisp input-1))
-         (expected (flatten-list (seq-map (lambda (l)
+         (expected (asm-blox--flatten-list (seq-map (lambda (l)
                                        (append (reverse l) (list 0)))
                                      lists))))
     (asm-blox--problem-spec-create
@@ -689,4 +695,4 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
 (provide 'asm-blox-puzzles)
 
-;;; asm-blox-puzzle.el ends here
+;;; asm-blox-puzzles.el ends here

@@ -1589,8 +1589,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
 (defun asm-blox--verify-controller (spec)
   "Throw error if YAML box's SPEC is not a valid Controller."
   (when (eql spec ':null)
-    (throw 'error '(error 0 "spec can't be empty")))
-  )
+    (throw 'error '(error 0 "spec can't be empty"))))
 
 (defun asm-blox--yaml-create-controller (row col _ spec)
   "Return a Controller runtime according to SPEC with METADATA at ROW COL."
