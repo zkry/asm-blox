@@ -3022,7 +3022,7 @@ The following commands are available:
       (asm-blox-redraw-game-board)))
   (unless asm-blox--show-pair-idle-timer
     (setq asm-blox--show-pair-idle-timer
-          (run-with-idle-timer 0.125 t 'asm-blox--highlight-pairs))))
+          (run-with-idle-timer 0.125 t #'asm-blox--highlight-pairs))))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.asbx\\'" 'asm-blox-mode))

@@ -3,7 +3,6 @@
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "26.1"))
 ;; Homepage: https://github.com/zkry/asm-blox
 ;; Keywords: games
 
@@ -69,6 +68,7 @@
               nums breaks)))
 
 (defun asm-blox-puzzles--stack-machine-solver (args ops)
+  "Simulate the stack-machine with ARGS and OPS to generate solution."
   (let ((args (seq-reverse args))
         (result))
     (dolist (op ops)
