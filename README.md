@@ -17,6 +17,11 @@
   The game is still in progress but you can install it by adding the
   files in your load path and calling `(require 'asm-blox)`.
 
+## via straight.el
+
+  ```emacs-lisp
+  (straight-use-package '(asm-blox :host github :repo "zkry/asm-blox"))
+  ```
 # Selecting a Puzzle
 
   You can initialize a game with the command <kbd>M-x asm-blox</kbd>.
