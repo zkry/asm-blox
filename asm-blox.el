@@ -36,8 +36,6 @@
 ;; how to program the board please refer to the reference material
 ;; provided by this package.
 
-;; commentary
-
 ;;; Code:
 
 (require 'cl-lib)
