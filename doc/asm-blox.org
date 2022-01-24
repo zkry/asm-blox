@@ -264,12 +264,12 @@ General Public License for more details.
    which block or loop it is referring to via a number.  Consider the
    following example:
 
-   #+begin_src wat
+#+begin_example wat
      (block   ; 2
       (block  ; 1
        (block ; 0
         (br <block ID>))))
- #+end_src
+ #+end_example
 
  The <block ID> above can be either 0, 1, or 2 since it is contained
  in three nested blocks.  If <block ID> was set to 1, then control
@@ -281,7 +281,7 @@ Let's consider another example with ~loop~.  Suppose we want to send
 the numbers from 0 to 10 to the down port.  We could write the
 following code:
 
-#+begin_src wat
+#+begin_example wat
   (const 0) ; 1
   (loop     ; 2
    (send down (get 0)) ; 3
@@ -289,7 +289,7 @@ following code:
                (const 1))) ; 4
    (ne (get 0) (const 10)) ; 5
    (br_if 0))              ; 6
-#+end_src
+#+end_example
 
   1. Initialize the top of the stack to 0.
   2. Setup a loop

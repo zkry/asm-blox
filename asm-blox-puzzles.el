@@ -37,18 +37,16 @@
 (declare-function asm-blox--problem-spec-name "asm-blox")
 (declare-function asm-blox--flatten-list "asm-blox")
 
-;; (defun asm-blox-puzzles-list-of-lists-to-lisp (lists)
-;;   "Return a list of LISTS from 0-terminated list of number lists."
-;;   (reverse
-;;    (car
-;;     (seq-reduce (lambda (acc x)
-;;                   (let ((lol (car acc))
-;;                         (curr-list (cadr acc)))
-;;                     (if (= x 0)
-;;                         (list (cons (reverse curr-list) lol) '())
-;;                       (list lol (cons  x curr-list)))))
-;;                 (list '() '())
-;;                 lists))))
+(defun asm-blox-puzzles-list-of-lists-to-lisp (lists)
+  "Return a list of LISTS from 0-terminated list of number lists."
+  (reverse (car (seq-reduce (lambda (acc x)
+                              (let ((lol (car acc))
+                                    (curr-list (cadr acc)))
+                                (if (= x 0)
+                                    (list (cons (reverse curr-list) lol) '())
+                                  (list lol (cons  x curr-list)))))
+                            lists
+                            (list '() '())))))
 
 (defun asm-blox-puzzles-random-list-of-lists ()
   "Generate list of 0-terminated lists as helper."
@@ -396,30 +394,30 @@ ex. 1 2 0 5 6 4
      "Read values from I. After the 12th consecutive value is greater than
 or equal to 500, return that 12th value divided by 40.")))
 
-;; (defun asm-blox-puzzles--list-reverse ()
-;;   "Generate a simple addition problem."
-;;   (let* ((input-1 (asm-blox-puzzles-random-list-of-lists))
-;;          (lists (asm-blox-puzzles-list-of-lists-to-lisp input-1))
-;;          (expected (asm-blox--flatten-list (seq-map (lambda (l)
-;;                                        (append (reverse l) (list 0)))
-;;                                      lists))))
-;;     (asm-blox--problem-spec-create
-;;      :name "List Reverse"
-;;      :difficulty 'medium
-;;      :sources (list (asm-blox--cell-source-create :row -1
-;;                                                  :col 2
-;;                                                  :data input-1
-;;                                                  :idx 0
-;;                                                  :name "L"))
-;;      :sinks
-;;      (list (asm-blox--cell-sink-create :row 3
-;;                                       :col 1
-;;                                       :expected-data expected
-;;                                       :idx 0
-;;                                       :name "R"))
-;;      :description
-;;      "Lists are 0 terminated.
-;; Read a list from L, reverse it, and send it to R (terminating it with 0).")))
+(defun asm-blox-puzzles--list-reverse ()
+  "Generate a simple list reverse problem."
+  (let* ((input-1 (asm-blox-puzzles-random-list-of-lists))
+         (lists (asm-blox-puzzles-list-of-lists-to-lisp input-1))
+         (expected (asm-blox--flatten-list (seq-map (lambda (l)
+                                       (append (reverse l) (list 0)))
+                                     lists))))
+    (asm-blox--problem-spec-create
+     :name "List Reverse"
+     :difficulty 'medium
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                 :col 2
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "L"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                      :col 1
+                                      :expected-data expected
+                                      :idx 0
+                                      :name "R"))
+     :description
+     "Lists are 0 terminated.
+Read a list from L, reverse it, and send it to R (terminating it with 0).")))
 
 (defun asm-blox-puzzles--list-length ()
   "Generate a simple addition problem."
@@ -683,7 +681,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
        #'asm-blox-puzzles--clock
        #'asm-blox-puzzles--tax
        #'asm-blox-puzzles--list-length
-       ;;#'asm-blox-puzzles--list-reverse
+       #'asm-blox-puzzles--list-reverse
        #'asm-blox-puzzles--inc-ct
        #'asm-blox-puzzles--upcase
        #'asm-blox-puzzles--merge-step
