@@ -28,6 +28,8 @@
 
 ;;; Code:
 
+(require 'cl-lib)
+
 (defvar asm-blox-puzzles)
 (declare-function asm-blox--problem-spec-create "asm-blox")
 (declare-function asm-blox--cell-source-create "asm-blox")
