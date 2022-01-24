@@ -14,8 +14,9 @@
 
 # Installation
 
-  The game is still in progress but you can install it by adding the
-  files in your load path and calling `(require 'asm-blox)`.
+## MELPA
+
+  This package is on MELPA and can be found under the name `asm-blox`.
 
 ## via straight.el
 
