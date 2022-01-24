@@ -2826,7 +2826,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
 (defvar asm-blox-multi-step-ct 10)
 
 (defun asm-blox--execution-next-multiple-commands ()
-  "Perform a multiple steps of execution according to `asm-blox-multi-step-ct'."
+  "Perform a multiple instructions of execution according to `asm-blox-multi-step-ct'."
   (interactive)
   (dotimes (_ asm-blox-multi-step-ct)
     (when (not (asm-blox--gameboard-in-final-state-p))
