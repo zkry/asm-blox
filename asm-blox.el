@@ -764,7 +764,7 @@ If OP is a symbol, perform special logic."
         (asm-blox--cell-runtime-push cell-runtime v)))))
 
 (defun asm-blox--cell-runtime-stack-get (cell-runtime loc)
-  "Perform a variant of the GET command, grabbing the LOC value from CELL-RUNTIME's stack."
+  "Perform GET command variant, grabbing the LOC value from CELL-RUNTIME's stack."
   (let ((row (asm-blox--cell-runtime-row cell-runtime))
         (col (asm-blox--cell-runtime-col cell-runtime))
         (stack (seq-reverse (asm-blox--cell-runtime-stack cell-runtime)))
@@ -2865,7 +2865,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?| "-" st)
     st)
-  "Syntax table for asm-blox mode.")
+  "Syntax table for `asm-blox' mode.")
 
 (defun asm-blox--create-execution-buffer (box-contents extra-cells)
   "Create new gamebuffer to display execution of BOX-CONTENTS with EXTRA-CELLS."
@@ -2995,10 +2995,10 @@ The follwoing commadns are defined:
   "Idle-timer for showing matching parenthesis.")
 
 (define-derived-mode asm-blox-mode fundamental-mode "asm-blox"
-  "Major mode for editing asm-blox puzzles.
+  "Major mode for editing `asm-blox' puzzles.
 
-This mode provides capabilities for editing asm-blox code.  Since
-asm-blox code is split into multiple cells, this mode in
+This mode provides capabilities for editing `asm-blox' code.  Since
+the code is split into multiple cells, this mode in
 necessary to be able to edit such cells.  The mode defines
 editing functions as well as a function to compile and run the puzzle.
 
@@ -3300,7 +3300,7 @@ The following commands are available:
       (define-key map "q" #'quit-window)
       (define-key map "g" #'asm-blox-puzzle-selection-refresh)
       (define-key map (kbd "RET") #'asm-blox-select-puzzle)))
-  "Mode map for selecting a asm-blox puzzle.")
+  "Mode map for selecting a `asm-blox' puzzle.")
 
 (defun asm-blox--font-for-difficulty (difficulty)
   "Return font color from DIFFICULTY symbol."
@@ -3373,7 +3373,7 @@ The following commands are available:
     (forward-char col-num)))
 
 (defun asm-blox-puzzle-selection-mode ()
-  "Activate mode for selecting asm-blox puzzles."
+  "Activate mode for selecting `asm-blox' puzzles."
   (interactive)
   (kill-all-local-variables)
   (use-local-map asm-blox-puzzle-selection-mode-map)
@@ -3392,7 +3392,7 @@ The following commands are available:
 
 ;;;###autoload
 (defun asm-blox ()
-  "Open asm-blox puzzle selection screen."
+  "Open `asm-blox' puzzle selection screen."
   (interactive)
   (let ((buffer (get-buffer-create "*asm-blox-puzzle-selection*")))
     (switch-to-buffer buffer)
