@@ -21,7 +21,7 @@
 ## via straight.el
 
   ```emacs-lisp
-  (straight-use-package '(asm-blox :host github :repo "zkry/asm-blox"))
+  (straight-use-package 'asm-blox)
   ```
 # Selecting a Puzzle
 
