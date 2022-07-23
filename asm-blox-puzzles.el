@@ -669,8 +669,40 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :description
      "Take an input from the input X and send it to the output X.")))
 
+(defun asm-blox-puzzles--diagnostic-test ()
+  "Generate a simple addition problem."
+  (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil))))
+    (asm-blox--problem-spec-create
+     :name "Diagnostic Test"
+     :difficulty 'tutorial
+     :sources (list (asm-blox--cell-source-create :row 0
+                                                 :col -1
+                                                 :data input-1
+                                                 :idx 0
+                                                 :name "A")
+                    (asm-blox--cell-source-create :row 2
+                                                 :col -1
+                                                 :data input-2
+                                                 :idx 0
+                                                 :name "B"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 0
+                                      :col 4
+                                      :expected-data input-1
+                                      :idx 0
+                                      :name "X")
+           (asm-blox--cell-sink-create :row 2
+                                      :col 4
+                                      :expected-data input-2
+                                      :idx 0
+                                      :name "Y"))
+     :description
+     "Send data from A to X. Send data from B to Y.")))
+
 (setq asm-blox-puzzles
       (list
+       #'asm-blox-puzzles--diagnostic-test
        #'asm-blox-puzzles--indentation
        #'asm-blox-puzzles--constant
        #'asm-blox-puzzles--identity
@@ -692,6 +724,9 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
        #'asm-blox-puzzles--stack-machine
        #'asm-blox-puzzles--delete-word
        #'asm-blox-puzzles--triangle-area))
+
+(setq asm-blox-puzzles
+      (list #'asm-blox-puzzles--diagnostic-test))
 
 (provide 'asm-blox-puzzles)
 
