@@ -702,7 +702,6 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
 (setq asm-blox-puzzles
       (list
-       #'asm-blox-puzzles--diagnostic-test
        #'asm-blox-puzzles--indentation
        #'asm-blox-puzzles--constant
        #'asm-blox-puzzles--identity
@@ -724,9 +723,6 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
        #'asm-blox-puzzles--stack-machine
        #'asm-blox-puzzles--delete-word
        #'asm-blox-puzzles--triangle-area))
-
-(setq asm-blox-puzzles
-      (list #'asm-blox-puzzles--diagnostic-test))
 
 (provide 'asm-blox-puzzles)
 
