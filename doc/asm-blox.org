@@ -448,6 +448,31 @@ following code:
    to be created via YAML statements.  Currently this is not
    recommended and may be removed in future versions of =asm-blox=.
 
+   The following is an example of a YAML block:
+
+   #+begin_example
+      +--------------------+
+      |apiVersion: v1      |
+      |kind: Heap          |
+      |spec:               |
+      |  size: 100         |
+      |  setPort: up       |
+      |  seekPort: left    |
+      |  peekPort: up      |
+      |  offsetPort: left  |
+      |                    |
+      |                    |
+      |                    |
+      |                    |
+      +--------------------+
+   #+end_example
+
+   A YAML block has three top level items: ~apiVersion~, ~kind~, and
+   ~spec~.  ~kind~ must be either ~Stack~, ~Heap~, or ~Controller~.
+   The spec is the same stated above but with the keys in snake case
+   (ex. ~:seek-port~ becomes ~seekPort~).
+
+
 * Editing Commands
 
   The following commands may be helpful when editing asm-blox code:
