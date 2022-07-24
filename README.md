@@ -1,12 +1,12 @@
   ![logo](./doc/asm-blox-logo.png)
 
-# asm-blox: a programming game inspired by WAT and YAML
+# asm-blox: a programming game inspired by WAT
 
-  Solve a variety of puzzles involving moving data using WAT and YAML.
-  The game is played on a 3x4 grid where each grid can hold 11 lines
-  of text.  Nodes can send to adjacent notes number values.  Using
-  YAML, you can define extra components such as stacks and heaps to
-  help you solve your puzzles.
+  Solve a variety of puzzles involving moving data using WAT.  The
+  game is played on a 3x4 grid where each grid can hold 11 lines of
+  text.  Nodes can send to adjacent notes number values.  You can
+  define extra components such as stacks and heaps to help you solve
+  your puzzles.
 
   ![screenshot](./doc/screenshot1.gif)
 
@@ -89,7 +89,7 @@
 
   For more information please refer to [the manual](./doc/asm-blox.pdf).
 
-## YAML Blocks
+## Module Blocks
 
   Aside from ASM you can define a cell to be a stack or heap.  You can
   use as many stacks or heaps as you want in order to solve your
@@ -100,13 +100,9 @@
   (controller is used for special types of puzzles).  The `spec` field
   varies by the kind.  For example, the following is a definition of a stack:
 
-  ```yaml
-  apiVersion: v1
-  kind: Stack
-  spec:
-    size: 10
-    inputPorts:
-      - left
-    outputPort:
-      right
+  ```lisp
+(module stack
+ :size 10
+ :input-ports (left)
+ :output-port right)
   ```

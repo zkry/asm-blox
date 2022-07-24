@@ -1,4 +1,4 @@
-;;; asm-blox.el --- Programming game involving WAT and YAML -*- lexical-binding: t -*-
+;;; asm-blox.el --- Programming game involving WAT -*- lexical-binding: t -*-
 
 ;; Copyright © 2021-2022 Zachary Romero <zkry@posteo.net>
 
@@ -101,24 +101,29 @@ The format of the error is (list message row column).")
                (substring-no-properties (string-trim-left code) 0 1)))
          ;; There is currently no switch the user can use to indicate
          ;; filetype, thus the need of heuristic.
+         (sexp-p (eql (ignore-errors (car (read code))) 'module))
          (wat-p (or (not first-char)
                     (string= first-char "(")
                     (string= first-char ")")
                     (string= first-char ";"))))
-    (if wat-p
-        (let ((parse-tree (asm-blox--parse-assembly code)))
-          (if (asm-blox--parse-error-p parse-tree)
-              parse-tree
-            (let ((row (car coords))
-                  (col (cadr coords))
-                  (asm (asm-blox--parse-tree-to-asm parse-tree)))
-              (asm-blox--cell-runtime-create
-               :instructions asm
-               :pc 0
-               :stack '()
-               :row row
-               :col col))))
-      (asm-blox--create-yaml-code-node (car coords) (cadr coords) code))))
+    (cond
+     (sexp-p
+      (asm-blox--create-sexp-code-node (car coords) (cadr coords) code))
+     (wat-p
+      (let ((parse-tree (asm-blox--parse-assembly code)))
+        (if (asm-blox--parse-error-p parse-tree)
+            parse-tree
+          (let ((row (car coords))
+                (col (cadr coords))
+                (asm (asm-blox--parse-tree-to-asm parse-tree)))
+            (asm-blox--cell-runtime-create
+             :instructions asm
+             :pc 0
+             :stack '()
+             :row row
+             :col col)))))
+     (t
+      (asm-blox--create-yaml-code-node (car coords) (cadr coords) code)))))
 
 (defun asm-blox--parse-assembly (code)
   "Parse ASM CODE returning a list of instructions."
@@ -1310,6 +1315,47 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
        ("Network" (error "Network not implemented"))
        ("Heap" (asm-blox--yaml-create-heap row col .metadata .spec))
        (_ (throw 'error '(error 0 "unknown kind")))))))
+
+(defun asm-blox--transform-sexp-data (plist)
+  "Convert sexp spec to a legacy spec."
+  (let ((res '()))
+   (while plist
+     (let* ((key (symbol-name (car plist)))
+            (val (cadr plist))
+            (_ (when (not (= (aref key 0) ?:))
+                 (error "key `%s' in properties must begin with `:'" key)))
+            (new-key (substring key 1 (length key)))
+            (new-key (string-replace "-" "" (capitalize new-key)))
+            (new-key (concat (downcase (substring new-key 0 1))
+                             (substring new-key 1 (length new-key)))))
+       (when (symbolp val)
+         (setq val (symbol-name val)))
+       (when (listp val)
+         (setq val (seq-map #'symbol-name val)))
+       (push (cons (intern new-key) val) res)
+       (setq plist (cddr plist))))
+   res))
+
+(defun asm-blox--create-sexp-code-node (row col code)
+  "Create a runtime for the parsed CODE, located at ROW COL."
+  (catch 'error
+    (let* ((data (read code))
+           (kind (cadr data))
+           (spec (asm-blox--transform-sexp-data (ddr data))))
+      (when (or (not spec))
+        (throw 'error '(error 0 "must define spec")))
+      (pcase kind
+        ('stack
+         (asm-blox--yaml-create-stack row col nil spec))
+        ('controller
+         (asm-blox--yaml-create-controller row col nil spec))
+        ('container
+         (error "Container not implemented"))
+        ('network
+         (error "Network not implemented"))
+        ('heap
+         (asm-blox--yaml-create-heap row col nil spec))
+        (_ (throw 'error '(error 0 "unknown kind")))))))
 
 (defun asm-blox--yaml-message-stack (cell-runtime)
   "Return message to disblay for CELL-RUNTIME of YAML Stack."
