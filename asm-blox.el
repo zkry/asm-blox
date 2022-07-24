@@ -116,12 +116,14 @@ The format of the error is (list message row column).")
           (let ((row (car coords))
                 (col (cadr coords))
                 (asm (asm-blox--parse-tree-to-asm parse-tree)))
-            (asm-blox--cell-runtime-create
-             :instructions asm
-             :pc 0
-             :stack '()
-             :row row
-             :col col)))))
+            (if (asm-blox--parse-error-p asm)
+                asm
+              (asm-blox--cell-runtime-create
+               :instructions asm
+               :pc 0
+               :stack '()
+               :row row
+               :col col))))))
      (t
       (asm-blox--create-yaml-code-node (car coords) (cadr coords) code)))))
 
@@ -1323,7 +1325,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
      (let* ((key (symbol-name (car plist)))
             (val (cadr plist))
             (_ (when (not (= (aref key 0) ?:))
-                 (error "key `%s' in properties must begin with `:'" key)))
+                 (throw 'error '(error 0 "invalid spec key"))))
             (new-key (substring key 1 (length key)))
             (new-key (string-replace "-" "" (capitalize new-key)))
             (new-key (concat (downcase (substring new-key 0 1))
@@ -1341,7 +1343,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   (catch 'error
     (let* ((data (read code))
            (kind (cadr data))
-           (spec (asm-blox--transform-sexp-data (ddr data))))
+           (spec (asm-blox--transform-sexp-data (cddr data))))
       (when (or (not spec))
         (throw 'error '(error 0 "must define spec")))
       (pcase kind
