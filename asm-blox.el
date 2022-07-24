@@ -1319,7 +1319,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
        (_ (throw 'error '(error 0 "unknown kind")))))))
 
 (defun asm-blox--transform-sexp-data (plist)
-  "Convert sexp spec to a legacy spec."
+  "Convert sexp spec PLIST to a legacy spec."
   (let ((res '()))
    (while plist
      (let* ((key (car plist))
@@ -1330,7 +1330,7 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
             (_ (when (not (= (aref key 0) ?:))
                  (throw 'error '(error 0 "invalid spec key"))))
             (new-key (substring key 1 (length key)))
-            (new-key (string-replace "-" "" (capitalize new-key)))
+            (new-key (replace-regexp-in-string "-" "" (capitalize new-key)))
             (new-key (concat (downcase (substring new-key 0 1))
                              (substring new-key 1 (length new-key)))))
        (when (symbolp val)
