@@ -1322,7 +1322,10 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   "Convert sexp spec to a legacy spec."
   (let ((res '()))
    (while plist
-     (let* ((key (symbol-name (car plist)))
+     (let* ((key (car plist))
+            (_ (when (not (symbolp key))
+                 (throw 'error '(error 0 "invalid spec key"))))
+            (key (symbol-name key))
             (val (cadr plist))
             (_ (when (not (= (aref key 0) ?:))
                  (throw 'error '(error 0 "invalid spec key"))))
@@ -1342,22 +1345,24 @@ DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
   "Create a runtime for the parsed CODE, located at ROW COL."
   (catch 'error
     (let* ((data (read code))
-           (kind (cadr data))
-           (spec (asm-blox--transform-sexp-data (cddr data))))
-      (when (or (not spec))
-        (throw 'error '(error 0 "must define spec")))
-      (pcase kind
-        ('stack
-         (asm-blox--yaml-create-stack row col nil spec))
-        ('controller
-         (asm-blox--yaml-create-controller row col nil spec))
-        ('container
-         (error "Container not implemented"))
-        ('network
-         (error "Network not implemented"))
-        ('heap
-         (asm-blox--yaml-create-heap row col nil spec))
-        (_ (throw 'error '(error 0 "unknown kind")))))))
+           (kind (cadr data)))
+      (when (not (memq kind '(stack controller container network heap)))
+        (throw 'error '(error 8 "invalid kind")))
+      (let ((spec (asm-blox--transform-sexp-data (cddr data))))
+        (when (or (not spec))
+          (throw 'error '(error 0 "must define spec")))
+        (pcase kind
+          ('stack
+           (asm-blox--yaml-create-stack row col nil spec))
+          ('controller
+           (asm-blox--yaml-create-controller row col nil spec))
+          ('container
+           (error "Container not implemented"))
+          ('network
+           (error "Network not implemented"))
+          ('heap
+           (asm-blox--yaml-create-heap row col nil spec))
+          (_ (throw 'error '(error 0 "unknown kind"))))))))
 
 (defun asm-blox--yaml-message-stack (cell-runtime)
   "Return message to disblay for CELL-RUNTIME of YAML Stack."
