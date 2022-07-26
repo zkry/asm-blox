@@ -49,7 +49,8 @@
                             (list '() '())))))
 
 (defun asm-blox-puzzles-random-list-of-lists (&optional limit)
-  "Generate list of 0-terminated lists as helper."
+  "Generate list of 0-terminated lists as helper.
+If LIMIT is non-nil, the number generated will be less-than it."
   (let* ((nums (seq-map (lambda (_) (if limit
                                         (1+ (random limit))
                                       (1+ (random 998))))
@@ -858,7 +859,7 @@ Otherwise write 0 to O.
 Always write 0 for the first input.")))
 
 (defun asm-blox-puzzles--make-interrupt-handler-seq ()
-  "Generate a problem."
+  "Generated an interrupt sequence."
   (let ((state 'zero)
         (res '()))
     (while (< (length res) 40)
@@ -870,7 +871,7 @@ Always write 0 for the first input.")))
     res))
 
 (defun asm-blox-puzzles--make-interrupt-handler-solution (a b c d)
-  "Generate a problem."
+  "Return the solution to interrupt handler given sequences A, B, C and D."
   (catch 'result
    (cl-labels
        ((compare (x prev) (if (and (= prev 0) (= x 1)) 1 0)))
@@ -879,8 +880,7 @@ Always write 0 for the first input.")))
         (let ((ress (list (compare a pa)
                           (compare b pb)
                           (compare c pc)
-                          (compare d pd)))
-              (res nil))
+                          (compare d pd))))
           (when (> (apply #'+ ress) 1)
             (throw 'result nil))
           (if (= (apply #'+ ress) 0)
