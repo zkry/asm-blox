@@ -48,10 +48,16 @@
                             lists
                             (list '() '())))))
 
-(defun asm-blox-puzzles-random-list-of-lists ()
-  "Generate list of 0-terminated lists as helper."
-  (let* ((nums (seq-map (lambda (_) (random 999)) (make-list 40 nil)))
-         (breaks (seq-map (lambda (_) (random 5)) (make-list 40 nil)))
+(defun asm-blox-puzzles-random-list-of-lists (&optional limit)
+  "Generate list of 0-terminated lists as helper.
+If LIMIT is non-nil, the number generated will be less-than it."
+  (let* ((nums (seq-map (lambda (_) (if limit
+                                        (1+ (random limit))
+                                      (1+ (random 998))))
+                        (make-list 40 nil)))
+         (breaks (seq-map (lambda (_)
+                            (random 5))
+                          (make-list 40 nil)))
          (switched nil)
          (i 0))
     (seq-mapn (lambda (a b)
@@ -355,45 +361,6 @@ upcasing it if it is a lowercase letter.")))
 ex. 1 2 0 5 6 4
      + - + + -     3 increses")))
 
-(defun asm-blox-puzzles--tax ()
-  "Generate a simple tax problem."
-  (let* ((high-start-ct (random 20))
-         (start-seq (seq-map (lambda (_) (random 999))
-                             (make-list high-start-ct nil)))
-         (high-seq (seq-map (lambda (_) (+ 500 (random 499)))
-                            (make-list 12 nil)))
-         (rest-seq (seq-map (lambda (_) (random 999))
-                            (make-list (- 40 high-start-ct 12) nil)))
-         (input-1 (append start-seq high-seq rest-seq))
-         (expected (cdr (seq-reduce (lambda (acc x)
-                                      (if (listp acc)
-                                          acc
-                                        (let ((at-ct (if (>= x 500)
-                                                         (1+ acc)
-                                                       0)))
-                                          (if (= at-ct 12)
-                                              (list 'done (/ x 40))
-                                            at-ct))))
-                                    input-1
-                                    0))))
-    (asm-blox--problem-spec-create
-     :name "Tax"
-     :difficulty 'hard
-     :sources (list (asm-blox--cell-source-create :row 1
-                                                 :col -1
-                                                 :data input-1
-                                                 :idx 0
-                                                 :name "I"))
-     :sinks
-     (list (asm-blox--cell-sink-create :row 1
-                                      :col 4
-                                      :expected-data expected
-                                      :idx 0
-                                      :name "O"))
-     :description
-     "Read values from I. After the 12th consecutive value is greater than
-or equal to 500, return that 12th value divided by 40.")))
-
 (defun asm-blox-puzzles--list-reverse ()
   "Generate a simple list reverse problem."
   (let* ((input-1 (asm-blox-puzzles-random-list-of-lists))
@@ -670,7 +637,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      "Take an input from the input X and send it to the output X.")))
 
 (defun asm-blox-puzzles--diagnostic-test ()
-  "Generate a simple addition problem."
+  "Generate a problem."
   (let* ((input-1 (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
          (input-2 (seq-map (lambda (_) (random 10)) (make-list 40 nil))))
     (asm-blox--problem-spec-create
@@ -700,6 +667,574 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :description
      "Send data from A to X. Send data from B to Y.")))
 
+(defun asm-blox-puzzles--signal-amplifier ()
+  "Generate a problem."
+  (let* ((input (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (output (seq-map (lambda (x) (* 2 x)) input)))
+    (asm-blox--problem-spec-create
+     :name "Signal Amplifier"
+     :difficulty 'tutorial
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 2
+                                                  :data input
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 1
+                                       :expected-data output
+                                       :idx 0
+                                       :name "O"))
+     :description
+     "Read a value from I. Double it. Send that to O.")))
+
+(defun asm-blox-puzzles--differential-converter ()
+  "Generate a problem."
+  (let* ((input-a (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (input-b (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (output-p (seq-mapn (lambda (a b) (- a b)) input-a input-b))
+         (output-n (seq-mapn (lambda (a b) (- b a)) input-a input-b)))
+    (asm-blox--problem-spec-create
+     :name "Differential Converter"
+     :difficulty 'tutorial
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input-a
+                                                  :idx 0
+                                                  :name "I")
+                    (asm-blox--cell-source-create :row -1
+                                                  :col 2
+                                                  :data input-b
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 1
+                                       :expected-data output-p
+                                       :idx 0
+                                       :name "P")
+           (asm-blox--cell-sink-create :row 3
+                                       :col 1
+                                       :expected-data output-n
+                                       :idx 0
+                                       :name "N"))
+     :description
+     "Read a value from A and B. Send A - B to P. Send B - A to N.")))
+
+(defun asm-blox-puzzles--signal-comparator ()
+  "Generate a problem."
+  (let* ((input (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (output-g (seq-mapn (lambda (x) (if (> x 0) 1 0)) input))
+         (output-e (seq-mapn (lambda (x) (if (= x 0) 1 0)) input))
+         (output-l (seq-mapn (lambda (x) (if (< x 0) 1 0)) input)))
+    (asm-blox--problem-spec-create
+     :name "Signal Comparator"
+     :difficulty 'tutorial
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 0
+                                                  :data input
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 1
+                                       :expected-data output-g
+                                       :idx 0
+                                       :name "P")
+           (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output-e
+                                       :idx 0
+                                       :name "E")
+           (asm-blox--cell-sink-create :row 3
+                                       :col 3
+                                       :expected-data output-l
+                                       :idx 0
+                                       :name "L"))
+     :description
+     "Read a value from I.
+If I > 0 send 1 to G.
+If I < 0 send 1 to L.
+If I = 0 send 1 to E.
+When sending 1 to output, send 0 to the other two output ports.")))
+
+(defun asm-blox-puzzles--sequence-generator ()
+  "Generate a problem."
+  (let* ((input-1 (seq-map (lambda (_) (1+ (* (random 10) 2))) (make-list 8 nil)))
+         (input-2 (seq-map (lambda (_) (* (random 10) 2)) (make-list 8 nil)))
+         (output (asm-blox--flatten-list
+                  (seq-mapn (lambda (a b)
+                              (if (< a b)
+                                  (list a b 0)
+                                (list b a 0)))
+                            input-1 input-2))))
+    (asm-blox--problem-spec-create
+     :name "Sequence Generator"
+     :difficulty 'easy
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input-1
+                                                  :idx 0
+                                                  :name "A")
+                    (asm-blox--cell-source-create :row -1
+                                                  :col 2
+                                                  :data input-2
+                                                  :idx 0
+                                                  :name "B"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output
+                                       :idx 0
+                                       :name "O"))
+     :description
+     "Read a value from A and B.
+Send the lesser of the two to O.
+Send the other value to O.
+Send 0 to O.")))
+
+(defun asm-blox-puzzles--sequence-counter ()
+  "Generate a problem."
+  (let* ((input (asm-blox-puzzles-random-list-of-lists 30))
+         (lists (asm-blox-puzzles-list-of-lists-to-lisp input))
+         (output-sum (seq-map
+                      (lambda (list)
+                        (apply #'+ list))
+                      lists))
+         (output-length (seq-map
+                         (lambda (list)
+                           (length list))
+                         lists)))
+    (asm-blox--problem-spec-create
+     :name "Sequence Counter"
+     :difficulty 'easy
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output-sum
+                                       :idx 0
+                                       :name "S")
+           (asm-blox--cell-sink-create :row 3
+                                       :col 3
+                                       :expected-data output-length
+                                       :idx 0
+                                       :name "L"))
+     :description
+     "Read a 0-terminated sequence from I.
+Write the length of the sequence to L.
+Write the sum of the sequence to S.")))
+
+(defun asm-blox-puzzles--signal-edge-detector ()
+  "Generate a problem."
+  (let* ((input (asm-blox-puzzles-random-list-of-lists 100))
+         (output (seq-mapn (lambda (at prev)
+                             (if (>= at (+ prev 10))
+                                 1
+                               0))
+                           input
+                           (cons (car input) input))))
+    (asm-blox--problem-spec-create
+     :name "Signal Edge Detector"
+     :difficulty 'easy
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output
+                                       :idx 0
+                                       :name "O"))
+     :description
+     "Read a value from I, comparing it with the previous value.
+If the value increased by 10 or more, write 1 to O.
+Otherwise write 0 to O.
+Always write 0 for the first input.")))
+
+(defun asm-blox-puzzles--make-interrupt-handler-seq ()
+  "Generated an interrupt sequence."
+  (let ((state 'zero)
+        (res '()))
+    (while (< (length res) 40)
+      (let ((seq-length (1+ (random 9))))
+        (when (> (+ seq-length (length res)) 40)
+          (setq seq-length (- 40 (length res))))
+        (setq res (append res (make-list seq-length (if (eql state 'zero) 0 1))))
+        (setq state (if (eql state 'zero) 'one 'zero))))
+    res))
+
+(defun asm-blox-puzzles--make-interrupt-handler-solution (a b c d)
+  "Return the solution to interrupt handler given sequences A, B, C and D."
+  (catch 'result
+   (cl-labels
+       ((compare (x prev) (if (and (= prev 0) (= x 1)) 1 0)))
+     (seq-mapn
+      (lambda (a pa b pb c pc d pd)
+        (let ((ress (list (compare a pa)
+                          (compare b pb)
+                          (compare c pc)
+                          (compare d pd))))
+          (when (> (apply #'+ ress) 1)
+            (throw 'result nil))
+          (if (= (apply #'+ ress) 0)
+              0
+            (seq-find #'identity
+                      (seq-mapn (lambda (x idx)
+                                  (if (= 1 x)
+                                      idx
+                                    nil))
+                                ress '(1 2 3 4))))))
+      (cdr a) a (cdr b) b (cdr c) c (cdr d) d))))
+
+(defun asm-blox-puzzles--interrupt-handler ()
+  "Generate a problem."
+  (let* ((input-a)
+         (input-b)
+         (input-c)
+         (input-d)
+         (res))
+    ;; kindof hacky....
+    (while (not res)
+      (setq input-a (asm-blox-puzzles--make-interrupt-handler-seq))
+      (setq input-b (asm-blox-puzzles--make-interrupt-handler-seq))
+      (setq input-c (asm-blox-puzzles--make-interrupt-handler-seq))
+      (setq input-d (asm-blox-puzzles--make-interrupt-handler-seq))
+      (setq res (asm-blox-puzzles--make-interrupt-handler-solution
+                 input-a input-b input-c input-d)))
+    (asm-blox--problem-spec-create
+     :name "Interrupt Handler"
+     :difficulty 'easy
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 0
+                                                  :data input-a
+                                                  :idx 0
+                                                  :name "1")
+                    (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input-b
+                                                  :idx 0
+                                                  :name "2")
+                    (asm-blox--cell-source-create :row -1
+                                                  :col 2
+                                                  :data input-c
+                                                  :idx 0
+                                                  :name "3")
+                    (asm-blox--cell-source-create :row -1
+                                                  :col 3
+                                                  :data input-d
+                                                  :idx 0
+                                                  :name "4"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data res
+                                       :idx 0
+                                       :name "O"))
+     :description
+     "Read inputs 1, 2, 3, and 4.
+Whenever an input sequence changes from 0 to 1
+   write the input port number to O.
+
+Example:
+       /---- Input ports
+1 2 3 4 | O <- Output
+--------+--
+0 0 0 0 | 0
+0 1 0 0 | 2
+0 1 0 0 | 0
+0 1 0 1 | 4
+1 1 0 0 | 1
+1 1 0 0 | 0")))
+
+(defun asm-blox-puzzles--signal-pattern-detector ()
+  "Generate a problem."
+  (let* ((input (seq-map (lambda (_)
+                           (let ((res (random 5)))
+                             (if (>= res 3)
+                                 0
+                               res)))
+                         (make-list 40 nil)))
+         (output (seq-mapn
+                  (lambda (at p1 p2)
+                    (if (= at p1 p2 0)
+                        1
+                      0))
+                  input
+                  (cons -1 input)
+                  (cons -1 (cons -1 input)))))
+    (if (< (apply #'+ output) 5)
+        ;; hacky...
+        (asm-blox-puzzles--signal-pattern-detector)
+      (asm-blox--problem-spec-create
+      :name "Signal Pattern Detector"
+      :difficulty 'medium
+      :sources (list (asm-blox--cell-source-create :row -1
+                                                   :col 1
+                                                   :data input
+                                                   :idx 0
+                                                   :name "I"))
+      :sinks
+      (list (asm-blox--cell-sink-create :row 3
+                                        :col 2
+                                        :expected-data output
+                                        :idx 0
+                                        :name "O"))
+      :description
+      "Read a value from I.
+Find the pattern 0, 0, 0:
+- If the current value, and the two previous values are all 0,
+   write 1.
+- Otherwise write 0."))))
+
+(defun asm-blox-puzzles--sequence-peak-detector ()
+  "Generate a problem."
+  (let* ((input (asm-blox-puzzles-random-list-of-lists 100))
+         (input-list (asm-blox-puzzles-list-of-lists-to-lisp input))
+         (output-n (seq-map (lambda (l)
+                              (apply #'min l))
+                            input-list))
+         (output-x (seq-map (lambda (l)
+                              (apply #'max l))
+                            input-list)))
+    (asm-blox--problem-spec-create
+     :name "Sequence Peak Detector"
+     :difficulty 'medium
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output-n
+                                       :idx 0
+                                       :name "N")
+           (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output-x
+                                       :idx 0
+                                       :name "X"))
+     :description
+     "Read a 0-terminated sequence from I.
+Write the minimum value of the sequence to N.
+Write the maximum value of the sequence to X.")))
+
+(defun asm-blox-puzzles--sequence-reverser ()
+  "Generate a problem."
+  (let* ((input (asm-blox-puzzles-random-list-of-lists 100))
+         (input-list (asm-blox-puzzles-list-of-lists-to-lisp input))
+         (reversed (asm-blox--flatten-list
+                    (seq-map (lambda (l)
+                               (append (reverse l) '(0)))
+                             input-list))))
+    (asm-blox--problem-spec-create
+     :name "Sequence Reverser"
+     :difficulty 'medium
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data reversed
+                                       :idx 0
+                                       :name "R"))
+     :description
+     "Read a sequence from I. Reverse the sequence and write it to R (0-terminated).")))
+
+(defun asm-blox-puzzles--signal-multiplier ()
+  "Generate a problem."
+  (let* ((input-a (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (input-b (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (output (seq-mapn (lambda (a b) (* a b)) input-a input-b)))
+    (asm-blox--problem-spec-create
+     :name "Signal Multiplier"
+     :difficulty 'medium
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input-a
+                                                  :idx 0
+                                                  :name "A")
+                    (asm-blox--cell-source-create :row -1
+                                                  :col 2
+                                                  :data input-b
+                                                  :idx 0
+                                                  :name "B"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output
+                                       :idx 0
+                                       :name "M"))
+     :description
+     "Read a value from A and B. Multiply the numbers. Send result to M.")))
+
+(defun asm-blox-puzzles--signal-window-filter ()
+  "Generate a problem."
+  (let* ((input (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (output-3 (seq-mapn
+                    (lambda (a b c)
+                      (+ a b c))
+                    input
+                    (cons 0 input)
+                    (cons 0 (cons 0 input))))
+         (output-5 (seq-mapn
+                    (lambda (a b c d e)
+                      (+ a b c d e))
+                    input
+                    (cons 0 input)
+                    (cons 0 (cons 0 input))
+                    (append '(0 0 0) input)
+                    (append '(0 0 0 0) input))))
+    (asm-blox--problem-spec-create
+     :name "Signal Window Filter"
+     :difficulty 'hard
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 1
+                                       :expected-data output-3
+                                       :idx 0
+                                       :name "3")
+           (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output-5
+                                       :idx 0
+                                       :name "5"))
+     :description
+     "Read a value from I.
+Write the sum of the last 3 values to output port `3'.
+Write the sum of the last 5 values to output port `5'.
+Assume previous numbers are 0.")))
+
+(defun asm-blox-puzzles--signal-divider ()
+  "Generate a problem."
+  (let* ((input-a (seq-map (lambda (_) (+ (random 10) 10)) (make-list 40 nil)))
+         (input-b (seq-map (lambda (_) (+ (random 10) 2)) (make-list 40 nil)))
+         (output-q (seq-mapn
+                    (lambda (a b)
+                      (/ a b))
+                    input-a
+                    input-b))
+         (output-r (seq-mapn
+                    (lambda (a b)
+                      (% a b))
+                    input-a
+                    input-b)))
+    (asm-blox--problem-spec-create
+     :name "Signal Divider"
+     :difficulty 'hard
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input-a
+                                                  :idx 0
+                                                  :name "A")
+                    (asm-blox--cell-source-create :row -1
+                                                  :col 2
+                                                  :data input-b
+                                                  :idx 0
+                                                  :name "B"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 1
+                                       :expected-data output-r
+                                       :idx 0
+                                       :name "R")
+           (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output-q
+                                       :idx 0
+                                       :name "Q"))
+     :description
+     "Read a value from A and B.
+Send the quotient of A / B to Q.
+Send the remainder of A / B to R.")))
+
+(defun asm-blox-puzzles--sequence-indexer ()
+  "Generate a problem."
+  (let* ((db (append (seq-map (lambda (_) (+ (random 500) 300)) (make-list 10 nil)) '(0)))
+         (idxs (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+         (output (seq-map
+                  (lambda (idx)
+                    (nth idx db))
+                  idxs)))
+    (asm-blox--problem-spec-create
+     :name "Sequence Indexer"
+     :difficulty 'hard
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data db
+                                                  :idx 0
+                                                  :name "D")
+                    (asm-blox--cell-source-create :row -1
+                                                  :col 2
+                                                  :data idxs
+                                                  :idx 0
+                                                  :name "X"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 1
+                                       :expected-data output
+                                       :idx 0
+                                       :name "V"))
+     :description
+     "Read a 0-terminated sequence from D,
+  storing it to be accessable later on.
+Read an index from X.
+Send the Xth value read from D to output port V.
+
+Example:
+  D  X | V
+-------+---
+ 100 0 | 100
+ 200 2 | 400
+ 400 1 | 200
+   0 1 | 200
+     0 | 100
+")))
+
+(defun asm-blox-puzzles--sequence-sorter ()
+  "Generate a problem."
+  (let* ((input (asm-blox-puzzles-random-list-of-lists 100))
+         (input-list (asm-blox-puzzles-list-of-lists-to-lisp input))
+         (output (asm-blox--flatten-list
+                  (seq-map
+                   (lambda (l)
+                     (append (seq-sort #'< l) '(0)))
+                   input-list))))
+    (asm-blox--problem-spec-create
+     :name "Sequence Sorter"
+     :difficulty 'hard
+     :sources (list (asm-blox--cell-source-create :row -1
+                                                  :col 1
+                                                  :data input
+                                                  :idx 0
+                                                  :name "I"))
+     :sinks
+     (list (asm-blox--cell-sink-create :row 3
+                                       :col 2
+                                       :expected-data output
+                                       :idx 0
+                                       :name "O"))
+     :description
+     "Read a 0-terminated sequence from I.
+Sort the sequence and write it to O (0-terminated).")))
+
+
 (setq asm-blox-puzzles
       (list
        #'asm-blox-puzzles--indentation
@@ -710,7 +1245,6 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
        #'asm-blox-puzzles--number-sum
        #'asm-blox-puzzles--number-sorter
        #'asm-blox-puzzles--clock
-       #'asm-blox-puzzles--tax
        #'asm-blox-puzzles--list-length
        #'asm-blox-puzzles--list-reverse
        #'asm-blox-puzzles--inc-ct
@@ -722,7 +1256,24 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
        #'asm-blox-puzzles--turing
        #'asm-blox-puzzles--stack-machine
        #'asm-blox-puzzles--delete-word
-       #'asm-blox-puzzles--triangle-area))
+       #'asm-blox-puzzles--triangle-area
+
+       #'asm-blox-puzzles--diagnostic-test
+       #'asm-blox-puzzles--signal-amplifier
+       #'asm-blox-puzzles--differential-converter
+       #'asm-blox-puzzles--signal-comparator
+       #'asm-blox-puzzles--sequence-generator
+       #'asm-blox-puzzles--sequence-counter
+       #'asm-blox-puzzles--signal-edge-detector
+       #'asm-blox-puzzles--interrupt-handler
+       #'asm-blox-puzzles--signal-pattern-detector
+       #'asm-blox-puzzles--sequence-peak-detector
+       #'asm-blox-puzzles--sequence-reverser
+       #'asm-blox-puzzles--signal-multiplier
+       #'asm-blox-puzzles--signal-window-filter
+       #'asm-blox-puzzles--signal-divider
+       #'asm-blox-puzzles--sequence-indexer
+       #'asm-blox-puzzles--sequence-sorter))
 
 (provide 'asm-blox-puzzles)
 
