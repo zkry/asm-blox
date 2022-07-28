@@ -2504,6 +2504,12 @@ individual box."
     (lambda ()
       ,code)))
 
+(defun asm-blox--on-edit-eldoc ()
+  (when eldoc-mode
+    (let ((eldoc-msg (asm-blox-eldoc)))
+      (when eldoc-msg
+        (message "%s" eldoc-msg)))))
+
 (defun asm-blox-self-insert-command ()
   "Insert the character you type."
   (interactive)
@@ -2512,15 +2518,15 @@ individual box."
     (asm-blox--in-buffer
      (insert (this-command-keys)))
     (asm-blox--push-undo-stack-value)
-    (let ((eldoc-msg (asm-blox-eldoc)))
-      (message "%s" eldoc-msg))))
+    (asm-blox--on-edit-eldoc)))
 
 (defun asm-blox-backward-delete-char ()
   "Delete the character to the left of the point."
   (interactive)
   (asm-blox--in-buffer
    (backward-delete-char 1))
-  (asm-blox--push-undo-stack-value))
+  (asm-blox--push-undo-stack-value)
+  (asm-blox--on-edit-eldoc))
 
 (defun asm-blox-delete-char ()
   "Delete the character at the point."
@@ -3101,13 +3107,13 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
           (when (equal "" at-cmd)
             (error "invalid command"))
           (let* ((at-sym (intern (upcase at-cmd)))
-                 (spec (seq-find (lambda (spec)
-                                   (eql (car spec) at-sym ))
-                                 asm-blox-eldoc-specs)))
+                 (spec (cdr (seq-find (lambda (spec)
+                                        (eql (car spec) at-sym ))
+                                      asm-blox-eldoc-specs))))
             (if (not spec)
                 nil
               (when (>= pos (length spec))
-                (setq pos (1- (length spec))))
+                (setq pos (length spec)))
               (let ((eldoc-string ""))
                 (dotimes (n (length spec))
                   (let* ((at-spec (symbol-name (nth n spec)))
@@ -3116,7 +3122,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                                   (if (equal at-spec "rest")
                                       "&sub-expressions..."
                                     at-spec))))
-                    (when (= n pos)
+                    (when (= n (- pos 1))
                       (setq at-str (propertize at-str 'face '(:weight bold))))
                     (setq eldoc-string (concat eldoc-string at-str))))
                 (concat
