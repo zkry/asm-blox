@@ -276,10 +276,10 @@ The format of the error is (list message row column).")
     (DROP asm-blox--subexpressions)
     (SEND asm-blox--portp asm-blox--subexpressions)
     (GET (lambda (x) (or (asm-blox--portp x) (integerp x))))
-    (LEFT)  ;; TODO: Should these be in final game?
-    (RIGHT) ;; TODO
-    (UP)    ;; TODO
-    (DOWN)  ;; TODO
+    (LEFT)
+    (RIGHT)
+    (UP)
+    (DOWN)
     (FN t)  ;; FN needs special verification code
     )
   "List of commands and specifications for command arguments.")
@@ -3063,17 +3063,22 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
           (setq at-cmd (buffer-substring-no-properties
                         (point)
                         (save-excursion (forward-sexp) (point))))
-          (let ((spec (cdr (assoc at-cmd asm-blox-eldoc-specs #'equal))))
+          (when (equal "" at-cmd)
+            (error "invalid command"))
+          (let* ((at-sym (intern (upcase at-cmd)))
+                 (spec (seq-find (lambda (spec)
+                                   (eql (car spec) at-sym ))
+                                 asm-blox-command-specs)))
             (if (not spec)
                 "UNKNOWN COMMAND"
               (when (>= pos (length spec))
                 (setq pos (1- (length spec))))
               (let ((eldoc-string ""))
                 (dotimes (n (length spec))
-                  (let* ((at-spec (nth n spec))
+                  (let* ((at-spec (symbol-name (nth n spec)))
                          (at-str (concat
                                   (if (= n 0) "" " ")
-                                  (if (eql at-spec 'rest)
+                                  (if (equal at-spec "asm-blox--subexpressions")
                                       "&sub-expressions..."
                                     at-spec))))
                     (when (= n pos)
