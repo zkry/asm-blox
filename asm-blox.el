@@ -2511,7 +2511,9 @@ individual box."
       (ding)
     (asm-blox--in-buffer
      (insert (this-command-keys)))
-    (asm-blox--push-undo-stack-value)))
+    (asm-blox--push-undo-stack-value)
+    (let ((eldoc-msg (asm-blox-eldoc)))
+      (message "%s" eldoc-msg))))
 
 (defun asm-blox-backward-delete-char ()
   "Delete the character to the left of the point."
@@ -3027,6 +3029,69 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
         (asm-blox--create-execution-buffer box-contents extra-cells)
         (goto-char (point-min))))))
 
+;;; Eldoc integration
+
+(defconst asm-blox-eldoc-specs
+  '(("const" . ("number"))
+    ("set" . ("stack-offset"))
+    ("inc" . ("stack-offset" rest)))
+  "")
+
+(defun asm-blox-eldoc (&rest _ignored)
+  "Backend function for eldoc to show documentation."
+  (ignore-errors
+    (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
+           (row (car box-id))
+           (col (cadr box-id))
+           (line (caddr box-id))
+           (line-col (asm-blox-get-line-col-num (point)))
+           (box-text (asm-blox--get-box-content row col)))
+      (with-temp-buffer
+        (insert box-text)
+        (goto-char (point-min))
+        (forward-line line)
+        (forward-char line-col)
+        (char-after (point))
+        (let ((pos 0)
+              (at-sym))
+          (when (looking-back "[a-zA-Z0-9_$-]" (- (point) 2))
+            (backward-sexp))
+          (while (and (not (looking-back "(" (- (point) 2)))
+                      (not (bobp)))
+            (backward-sexp)
+            (cl-incf pos))
+          (setq at-cmd (buffer-substring-no-properties
+                        (point)
+                        (save-excursion (forward-sexp) (point))))
+          (let ((spec (cdr (assoc at-cmd asm-blox-eldoc-specs #'equal))))
+            (if (not spec)
+                "UNKNOWN COMMAND"
+              (when (>= pos (length spec))
+                (setq pos (1- (length spec))))
+              (let ((eldoc-string ""))
+                (dotimes (n (length spec))
+                  (let* ((at-spec (nth n spec))
+                         (at-str (concat
+                                  (if (= n 0) "" " ")
+                                  (if (eql at-spec 'rest)
+                                      "&sub-expressions..."
+                                    at-spec))))
+                    (when (= n pos)
+                      (setq at-str (propertize at-str 'face '(:weight bold))))
+                    (setq eldoc-string (concat eldoc-string at-str))))
+                (concat
+                 (propertize at-cmd 'face 'font-lock-function-name-face)
+                 ": "
+                 eldoc-string)))))))))
+
+(defun asm-blox-eldoc-setup ()
+  "Setup eldoc in the current buffer."
+  (if (boundp 'eldoc-documentation-functions)
+      (add-hook 'eldoc-documentation-functions #'asm-blox-eldoc nil t)
+    (setq-local eldoc-documentation-function #'asm-blox-eldoc)))
+
+;;; Mode definition
+
 (define-derived-mode asm-blox-execution-mode fundamental-mode "asm-blox-execution"
   "Major mode for viewing the execution of an asm blox puzzle.
 
@@ -3073,7 +3138,8 @@ The following commands are available:
       (asm-blox-redraw-game-board)))
   (unless asm-blox--show-pair-idle-timer
     (setq asm-blox--show-pair-idle-timer
-          (run-with-idle-timer 0.125 t #'asm-blox--highlight-pairs))))
+          (run-with-idle-timer 0.125 t #'asm-blox--highlight-pairs)))
+  (asm-blox-eldoc-setup))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.asbx\\'" 'asm-blox-mode))
