@@ -5,7 +5,7 @@
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "26.1") (yaml "0.3.4"))
+;; Package-Requires: ((emacs "26.1") (yaml "0.5.1"))
 ;; Homepage: https://github.com/zkry/asm-blox
 ;; Keywords: games
 
@@ -276,10 +276,10 @@ The format of the error is (list message row column).")
     (DROP asm-blox--subexpressions)
     (SEND asm-blox--portp asm-blox--subexpressions)
     (GET (lambda (x) (or (asm-blox--portp x) (integerp x))))
-    (LEFT)  ;; TODO: Should these be in final game?
-    (RIGHT) ;; TODO
-    (UP)    ;; TODO
-    (DOWN)  ;; TODO
+    (LEFT)
+    (RIGHT)
+    (UP)
+    (DOWN)
     (FN t)  ;; FN needs special verification code
     )
   "List of commands and specifications for command arguments.")
@@ -2504,6 +2504,12 @@ individual box."
     (lambda ()
       ,code)))
 
+(defun asm-blox--on-edit-eldoc ()
+  (when eldoc-mode
+    (let ((eldoc-msg (asm-blox-eldoc)))
+      (when eldoc-msg
+        (message "%s" eldoc-msg)))))
+
 (defun asm-blox-self-insert-command ()
   "Insert the character you type."
   (interactive)
@@ -2511,14 +2517,16 @@ individual box."
       (ding)
     (asm-blox--in-buffer
      (insert (this-command-keys)))
-    (asm-blox--push-undo-stack-value)))
+    (asm-blox--push-undo-stack-value)
+    (asm-blox--on-edit-eldoc)))
 
 (defun asm-blox-backward-delete-char ()
   "Delete the character to the left of the point."
   (interactive)
   (asm-blox--in-buffer
    (backward-delete-char 1))
-  (asm-blox--push-undo-stack-value))
+  (asm-blox--push-undo-stack-value)
+  (asm-blox--on-edit-eldoc))
 
 (defun asm-blox-delete-char ()
   "Delete the character at the point."
@@ -3027,6 +3035,110 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
         (asm-blox--create-execution-buffer box-contents extra-cells)
         (goto-char (point-min))))))
 
+;;; Eldoc integration
+
+(defconst asm-blox-eldoc-specs
+  '((SET stack-offset rest)
+    (CLR)
+    (CONST number)
+    (DUP rest)
+    (ABS rest)
+    (ADD rest)
+    (SUB rest)
+    (MUL rest)
+    (DIV rest)
+    (NEG rest)
+    (REM rest)
+    (AND rest)
+    (NOT rest)
+    (OR rest)
+    (EQ rest)
+    (NE rest)
+    (LT rest)
+    (LE rest)
+    (GT rest)
+    (GE rest)
+    (GZ rest)
+    (LZ rest)
+    (EQZ rest)
+    (BLOCK rest)
+    (LOOP rest)
+    (INC stack-offset)
+    (DEC stack-offset)
+    (BR_IF nesting-level)
+    (BR nesting-level)
+    (NOP)
+    (DROP rest)
+    (SEND port rest)
+    (GET stack-offset-or-port)
+    (LEFT)
+    (RIGHT)
+    (UP)
+    (DOWN)
+    (FN TBD))
+  "List of eldoc specifications.")
+
+(defun asm-blox-eldoc (&rest _ignored)
+  "Backend function for eldoc to show documentation."
+  (ignore-errors
+    (let* ((box-id (get-text-property (point) 'asm-blox-box-id))
+           (row (car box-id))
+           (col (cadr box-id))
+           (line (caddr box-id))
+           (line-col (asm-blox-get-line-col-num (point)))
+           (box-text (asm-blox--get-box-content row col)))
+      (with-temp-buffer
+        (insert box-text)
+        (goto-char (point-min))
+        (forward-line line)
+        (forward-char line-col)
+        (char-after (point))
+        (let ((pos 0)
+              (at-sym))
+          (when (looking-back "[a-zA-Z0-9_$-]" (- (point) 2))
+            (backward-sexp))
+          (while (and (not (looking-back "(" (- (point) 2)))
+                      (not (bobp)))
+            (backward-sexp)
+            (cl-incf pos))
+          (setq at-cmd (buffer-substring-no-properties
+                        (point)
+                        (save-excursion (forward-sexp) (point))))
+          (when (equal "" at-cmd)
+            (error "Invalid command"))
+          (let* ((at-sym (intern (upcase at-cmd)))
+                 (spec (seq-find (lambda (spec)
+                                   (eql (car spec) at-sym ))
+                                 asm-blox-eldoc-specs))
+                 (params (cdr spec)))
+            (if (not spec)
+                nil
+              (when (>= pos (length params))
+                (setq pos (length params)))
+              (let ((eldoc-string ""))
+                (dotimes (n (length params))
+                  (let* ((at-spec (symbol-name (nth n params)))
+                         (at-str (concat
+                                  (if (= n 0) "" " ")
+                                  (if (equal at-spec "rest")
+                                      "&sub-expressions..."
+                                    at-spec))))
+                    (when (= n (- pos 1))
+                      (setq at-str (propertize at-str 'face '(:weight bold))))
+                    (setq eldoc-string (concat eldoc-string at-str))))
+                (concat
+                 (propertize at-cmd 'face 'font-lock-function-name-face)
+                 ": "
+                 eldoc-string)))))))))
+
+(defun asm-blox-eldoc-setup ()
+  "Setup eldoc in the current buffer."
+  (if (boundp 'eldoc-documentation-functions)
+      (add-hook 'eldoc-documentation-functions #'asm-blox-eldoc nil t)
+    (setq-local eldoc-documentation-function #'asm-blox-eldoc)))
+
+;;; Mode definition
+
 (define-derived-mode asm-blox-execution-mode fundamental-mode "asm-blox-execution"
   "Major mode for viewing the execution of an asm blox puzzle.
 
@@ -3073,7 +3185,8 @@ The following commands are available:
       (asm-blox-redraw-game-board)))
   (unless asm-blox--show-pair-idle-timer
     (setq asm-blox--show-pair-idle-timer
-          (run-with-idle-timer 0.125 t #'asm-blox--highlight-pairs))))
+          (run-with-idle-timer 0.125 t #'asm-blox--highlight-pairs)))
+  (asm-blox-eldoc-setup))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.asbx\\'" 'asm-blox-mode))
