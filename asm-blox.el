@@ -3035,6 +3035,29 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
         (asm-blox--create-execution-buffer box-contents extra-cells)
         (goto-char (point-min))))))
 
+;;; font-lock
+
+(defconst asm-blox--keywords
+  (seq-map
+   (lambda (elt)
+     (symbol-name (car elt)))
+   asm-blox-command-specs)
+  "Generated list of asm-blox keywords from data spec.")
+
+(defun asm-blox--match-keyword (limit)
+  "Match asm-blox keyword up to LIMIT."
+  (let ((case-fold-search t))
+    (re-search-forward
+     (concat "\\_<" (regexp-opt asm-blox--keywords) "\\_>")
+     limit
+     t)))
+
+(defun asm-blox--build-font-lock-keywords ()
+  "Build default font-lock settings for asm-blox buffer."
+  `(("^[^│─\n]+$" . font-lock-doc-face)
+    (asm-blox--match-keyword
+     (0 font-lock-keyword-face))))
+
 ;;; Eldoc integration
 
 (defconst asm-blox-eldoc-specs
@@ -3146,6 +3169,7 @@ The follwoing commadns are defined:
 
 \\{asm-blox-execution-mode-map}"
   :syntax-table asm-blox-mode-syntax-table
+  (setq font-lock-defaults '(asm-blox--build-font-lock-keywords))
   (setq buffer-read-only t)
   (setq-local truncate-lines 0
               asm-blox--display-mode 'execute)
@@ -3171,6 +3195,7 @@ The following commands are available:
 
 \\{asm-blox-mode-map}"
   :syntax-table asm-blox-mode-syntax-table
+  (setq font-lock-defaults '(asm-blox--build-font-lock-keywords))
   (setq buffer-read-only t)
   (setq asm-blox-parse-errors nil)
   (setq-local truncate-lines 0)
