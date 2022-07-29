@@ -3054,7 +3054,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
 
 (defun asm-blox--build-font-lock-keywords ()
   "Build default font-lock settings for asm-blox buffer."
-  `(("^[^│─\n]+$" . font-lock-doc-face)
+  `(("^[^│─↑\n]+$" . font-lock-doc-face)
     (asm-blox--match-keyword
      (0 font-lock-keyword-face))))
 
