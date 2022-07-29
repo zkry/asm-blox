@@ -5,7 +5,7 @@
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "26.1") (yaml "0.3.4"))
+;; Package-Requires: ((emacs "26.1") (yaml "0.5.1"))
 ;; Homepage: https://github.com/zkry/asm-blox
 ;; Keywords: games
 
@@ -3105,7 +3105,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                         (point)
                         (save-excursion (forward-sexp) (point))))
           (when (equal "" at-cmd)
-            (error "invalid command"))
+            (error "Invalid command"))
           (let* ((at-sym (intern (upcase at-cmd)))
                  (spec (seq-find (lambda (spec)
                                    (eql (car spec) at-sym ))
