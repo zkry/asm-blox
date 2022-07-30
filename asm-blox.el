@@ -3035,6 +3035,45 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
         (asm-blox--create-execution-buffer box-contents extra-cells)
         (goto-char (point-min))))))
 
+;;; Completion
+
+;; (defun asm-blox--point-context ()
+;;   "Return a list of the text up-to point, function, and function pos."
+;;   (let ((start (point))
+;;         (up-to-text)
+;;         (pos 0)
+;;         (at-sym))
+;;     (save-excursion
+;;       (skip-chars-backward "[a-zA-Z0-9_$-]")
+;;       (setq up-to-text (buffer-substring-no-properties start (point))))
+;;     (save-excursion
+;;       (when (looking-back "[a-zA-Z0-9_$-]" (- (point) 2))
+;;         (backward-sexp))
+;;       (while (and (not (looking-back "(" (- (point) 2)))
+;;                   (not (bobp)))
+;;         (backward-sexp)
+;;         (cl-incf pos))
+;;       (setq at-cmd (buffer-substring-no-properties
+;;                     (point)
+;;                     (save-excursion (forward-sexp) (point)))))
+;;     (list up-to-text at-cmd pos)))
+
+(defconst asm-blox--all-completions
+  (seq-map (lambda (elt)
+             (downcase (symbol-name (car elt))))
+           asm-blox-command-specs)
+  "Generated list of all completions for asm-bolx.")
+
+(defun asm-blox-complete (_elt)
+  ""
+  asm-blox--all-completions)
+
+(defun asm-blox--completion-at-point ()
+  ""
+  (when-let* ((bounds (bounds-of-thing-at-point 'symbol)))
+    (list (car bounds) (cdr bounds)
+          (completion-table-dynamic #'asm-blox-complete))))
+
 ;;; font-lock
 
 (defconst asm-blox--keywords
@@ -3211,7 +3250,8 @@ The following commands are available:
   (unless asm-blox--show-pair-idle-timer
     (setq asm-blox--show-pair-idle-timer
           (run-with-idle-timer 0.125 t #'asm-blox--highlight-pairs)))
-  (asm-blox-eldoc-setup))
+  (asm-blox-eldoc-setup)
+  (add-hook 'completion-at-point-functions #'asm-blox--completion-at-point nil t))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.asbx\\'" 'asm-blox-mode))
