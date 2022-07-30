@@ -2867,6 +2867,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
       (define-key map (kbd "<s-left>") #'asm-blox-shift-box-left)
       (define-key map (kbd "<s-right>") #'asm-blox-shift-box-right)
       (define-key map [remap undo] #'asm-blox-undo)
+      (define-key map [remap completion-at-point] #'asm-blox-complete)
+      (define-key map [remap complete-symbol] #'asm-blox-complete)
       (define-key map (kbd "C-w") #'asm-blox-kill-region)
       (define-key map (kbd "M-w") #'asm-blox-copy-region)
       (define-key map (kbd "C-y") #'asm-blox-yank))))
@@ -3037,26 +3039,24 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
 
 ;;; Completion
 
-;; (defun asm-blox--point-context ()
-;;   "Return a list of the text up-to point, function, and function pos."
-;;   (let ((start (point))
-;;         (up-to-text)
-;;         (pos 0)
-;;         (at-sym))
-;;     (save-excursion
-;;       (skip-chars-backward "[a-zA-Z0-9_$-]")
-;;       (setq up-to-text (buffer-substring-no-properties start (point))))
-;;     (save-excursion
-;;       (when (looking-back "[a-zA-Z0-9_$-]" (- (point) 2))
-;;         (backward-sexp))
-;;       (while (and (not (looking-back "(" (- (point) 2)))
-;;                   (not (bobp)))
-;;         (backward-sexp)
-;;         (cl-incf pos))
-;;       (setq at-cmd (buffer-substring-no-properties
-;;                     (point)
-;;                     (save-excursion (forward-sexp) (point)))))
-;;     (list up-to-text at-cmd pos)))
+(defun asm-blox--point-context ()
+  "Return a list of the symbol at point, its bounds, at function, and function pos."
+  (let ((start (point))
+        (at-sym (thing-at-point 'symbol))
+        (bounds (bounds-of-thing-at-point 'symbol))
+        (at-cmd)
+        (pos 0))
+    (save-excursion
+      (when (looking-back "[a-zA-Z0-9_$-]" (- (point) 2))
+        (backward-sexp))
+      (while (and (not (looking-back "(" (- (point) 2)))
+                  (not (bobp)))
+        (backward-sexp)
+        (cl-incf pos))
+      (setq at-cmd (buffer-substring-no-properties
+                    (point)
+                    (save-excursion (forward-sexp) (point)))))
+    (list (downcase (or at-sym "")) bounds at-cmd pos)))
 
 (defconst asm-blox--all-completions
   (seq-map (lambda (elt)
@@ -3064,15 +3064,37 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
            asm-blox-command-specs)
   "Generated list of all completions for asm-bolx.")
 
-(defun asm-blox-complete (_elt)
-  ""
-  asm-blox--all-completions)
-
-(defun asm-blox--completion-at-point ()
-  ""
-  (when-let* ((bounds (bounds-of-thing-at-point 'symbol)))
-    (list (car bounds) (cdr bounds)
-          (completion-table-dynamic #'asm-blox-complete))))
+(defun asm-blox-complete ()
+  "Prompt user for completion and insert it in box."
+  (interactive)
+  (unless (asm-blox-in-box-p)
+    (error "Not in box"))
+  (seq-let (at-sym bounds at-cmd pos) (asm-blox--point-context)
+    (let ((completion-candidates))
+      (cond
+       (;; At a function name position
+        (= pos 0)
+        (setq completion-candidates asm-blox--all-completions))
+       (;; At a function name position
+        (= pos 1)
+        (let* ((spec (nth pos
+                          (seq-find (lambda (spec-list)
+                                      (equal (symbol-name (car spec-list))
+                                             (upcase at-cmd)))
+                                    asm-blox-command-specs))))
+          (pcase spec
+            ('asm-blox--portp
+             (setq completion-candidates '("up" "down" "right" "left")))))))
+      (let* ((filtered-candidates
+              (seq-filter
+               (lambda (candidate)
+                 (string-prefix-p at-sym candidate))
+               completion-candidates))
+             (selection (completing-read "" filtered-candidates nil t)))
+        (asm-blox--in-buffer
+         (progn
+           (backward-delete-char (length at-sym))
+           (insert selection)))))))
 
 ;;; font-lock
 
@@ -3100,44 +3122,73 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
 ;;; Eldoc integration
 
 (defconst asm-blox-eldoc-specs
-  '((SET stack-offset rest)
-    (CLR)
-    (CONST number)
-    (DUP rest)
-    (ABS rest)
-    (ADD rest)
-    (SUB rest)
-    (MUL rest)
-    (DIV rest)
-    (NEG rest)
-    (REM rest)
-    (AND rest)
-    (NOT rest)
-    (OR rest)
-    (EQ rest)
-    (NE rest)
-    (LT rest)
-    (LE rest)
-    (GT rest)
-    (GE rest)
-    (GZ rest)
-    (LZ rest)
-    (EQZ rest)
-    (BLOCK rest)
-    (LOOP rest)
-    (INC stack-offset)
-    (DEC stack-offset)
-    (BR_IF nesting-level)
-    (BR nesting-level)
-    (NOP)
-    (DROP rest)
-    (SEND port rest)
-    (GET stack-offset-or-port)
-    (LEFT)
-    (RIGHT)
-    (UP)
-    (DOWN)
-    (FN TBD))
+  '((SET "POP -> X; Set stack item nth from the bottom."
+         stack-offset rest)
+    (CLR "clear the entire stack.")
+    (CONST "Push number onto the stack."
+           number)
+    (DUP "duplicate the stack (must be only 1 or 2 items on stack)"
+         rest)
+    (ABS "POP -> X; PUSH the absolute value of X."
+     rest)
+    (ADD "POP -> X; POP -> Y; PUSH Y + X."
+         rest)
+    (SUB "POP -> X; POP -> Y; PUSH Y - X."
+         rest)
+    (MUL "POP -> X; POP -> Y; PUSH Y * X."
+         rest)
+    (DIV "POP -> X; POP -> Y; PUSH Y / X."
+         rest)
+    (NEG "POP -> X; PUSH -X"
+         rest)
+    (REM "POP -> X; POP -> Y; PUSH Y % X."
+         rest)
+    (AND "POP -> X; POP -> Y; PUSH 1 if X and Y are non-0, otherwise 0."
+         rest)
+    (NOT "POP -> X; PUSH 1 if X is 0; otherwise 1;"rest)
+    (OR "POP -> X; POP -> Y; PUSH 1 if X or Y are non-0, otherwise 0."
+        rest)
+    (EQ "POP -> X; POP -> Y; PUSH 1 if Y = X, otherwise 0."
+        rest)
+    (NE "POP -> X; POP -> Y; PUSH 1 if Y != X, otherwise 0."
+        rest)
+    (LT "POP -> X; POP -> Y; PUSH 1 if Y < X, otherwise 0."
+        rest)
+    (LE "POP -> X; POP -> Y; PUSH 1 if Y <= X, otherwise 0."
+        rest)
+    (GT "POP -> X; POP -> Y; PUSH 1 if Y > X, otherwise 0."
+        rest)
+    (GE "POP -> X; POP -> Y; PUSH 1 if Y >= X, otherwise 0."
+        rest)
+    (GZ "POP -> X; PUSH 1 if X > 0."
+        rest)
+    (LZ "POP -> X; PUSH 1 if X < 0."
+        rest)
+    (EQZ "POP -> X; PUSH 1 if X = 0."
+         rest)
+    (BLOCK "create block control flow"
+           rest)
+    (LOOP "create loop control flow"
+          rest)
+    (INC "increment value on stack stack-offset from bottom (-1 means top)"
+         stack-offset)
+    (DEC "decrement value on stack stack-offset from bottom (-1 means top)"
+         stack-offset)
+    (BR_IF "POP -> X; exit to control-flow at nesting-level if X is not 0."
+           nesting-level)
+    (BR "exit to control-flow at nesting-level if X is not 0."
+        nesting-level)
+    (NOP "do nothing")
+    (DROP "pop top item on stack"
+          rest)
+    (SEND "POP -> X; sent X to port."
+          port rest)
+    (GET "PUSH item from port or stack-offset"
+         stack-offset-or-port)
+    (LEFT "PUSH item from left port")
+    (RIGHT "PUSH item from right port")
+    (UP "PUSH item from up port")
+    (DOWN "PUSH item from down port"))
   "List of eldoc specifications.")
 
 (defun asm-blox-eldoc (&rest _ignored)
@@ -3172,7 +3223,8 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                  (spec (seq-find (lambda (spec)
                                    (eql (car spec) at-sym ))
                                  asm-blox-eldoc-specs))
-                 (params (cdr spec)))
+                 (doc-str (cadr spec))
+                 (params (cddr spec)))
             (if (not spec)
                 nil
               (when (>= pos (length params))
@@ -3191,7 +3243,9 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
                 (concat
                  (propertize at-cmd 'face 'font-lock-function-name-face)
                  ": "
-                 eldoc-string)))))))))
+                 eldoc-string
+                 "   "
+                 (propertize doc-str 'face 'shadow))))))))))
 
 (defun asm-blox-eldoc-setup ()
   "Setup eldoc in the current buffer."
@@ -3250,8 +3304,7 @@ The following commands are available:
   (unless asm-blox--show-pair-idle-timer
     (setq asm-blox--show-pair-idle-timer
           (run-with-idle-timer 0.125 t #'asm-blox--highlight-pairs)))
-  (asm-blox-eldoc-setup)
-  (add-hook 'completion-at-point-functions #'asm-blox--completion-at-point nil t))
+  (asm-blox-eldoc-setup))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons "\\.asbx\\'" 'asm-blox-mode))
