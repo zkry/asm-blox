@@ -1077,7 +1077,8 @@ Write the maximum value of the sequence to X.")))
                                        :idx 0
                                        :name "M"))
      :description
-     "Read a value from A and B. Multiply the numbers. Send result to M.")))
+     "Read a value from A and B. Multiply the numbers. Send result to M."
+     :banned-commands '(MUL))))
 
 (defun asm-blox-puzzles--signal-window-filter ()
   "Generate a problem."
@@ -1162,7 +1163,8 @@ Assume previous numbers are 0.")))
      :description
      "Read a value from A and B.
 Send the quotient of A / B to Q.
-Send the remainder of A / B to R.")))
+Send the remainder of A / B to R."
+     :banned-commands '(DIV REM))))
 
 (defun asm-blox-puzzles--sequence-indexer ()
   "Generate a problem."

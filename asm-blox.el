@@ -296,12 +296,17 @@ The format of the error is (list message row column).")
          (start-pos (asm-blox-code-node-start-pos code-node))
          ;; (end-pos (asm-blox-code-node-end-pos code-node))
          (first-child (car children))
-         (cmd-spec (assoc first-child asm-blox-command-specs)))
+         (cmd-spec (assoc first-child asm-blox-command-specs))
+         (banned-commands
+          (asm-blox--problem-spec-banned-commands
+           asm-blox--extra-gameboard-cells)))
     (cond
      ((not first-child)
       `(error ,start-pos "No command found"))
      ((not cmd-spec)
       `(error ,start-pos "Command not found"))
+     ((member first-child banned-commands)
+      `(error ,start-pos "Command banned"))
      (t
       (let* ((specs (cdr cmd-spec))
              (rest-children (cdr children))
@@ -1074,8 +1079,11 @@ text respectively."
                (:copier nil))
   "An entire definition of a gameboard.
 SOURCES and SINKS are the input and output of the game respectively.  NAME,
-DESCRIPTION, and DIFFICULTY are metadata about the puzzle."
-  sources sinks name description difficulty)
+DESCRIPTION, and DIFFICULTY are metadata about the puzzle.
+
+BANNED-COMMANDS is a list of command symbols that are not allowed
+when compiling the program."
+  sources sinks name description difficulty banned-commands)
 
 (defun asm-blox--reset-extra-gameboard-cells-state ()
   "Reset the state of all cells not in the grid (sources and sinks)."
@@ -3078,23 +3086,24 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
        (;; At a function name position
         (= pos 1)
         (let* ((spec (nth pos
-                          (seq-find (lambda (spec-list)
-                                      (equal (symbol-name (car spec-list))
-                                             (upcase at-cmd)))
-                                    asm-blox-command-specs))))
+                          (assoc (intern (upcase at-cmd))
+                                 asm-blox-command-specs))))
           (pcase spec
             ('asm-blox--portp
              (setq completion-candidates '("up" "down" "right" "left")))))))
+
       (let* ((filtered-candidates
               (seq-filter
                (lambda (candidate)
                  (string-prefix-p at-sym candidate))
-               completion-candidates))
-             (selection (completing-read "" filtered-candidates nil t)))
-        (asm-blox--in-buffer
-         (progn
-           (backward-delete-char (length at-sym))
-           (insert selection)))))))
+               completion-candidates)))
+        (if filtered-candidates
+            (let ((selection (completing-read "" filtered-candidates nil t)))
+              (asm-blox--in-buffer
+               (progn
+                 (backward-delete-char (length at-sym))
+                 (insert selection))))
+          (beep))))))
 
 ;;; font-lock
 
@@ -3132,7 +3141,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
 ;;; Eldoc integration
 
 (defconst asm-blox-eldoc-specs
-  '((SET "POP -> X; Set stack item nth from the bottom."
+  '((SET "POP -> X; Set stack item nth from the bottom to X."
          stack-offset rest)
     (CLR "clear the entire stack.")
     (CONST "Push number onto the stack."
@@ -3230,9 +3239,7 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
           (when (equal "" at-cmd)
             (error "Invalid command"))
           (let* ((at-sym (intern (upcase at-cmd)))
-                 (spec (seq-find (lambda (spec)
-                                   (eql (car spec) at-sym ))
-                                 asm-blox-eldoc-specs))
+                 (spec (assoc at-sym asm-blox-eldoc-specs))
                  (doc-str (cadr spec))
                  (params (cddr spec)))
             (if (not spec)
