@@ -3109,15 +3109,25 @@ If COPY-ONLY is non-nil, don't kill the text but add it to kill ring."
   "Match asm-blox keyword up to LIMIT."
   (let ((case-fold-search t))
     (re-search-forward
-     (concat "\\_<" (regexp-opt asm-blox--keywords) "\\_>")
+     (concat "( *\\_<\\(" (regexp-opt asm-blox--keywords) "\\)\\_>")
+     limit
+     t)))
+
+(defun asm-blox--match-port (limit)
+  (let ((case-fold-search t))
+    (re-search-forward
+     (concat "\\_<" (regexp-opt '("left" "right" "up" "down")) "\\_>")
      limit
      t)))
 
 (defun asm-blox--build-font-lock-keywords ()
   "Build default font-lock settings for asm-blox buffer."
-  `(("^[^│─↑\n]+$" . font-lock-doc-face)
+  `(("module" . font-lock-keyword-face)
     (asm-blox--match-keyword
-     (0 font-lock-keyword-face))))
+     (1 font-lock-keyword-face))
+    (":[a-zA-Z-]+" . font-lock-constant-face)
+    ("\\(;[^\n]*?\\)│" (1 font-lock-comment-face))
+    (asm-blox--match-port (0 font-lock-keyword-face))))
 
 ;;; Eldoc integration
 
