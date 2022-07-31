@@ -2305,9 +2305,15 @@ individual box."
   (let ((name
          (asm-blox--problem-spec-name asm-blox--extra-gameboard-cells))
         (description
-         (asm-blox--problem-spec-description asm-blox--extra-gameboard-cells)))
+         (asm-blox--problem-spec-description asm-blox--extra-gameboard-cells))
+        (banned-commands
+         (asm-blox--problem-spec-banned-commands asm-blox--extra-gameboard-cells)))
     (insert name ":\n")
-    (insert description "\n"))
+    (insert description "\n")
+    (when banned-commands
+      (insert "\nBannned Commands:\n")
+      (dolist (cmd banned-commands)
+        (insert "  " (symbol-name cmd) "\n"))))
   (when (and (eql asm-blox--display-mode 'execute) asm-blox-runtime-error)
     (insert (format "\nERROR: %s at cell (%d, %d)\n"
                     (car asm-blox-runtime-error)
