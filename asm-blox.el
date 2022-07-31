@@ -298,8 +298,9 @@ The format of the error is (list message row column).")
          (first-child (car children))
          (cmd-spec (assoc first-child asm-blox-command-specs))
          (banned-commands
-          (asm-blox--problem-spec-banned-commands
-           asm-blox--extra-gameboard-cells)))
+          (and asm-blox--extra-gameboard-cells
+               (asm-blox--problem-spec-banned-commands
+                asm-blox--extra-gameboard-cells))))
     (cond
      ((not first-child)
       `(error ,start-pos "No command found"))
