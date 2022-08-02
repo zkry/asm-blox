@@ -2327,9 +2327,9 @@ individual box."
              (eql 'win asm-blox--gameboard-state))
     (let ((inhibit-read-only t))
       (goto-char (point-min))
-      (dolist (l '("+=========================+"
-                   "|Congragulations, you won!|"
-                   "+=========================+"))
+      (dolist (l '("┌─────────────────────────┐"
+                   "│      Level Complete     │"
+                   "└─────────────────────────┘"))
         (end-of-line)
         (insert "  " l)
         (forward-line)))))
