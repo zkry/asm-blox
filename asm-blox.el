@@ -1071,7 +1071,7 @@ A normal sink contains expected-data while an editor sink contains
 editor- values (and no data).  ERR-VAL is the incorrect value that was fed
 into the sink.  EDITOR-TEXT and EXPECTED-TEXT is the current text and target
 text respectively."
-  row col expected-data idx name err-val
+  row col expected-data (idx 0) name err-val
   default-editor-text
   editor-text editor-point expected-text)
 

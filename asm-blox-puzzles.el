@@ -96,19 +96,16 @@ If LIMIT is non-nil, the number generated will be less-than it."
      :sources (list (asm-blox--cell-source-create :row 0
                                                   :col -1
                                                   :data ops
-                                                  :idx 0
                                                   :name "O")
                     (asm-blox--cell-source-create :row 0
                                                   :col 4
                                                   :data args
-                                                  :idx 0
                                                   :name "A"))
      :sinks
      (list (asm-blox--cell-sink-create
             :row 3
             :col 1
             :expected-data result
-            :idx 0
             :name "T"))
      :description "Read all 40 values from A, pushing them on a
 stack so that the last number in A is at the top of the stack.
@@ -128,19 +125,16 @@ One by one, read an operation from O and do the following based on it's value:
      :sources (list (asm-blox--cell-source-create :row 3
                                                   :col 2
                                                   :data bases
-                                                  :idx 0
                                                   :name "B")
                     (asm-blox--cell-source-create :row 1
                                                   :col 4
                                                   :data heights
-                                                  :idx 0
                                                   :name "H"))
      :sinks
      (list (asm-blox--cell-sink-create
             :row -1
             :col 1
             :expected-data areas
-            :idx 0
             :name "A"))
      :description "Read base and height of a right-triangle
 from B and H respectively.  Send the area of right-triangle to A")))
@@ -175,14 +169,12 @@ from B and H respectively.  Send the area of right-triangle to A")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 3
                                                   :data (list del-idx)
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create
             :row 1
             :col 5
             :expected-data nil
-            :idx 0
             :name "O"
             :default-editor-text text
             :editor-point 0
@@ -202,7 +194,6 @@ that number word in the text.")))
           :row 1
           :col 5
           :expected-data nil
-          :idx 0
           :name "O"
           :default-editor-text
           "func main () {\nfmt.Println(\"hello world\")\nreturn\n}"
@@ -221,13 +212,11 @@ that number word in the text.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 3
                                                  :data input
-                                                 :idx 0
                                                  :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 2
                                       :col 4
                                       :expected-data expected-output
-                                      :idx 0
                                       :name "O"
                                       :editor-text nil
                                       :editor-point nil
@@ -248,13 +237,11 @@ from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
      :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input
-                                                 :idx 0
                                                  :name "N"))
      :sinks
      (list (asm-blox--cell-sink-create :row 2
                                       :col 4
                                       :expected-data expected-output
-                                      :idx 0
                                       :name "O"
                                       :editor-text nil
                                       :editor-point nil
@@ -275,13 +262,11 @@ Send a number x which minimizes the equation
      :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input
-                                                 :idx 0
                                                  :name "A"))
      :sinks
      (list (asm-blox--cell-sink-create :row 1
                                       :col 5
                                       :expected-data nil
-                                      :idx 0
                                       :name "O"
                                       :editor-text ""
                                       :editor-point 1
@@ -300,7 +285,6 @@ Send a number x which minimizes the equation
    (list (asm-blox--cell-sink-create :row 1
                                     :col 5
                                     :expected-data nil
-                                    :idx 0
                                     :name "O"
                                     :editor-text "01"
                                     :editor-point 3
@@ -319,13 +303,11 @@ Send a number x which minimizes the equation
      :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
-                                                 :idx 0
                                                  :name "C"))
      :sinks
      (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
-                                      :idx 0
                                       :name "O"))
      :description "Read a character from C and send it to O,
 upcasing it if it is a lowercase letter.")))
@@ -348,13 +330,11 @@ upcasing it if it is a lowercase letter.")))
      :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
-                                                 :idx 0
                                                  :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
-                                      :idx 0
                                       :name "O"))
      :description
      "Return the number of times subsequent values of I increase.
@@ -374,13 +354,11 @@ ex. 1 2 0 5 6 4
      :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 2
                                                  :data input-1
-                                                 :idx 0
                                                  :name "L"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                       :col 1
                                       :expected-data expected
-                                      :idx 0
                                       :name "R"))
      :description
      "Lists are 0 terminated.
@@ -406,13 +384,11 @@ Read a list from L, reverse it, and send it to R (terminating it with 0).")))
      :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data nums
-                                                 :idx 0
                                                  :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data lengths
-                                      :idx 0
                                       :name "O"))
      :description "Lists are 0 terminated. Read a list from I,
 calculate its length and send it to O.")))
@@ -427,13 +403,11 @@ calculate its length and send it to O.")))
      :sources (list (asm-blox--cell-source-create :row 0
                                                  :col -1
                                                  :data input-1
-                                                 :idx 0
                                                  :name "X"))
      :sinks
      (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
-                                      :idx 0
                                       :name "O"))
      :description
      "Read a number from X. Implement a machine that moves a head
@@ -460,18 +434,15 @@ NOTE The head will go no more than +-10 spaces
      :sources (list (asm-blox--cell-source-create :row 0
                                                  :col -1
                                                  :data input-1
-                                                 :idx 0
                                                  :name "A")
                     (asm-blox--cell-source-create :row 2
                                                  :col -1
                                                  :data input-2
-                                                 :idx 0
                                                  :name "B"))
      :sinks
      (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
-                                      :idx 0
                                       :name "C"))
      :description "Numbers in A and B are sorted. Read numbers from A and B,
 combine them sorted and send it them to C.")))
@@ -490,13 +461,11 @@ combine them sorted and send it them to C.")))
      :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
-                                                 :idx 0
                                                  :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 1
                                       :col 4
                                       :expected-data expected
-                                      :idx 0
                                       :name "O"))
      :description
      "Read a value from I. If it is even send 0 to O, else send the value.")))
@@ -517,13 +486,11 @@ combine them sorted and send it them to C.")))
      :sources (list (asm-blox--cell-source-create :row 1
                                                  :col -1
                                                  :data input-1
-                                                 :idx 0
                                                  :name "H"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                       :col 1
                                       :expected-data expected
-                                      :idx 0
                                       :name "T"))
      :description "On a clock with hours 0 to 23, read a value from H and add
 that value to the current time which starts at 0.
@@ -542,23 +509,19 @@ Write the current time to T for every time you move the current time.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
-                                                 :idx 0
                                                  :name "A")
                     (asm-blox--cell-source-create :row -1
                                                  :col 1
                                                  :data input-2
-                                                 :idx 0
                                                  :name "B")
                     (asm-blox--cell-source-create :row -1
                                                  :col 2
                                                  :data input-3
-                                                 :idx 0
                                                  :name "C"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                       :col 1
                                       :expected-data expected
-                                      :idx 0
                                       :name "S"))
      :description
      "Take input from A, B, and C, add the three together, and send it to S.")))
@@ -579,23 +542,19 @@ Write the current time to T for every time you move the current time.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
-                                                 :idx 0
                                                  :name "A")
                     (asm-blox--cell-source-create :row -1
                                                  :col 1
                                                  :data input-2
-                                                 :idx 0
                                                  :name "B"))
      :sinks
      (list (asm-blox--cell-sink-create :row 0
                                       :col 4
                                       :expected-data expected-1
-                                      :idx 0
                                       :name "L")
            (asm-blox--cell-sink-create :row 2
                                       :col 4
                                       :expected-data expected-2
-                                      :idx 0
                                       :name "R"))
      :description "Take an input from A and B. If A>B then send A to L, 0 to R;
 If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
@@ -611,7 +570,6 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      (list (asm-blox--cell-sink-create :row 0
                                       :col 4
                                       :expected-data expected
-                                      :idx 0
                                       :name "N"))
      :description "Repeatedly send the number 1 to N. There are no inputs.")))
 
@@ -625,13 +583,11 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                  :col 0
                                                  :data input-1
-                                                 :idx 0
                                                  :name "X"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                       :col 3
                                       :expected-data expected
-                                      :idx 0
                                       :name "X"))
      :description
      "Take an input from the input X and send it to the output X.")))
@@ -646,23 +602,19 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :sources (list (asm-blox--cell-source-create :row 0
                                                  :col -1
                                                  :data input-1
-                                                 :idx 0
                                                  :name "A")
                     (asm-blox--cell-source-create :row 2
                                                  :col -1
                                                  :data input-2
-                                                 :idx 0
                                                  :name "B"))
      :sinks
      (list (asm-blox--cell-sink-create :row 0
                                       :col 4
                                       :expected-data input-1
-                                      :idx 0
                                       :name "X")
            (asm-blox--cell-sink-create :row 2
                                       :col 4
                                       :expected-data input-2
-                                      :idx 0
                                       :name "Y"))
      :description
      "Send data from A to X. Send data from B to Y.")))
@@ -677,13 +629,11 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 2
                                                   :data input
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 1
                                        :expected-data output
-                                       :idx 0
                                        :name "O"))
      :description
      "Read a value from I. Double it. Send that to O.")))
@@ -700,23 +650,19 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input-a
-                                                  :idx 0
                                                   :name "I")
                     (asm-blox--cell-source-create :row -1
                                                   :col 2
                                                   :data input-b
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 1
                                        :expected-data output-p
-                                       :idx 0
                                        :name "P")
            (asm-blox--cell-sink-create :row 3
                                        :col 1
                                        :expected-data output-n
-                                       :idx 0
                                        :name "N"))
      :description
      "Read a value from A and B. Send A - B to P. Send B - A to N.")))
@@ -733,23 +679,19 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 0
                                                   :data input
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 1
                                        :expected-data output-g
-                                       :idx 0
                                        :name "P")
            (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output-e
-                                       :idx 0
                                        :name "E")
            (asm-blox--cell-sink-create :row 3
                                        :col 3
                                        :expected-data output-l
-                                       :idx 0
                                        :name "L"))
      :description
      "Read a value from I.
@@ -774,18 +716,15 @@ When sending 1 to output, send 0 to the other two output ports.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input-1
-                                                  :idx 0
                                                   :name "A")
                     (asm-blox--cell-source-create :row -1
                                                   :col 2
                                                   :data input-2
-                                                  :idx 0
                                                   :name "B"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output
-                                       :idx 0
                                        :name "O"))
      :description
      "Read a value from A and B.
@@ -811,18 +750,15 @@ Send 0 to O.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output-sum
-                                       :idx 0
                                        :name "S")
            (asm-blox--cell-sink-create :row 3
                                        :col 3
                                        :expected-data output-length
-                                       :idx 0
                                        :name "L"))
      :description
      "Read a 0-terminated sequence from I.
@@ -844,13 +780,11 @@ Write the sum of the sequence to S.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output
-                                       :idx 0
                                        :name "O"))
      :description
      "Read a value from I, comparing it with the previous value.
@@ -914,28 +848,23 @@ Always write 0 for the first input.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 0
                                                   :data input-a
-                                                  :idx 0
                                                   :name "1")
                     (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input-b
-                                                  :idx 0
                                                   :name "2")
                     (asm-blox--cell-source-create :row -1
                                                   :col 2
                                                   :data input-c
-                                                  :idx 0
                                                   :name "3")
                     (asm-blox--cell-source-create :row -1
                                                   :col 3
                                                   :data input-d
-                                                  :idx 0
                                                   :name "4"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data res
-                                       :idx 0
                                        :name "O"))
      :description
      "Read inputs 1, 2, 3, and 4.
@@ -978,13 +907,11 @@ Example:
       :sources (list (asm-blox--cell-source-create :row -1
                                                    :col 1
                                                    :data input
-                                                   :idx 0
                                                    :name "I"))
       :sinks
       (list (asm-blox--cell-sink-create :row 3
                                         :col 2
                                         :expected-data output
-                                        :idx 0
                                         :name "O"))
       :description
       "Read a value from I.
@@ -1009,18 +936,15 @@ Find the pattern 0, 0, 0:
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output-n
-                                       :idx 0
                                        :name "N")
            (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output-x
-                                       :idx 0
                                        :name "X"))
      :description
      "Read a 0-terminated sequence from I.
@@ -1041,13 +965,11 @@ Write the maximum value of the sequence to X.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data reversed
-                                       :idx 0
                                        :name "R"))
      :description
      "Read a sequence from I. Reverse the sequence and write it to R (0-terminated).")))
@@ -1063,18 +985,15 @@ Write the maximum value of the sequence to X.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input-a
-                                                  :idx 0
                                                   :name "A")
                     (asm-blox--cell-source-create :row -1
                                                   :col 2
                                                   :data input-b
-                                                  :idx 0
                                                   :name "B"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output
-                                       :idx 0
                                        :name "M"))
      :description
      "Read a value from A and B. Multiply the numbers. Send result to M."
@@ -1103,18 +1022,15 @@ Write the maximum value of the sequence to X.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 1
                                        :expected-data output-3
-                                       :idx 0
                                        :name "3")
            (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output-5
-                                       :idx 0
                                        :name "5"))
      :description
      "Read a value from I.
@@ -1142,23 +1058,19 @@ Assume previous numbers are 0.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input-a
-                                                  :idx 0
                                                   :name "A")
                     (asm-blox--cell-source-create :row -1
                                                   :col 2
                                                   :data input-b
-                                                  :idx 0
                                                   :name "B"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 1
                                        :expected-data output-r
-                                       :idx 0
                                        :name "R")
            (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output-q
-                                       :idx 0
                                        :name "Q"))
      :description
      "Read a value from A and B.
@@ -1180,18 +1092,15 @@ Send the remainder of A / B to R."
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data db
-                                                  :idx 0
                                                   :name "D")
                     (asm-blox--cell-source-create :row -1
                                                   :col 2
                                                   :data idxs
-                                                  :idx 0
                                                   :name "X"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 1
                                        :expected-data output
-                                       :idx 0
                                        :name "V"))
      :description
      "Read a 0-terminated sequence from D,
@@ -1224,13 +1133,11 @@ Example:
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input
-                                                  :idx 0
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output
-                                       :idx 0
                                        :name "O"))
      :description
      "Read a 0-terminated sequence from I.
