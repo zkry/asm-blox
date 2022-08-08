@@ -27,7 +27,7 @@ Asm-Blox User Manual
 * Getting Started::
 * Gameplay::
 * WAT Command Set::
-* YAML Blocks::
+* Module Blocks::
 * Editing Commands::
 * Customizations::
 
@@ -54,11 +54,12 @@ WAT Command Set
 * Port Operations::
 * Blocks and Loops::
 
-YAML Blocks
+Module Blocks
 
 * Stack Cells::
 * Heap Cells::
 * Controller Cells and Editor Problems::
+* Legacy YAML-defined Modules::
 
 Editing Commands
 
@@ -72,10 +73,10 @@ File: asm-blox.info,  Node: Introduction,  Next: Installation,  Prev: Top,  Up: 
 **************
 
 Asm-Blox is an attempt to make Emacs more exciting by merging it with
-trendy topics, namely blocks (a la Minecraft), YAML (think Kubernetes,
-Helm, etc.), and WASM (have to mention Rust!).  Asm-blox is an attempt
-to combine all these elements together in a an exciting game package,
-taking inspiration from the budding genre of programming puzzle games.
+trendy topics, namely blocks (a la Minecraft), and WASM (have like what
+Rust can do!).  Asm-blox is an attempt to combine these elements
+together in a an exciting game package, taking inspiration from the
+budding genre of programming puzzle games.
 
    The game tasks you with writing a program in an idealized version of
 WebAssembly Text to solve a simple programming puzzle.  Puzzles range
@@ -86,10 +87,10 @@ pre-made utility components to solve even more complex problems.
 
 File: asm-blox.info,  Node: Installation,  Next: Getting Started,  Prev: Introduction,  Up: Top
 
-2 *TODO* Installation
-*********************
+2 Installation
+**************
 
-The package is not yet available on MELPA.
+This package is installable under the identifier "asm-blox" on MELPA.
 
 
 File: asm-blox.info,  Node: Getting Started,  Next: Gameplay,  Prev: Installation,  Up: Top
@@ -146,8 +147,8 @@ File: asm-blox.info,  Node: Overview,  Next: Execution,  Up: Gameplay
 
 The gameboard consists of three rows and four columns in which the user
 will enter their solution.  Each box will be referred to as a _code
-cell_. Code cells can contain WAT or YAML.  The following is an example
-of a WAT cell:
+cell_. Code cells can contain WAT or a module.  The following is an
+example of a WAT cell:
 
 
      +--------------------+
@@ -172,17 +173,15 @@ gameboard you will see some labeled arrows.  The input of the puzzle
 will come through these ports.  Labeled arrows going out of a box is
 where you have to send your answer.
 
-   The following is an example of a YAML cell:
+   The following is an example of a module cell:
 
      +--------------------+
-     |apiVersion: v1      |
-     |kind: Heap          |
-     |spec:               |
-     |  size: 100         |
-     |  setPort: up       |
-     |  seekPort: left    |
-     |  peekPort: up      |
-     |  offsetPort: left  |
+     |(module heap        |
+     | :size 100          |
+     | :set-port up       |
+     | :seek-port left    |
+     | :peek-port up      |
+     | :offset-port left) |
      |                    |
      |                    |
      |                    |
@@ -216,7 +215,7 @@ be available to you in an execution buffer:
 any runtime error.
 
 
-File: asm-blox.info,  Node: WAT Command Set,  Next: YAML Blocks,  Prev: Gameplay,  Up: Top
+File: asm-blox.info,  Node: WAT Command Set,  Next: Module Blocks,  Prev: Gameplay,  Up: Top
 
 5 WAT Command Set
 *****************
@@ -456,46 +455,43 @@ variety of constructs.
      continuing if false.
 
 
-File: asm-blox.info,  Node: YAML Blocks,  Next: Editing Commands,  Prev: WAT Command Set,  Up: Top
+File: asm-blox.info,  Node: Module Blocks,  Next: Editing Commands,  Prev: WAT Command Set,  Up: Top
 
-6 YAML Blocks
-*************
+6 Module Blocks
+***************
 
-YAML cells can be constructed in addition to WAT blocks to add pre-made
-processes which add essential functionality to solve some problems.
-The current available types of YAML blocks includes: Stack, Heap, and
-Controller.
+Module cells can be constructed in addition to WAT blocks to add
+pre-made processes which add essential functionality to solve some
+problems.  The current available types of module blocks includes:
+Stack, Heap, and Controller.
 
-   YAML blocks written using YAML similar to that of the extremely
-popular Kubernetes and are detailed in the following sections.  The top
-level items in a yaml block are `apiVersion', `kind', and `spec'.
-`apiVersion' will always be the value "v1".
+   Module blocks are written using a s-expression definition.  The spec
+is as follows: (module _module-kind_ _...specification_).
 
 * Menu:
 
 * Stack Cells::
 * Heap Cells::
 * Controller Cells and Editor Problems::
+* Legacy YAML-defined Modules::
 
 
-File: asm-blox.info,  Node: Stack Cells,  Next: Heap Cells,  Up: YAML Blocks
+File: asm-blox.info,  Node: Stack Cells,  Next: Heap Cells,  Up: Module Blocks
 
 6.1 Stack Cells
 ===============
 
-When the `kind' of a YAML cell is "Stack", a Stack is created.  A stack
+When the kind of a Module Cell is "stack", a stack is created.  A stack
 reads data from an input source, adding it to an internal data store,
 and makes it available to an external port.  The following is an
 example of a stack.
 
 
      +--------------------+
-     |apiVersion: v1      |
-     |kind: Stack         |
-     |spec:               |
-     |  inputPort: down   |
-     |  outputPort: right |
-     |  size: 20          |
+     |(module stack       |
+     | :input-port down   |
+     | :output-port right |
+     | :size 20)          |
      |                    |
      |                    |
      |                    |
@@ -504,76 +500,74 @@ example of a stack.
      |                    |
      +--------------------+
 
-   The following are spec properties of a YAML stack:
+   The following are spec properties of a stack module:
 
-   * `inputPort': any value sent here will be added to the top of the
+   * `:input-port': any value sent here will be added to the top of the
      stack.
 
-   * `inputPorts': multiple input port specifications.  Can not be used
-     with `inputPort'.
+   * `:input-ports': multiple input port specifications.  Can not be
+     used with `input-port'.
 
-   * `outputPort': if another cell reads from here, it will be popped
+   * `:output-port': if another cell reads from here, it will be popped
      off the stack.
 
-   * `size': the maximum amount of elements that can be on the stack
+   * `:size': the maximum amount of elements that can be on the stack
      before a stack-overflow error occurs.  The maximum size of a stack
      is 999.
 
-   * `size-port': the port to which the current amount of elements on
+   * `:size-port': the port to which the current amount of elements on
      the stack is written to.
 
 
-File: asm-blox.info,  Node: Heap Cells,  Next: Controller Cells and Editor Problems,  Prev: Stack Cells,  Up: YAML Blocks
+File: asm-blox.info,  Node: Heap Cells,  Next: Controller Cells and Editor Problems,  Prev: Stack Cells,  Up: Module Blocks
 
 6.2 Heap Cells
 ==============
 
-Heap cells are created by setting the `kind' property of a YAML cell to
-Heap.  Heaps provide you with an array of memory for your cells to read
-and write to.  The following is an example of a heap cell:
+Heap cells are created by creating a module with `heap' as its kind.
+Heaps provide you with an array of memory for your cells to read and
+write to.  The following is an example of a heap cell:
 
 
      +--------------------+
-     |apiVersion: v1      |
-     |kind: Heap          |
-     |spec:               |
-     |  readPort: down    |
-     |  writePort: down   |
-     |  seekPort: left    |
-     |  offsetPort: left  |
-     |  setPort: up       |
-     |  peekPort: up      |
+     |(module heap        |
+     | :read-port down    |
+     | :write-port down   |
+     | :seek-port left    |
+     | :offset-port left  |
+     | :set-port up       |
+     | :peek-port up)     |
      |                    |
      |                    |
      |                    |
      +--------------------+
 
-   * `readPort' (out): from this port you can read the value at the
+   * `:read-port' (out): from this port you can read the value at the
      current address.  By reading this value, the current address will
      increase by one.  Note that end of file is indicated by the value
      -999.
 
-   * `writePort' (in): writing a value to this port will store a value
+   * `:write-port' (in): writing a value to this port will store a value
      at the current address.  After writing a value, the current
      address will increase by one.
 
-   * `offsetPort' (out): from this port you can read the current offset
-     into memory.
-
-   * `seekPort' (in): by writing a value to this port, you can set the
+   * `:offset-port' (out): from this port you can read the current
      offset into memory.
 
-   * `peekPort' (out): this port will have the data at the current
+   * `:seek-port' (in): by writing a value to this port, you can set the
+     offset into memory.
+
+   * `:peek-port' (out): this port will have the data at the current
      offset.  Reading from this port will not move the offset.
 
-   * `setPort' (in): this port will set the data at the current offset.
-     Writing to this port will not move the offset
+   * `:set-port' (in): this port will set the data at the current
+     offset.  Writing to this port will not move the offset
 
-   * `size': You may configure the size of the heap with this variable.
-     The maximum size allowed is 999.
+   * `:size': You may configure the size of the heap with this
+     variable.  The maximum size allowed is 999.
 
 
-File: asm-blox.info,  Node: Controller Cells and Editor Problems,  Prev: Heap Cells,  Up: YAML Blocks
+File: asm-blox.info,  Node: Controller Cells and Editor Problems,  Next: Legacy YAML-defined Modules,  Prev: Heap Cells,  Up: Module Blocks
 
 6.3 Controller Cells and Editor Problems
 ========================================
@@ -582,21 +576,19 @@ Some problems require the special Asm-blox Editor integration.  These
 problems, when executed, will show an editor with the expected output
 under it.  Your goal in these problems is to get the editor to match
 the target text.  You can interact with the editor via Controller
-cells.  A controller cell is a YAML cell with a value of "Controller"
-for the `kind' property.  By configuring the ports on the Controller
+cells.  A controller cell is a Module cell with a value of "controller"
+for the `kind' position.  By configuring the ports on the Controller
 cell you can move the point and insert text, sort of like how you would
 in Emacs itself.  You can have multiple controllers in a game.
 
    The following is an example of a controller cell:
 
      +--------------------+
-     |apiVersion: v1      |
-     |kind: Controller    |
-     |spec:               |
-     |  inputPort: left   |
-     |  setPointPort:     |
+     |(module controller  |
+     | :input-port left   |
+     | :set-point-port    |
      |    down            |
-     |  pointPort:up      |
+     | :point-port up)    |
      |                    |
      |                    |
      |                    |
@@ -607,24 +599,57 @@ in Emacs itself.  You can have multiple controllers in a game.
    Controller cells allow you to set the following properties on the
 `spec':
 
-   * `inputPort': Data sent to this input point will be written to the
+   * `:input-port': Data sent to this input point will be written to the
      buffer at the current point.  ASCII characters with a value of 32
      through 126 can be printed. You may also send ASCII 10 (?) for a
      newline, 8 (?) or -1 for a backwards delete and -2 for a forwards
      delete.
 
-   * `setPointPort': Data sent to this input port will set the position
-     of the port.  A value past the bounds of the buffer will bring the
-     point to the beginning (position 1) or the end of the buffer.
+   * `:set-point-port': Data sent to this input port will set the
+     position of the port.  A value past the bounds of the buffer will
+     bring the point to the beginning (position 1) or the end of the
+     buffer.
 
-   * `charAtPort': This output port will contain the character in front
-     of the point.
+   * `:char-at-port': This output port will contain the character in
+     front of the point.
 
-   * `pointPort': This output port will contain the current point
+   * `:point-port': This output port will contain the current point
      position.
 
 
-File: asm-blox.info,  Node: Editing Commands,  Next: Customizations,  Prev: YAML Blocks,  Up: Top
+File: asm-blox.info,  Node: Legacy YAML-defined Modules,  Prev: Controller Cells and Editor Problems,  Up: Module Blocks
+
+6.4 Legacy YAML-defined Modules
+===============================
+
+In previous versions of the `asm-blox' software, modules were able to
+be created via YAML statements.  Currently this is not recommended and
+may be removed in future versions of `asm-blox'.
+
+   The following is an example of a YAML block:
+
+     +--------------------+
+     |apiVersion: v1      |
+     |kind: Heap          |
+     |spec:               |
+     |  size: 100         |
+     |  setPort: up       |
+     |  seekPort: left    |
+     |  peekPort: up      |
+     |  offsetPort: left  |
+     |                    |
+     |                    |
+     |                    |
+     |                    |
+     +--------------------+
+
+   A YAML block has three top level items: `apiVersion', `kind', and
+`spec'.  `kind' must be either `Stack', `Heap', or `Controller'.  The
+spec is the same stated above but with the keys in snake case (ex.
+`:seek-port' becomes `seekPort').
+
+
+File: asm-blox.info,  Node: Editing Commands,  Next: Customizations,  Prev: Module Blocks,  Up: Top
 
 7 Editing Commands
 ******************
@@ -720,30 +745,31 @@ The following customization options exist
 
 Tag Table:
 Node: Top77
-Node: Introduction1390
-Node: Installation2199
-Node: Getting Started2387
-Node: Puzzle Selection2580
-Node: Saved Puzzles and Backups3044
-Node: Gameplay3619
-Node: Overview3777
-Node: Execution5316
-Node: WAT Command Set6165
-Node: Execution Model of WAT Cells6625
-Node: Stack Commands7475
-Node: Numeric Commands8465
-Node: Boolean Operations9351
-Node: Comparison Operations9959
-Node: Other Operations11199
-Node: Port Operations11390
-Node: Blocks and Loops12132
-Node: YAML Blocks14167
-Node: Stack Cells14853
-Node: Heap Cells16169
-Node: Controller Cells and Editor Problems17871
-Node: Editing Commands19817
-Node: Undo and Redo21016
-Node: Advanced editing21379
-Node: Customizations22462
+Node: Introduction1426
+Node: Installation2200
+Node: Getting Started2401
+Node: Puzzle Selection2594
+Node: Saved Puzzles and Backups3058
+Node: Gameplay3633
+Node: Overview3791
+Node: Execution5280
+Node: WAT Command Set6129
+Node: Execution Model of WAT Cells6591
+Node: Stack Commands7441
+Node: Numeric Commands8431
+Node: Boolean Operations9317
+Node: Comparison Operations9925
+Node: Other Operations11165
+Node: Port Operations11356
+Node: Blocks and Loops12098
+Node: Module Blocks14133
+Node: Stack Cells14743
+Node: Heap Cells16016
+Node: Controller Cells and Editor Problems17669
+Node: Legacy YAML-defined Modules19614
+Node: Editing Commands20677
+Node: Undo and Redo21878
+Node: Advanced editing22241
+Node: Customizations23324
 
 End Tag Table
