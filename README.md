@@ -10,7 +10,7 @@
 
   ![screenshot](./doc/example-1.gif)
 
-  ![screenshot](./doc/example-2.gif)
+  <img src="./doc/example-2.gif" height="310px" />
 
 # Installation
 
