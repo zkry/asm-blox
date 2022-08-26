@@ -10,7 +10,7 @@
 
   ![screenshot](./doc/example-1.gif)
 
-  ![screenshot](./doc/example-1.gif)
+  ![screenshot](./doc/example-2.gif)
 
 # Installation
 
