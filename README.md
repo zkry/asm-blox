@@ -8,9 +8,9 @@
   define extra components such as stacks and heaps to help you solve
   your puzzles.
 
-  ![screenshot](./doc/screenshot1.gif)
+  ![screenshot](./doc/example-1.gif)
 
-  ![screenshot](./doc/screenshot2.gif)
+  ![screenshot](./doc/example-1.gif)
 
 # Installation
 
