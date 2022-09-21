@@ -3300,6 +3300,13 @@ The follwoing commadns are defined:
 (defvar asm-blox--show-pair-idle-timer nil
   "Idle-timer for showing matching parenthesis.")
 
+(defun asm-blox--ensure-buffer-not-empty ()
+  (let ((parse (ignore-errors (asm-blox--parse-saved-buffer))))
+    (if parse
+        nil
+      (message "File corrupted; unable to save.xo")
+      t)))
+
 (define-derived-mode asm-blox-mode fundamental-mode "asm-blox"
   "Major mode for editing `asm-blox' puzzles.
 
@@ -3328,6 +3335,7 @@ The following commands are available:
   (unless asm-blox--show-pair-idle-timer
     (setq asm-blox--show-pair-idle-timer
           (run-with-idle-timer 0.125 t #'asm-blox--highlight-pairs)))
+  (add-hook 'write-file-functions #'asm-blox--ensure-buffer-not-empty nil t)
   (asm-blox-eldoc-setup))
 
 ;;;###autoload
