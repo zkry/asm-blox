@@ -16,13 +16,24 @@
 
 ## MELPA
 
-  This package is on MELPA and can be found under the name `asm-blox`.
+  This package is on MELPA and can be found under the name `asm-bloc`.
+  Thus, the simplest way to install the package would be
+  <kbd>M-x</kbd> `package-install` <kbd>RET</kbd> `asm-blox`
+  <kbd>RET</kbd>.
 
-## via straight.el
+## via use-package
 
   ```emacs-lisp
-  (straight-use-package 'asm-blox)
+  (use-package asm-blox)
   ```
+
+# Configuration
+
+  asm-blox pluzzles' save data is stored as text files in the
+  directory specified by the `asm-blox-save-directory-name`.  When
+  running the `asm-blox` command, all the files from this directory
+  will be read and displayed under the corresponding puzzle.
+
 # Selecting a Puzzle
 
   You can initialize a game with the command <kbd>M-x asm-blox</kbd>.
@@ -30,7 +41,6 @@
   pressing <kbd>RET</kbd> a new solution to that puzzle will be
   created.  Back on the puzzle selection screen, you can view and open
   up saved files by pressing <kbd>RET</kbd> on the `[1]`-like text.
-
 
 # Getting Started
 
