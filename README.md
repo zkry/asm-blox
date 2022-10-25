@@ -16,7 +16,7 @@
 
 ## MELPA
 
-  This package is on MELPA and can be found under the name `asm-bloc`.
+  This package is on MELPA and can be found under the name `asm-blox`.
   Thus, the simplest way to install the package would be
   <kbd>M-x</kbd> `package-install` <kbd>RET</kbd> `asm-blox`
   <kbd>RET</kbd>.
