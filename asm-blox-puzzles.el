@@ -684,7 +684,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      (list (asm-blox--cell-sink-create :row 3
                                        :col 1
                                        :expected-data output-g
-                                       :name "P")
+                                       :name "G")
            (asm-blox--cell-sink-create :row 3
                                        :col 2
                                        :expected-data output-e
