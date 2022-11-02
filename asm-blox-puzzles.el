@@ -669,7 +669,7 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
 
 (defun asm-blox-puzzles--signal-comparator ()
   "Generate a problem."
-  (let* ((input (seq-map (lambda (_) (random 10)) (make-list 40 nil)))
+  (let* ((input (seq-map (lambda (_) (- (random 10) 5)) (make-list 40 nil)))
          (output-g (seq-mapn (lambda (x) (if (> x 0) 1 0)) input))
          (output-e (seq-mapn (lambda (x) (if (= x 0) 1 0)) input))
          (output-l (seq-mapn (lambda (x) (if (< x 0) 1 0)) input)))

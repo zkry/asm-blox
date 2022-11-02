@@ -1781,7 +1781,7 @@ This was added for performance reasons.")
                      (inner-str (if num (format "%4d" num) "    "))
                      (inner-str (if current-row-p
                                     (propertize inner-str
-                                                'font-lock-face '(:background "#777"))
+                                                'font-lock-face '(:background "#aaa"))
                                   inner-str)))
                 (format "│%s│" inner-str))))))))))
 
