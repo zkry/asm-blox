@@ -650,11 +650,11 @@ If B>A then send B to R, 0 to L. If A=B send 0 to L and R.")))
      :sources (list (asm-blox--cell-source-create :row -1
                                                   :col 1
                                                   :data input-a
-                                                  :name "I")
+                                                  :name "A")
                     (asm-blox--cell-source-create :row -1
                                                   :col 2
                                                   :data input-b
-                                                  :name "I"))
+                                                  :name "B"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
                                        :col 1
