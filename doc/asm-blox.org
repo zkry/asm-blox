@@ -530,20 +530,20 @@ following code:
 
    Asm-blox support undo and redo on a per-cell basis.
 
-   - ~asm-blox-undo~ (bound ~s-z~): undo a previous action in the
+   - ~asm-blox-undo~ (bound ~s-z~, remap ~undo~): undo a previous action in the
      current code cell.
    - ~asm-blox-redo~ (bound ~s-y~): redo a previous undo in the
      current code cell.
 
 ** Advanced editing
 
-   - ~asm-blox-shift-box-up~ (bound ~<s-up>~): Swap the current code
+   - ~asm-blox-shift-box-up~ (bound ~<M-up>~): Swap the current code
      cell with the one above the current one.
-   - ~asm-blox-shift-box-down~ (bound ~<s-down>~): Swap the current
+   - ~asm-blox-shift-box-down~ (bound ~<M-down>~): Swap the current
      code cell with the one below the current one.
-   - ~asm-blox-shift-box-left~ (bound ~<s-left>~): Swap the current
+   - ~asm-blox-shift-box-left~ (bound ~<M-left>~): Swap the current
      code cell with the one to the left of the current one.
-   - ~asm-blox-shift-box-right~ (bound ~<s-right>~): Swap the current
+   - ~asm-blox-shift-box-right~ (bound ~<M-right>~): Swap the current
      code cell with the one to the right of the current one.
    - ~asm-blox-kill-region~ (bound ~<C-w>~): kill the highlighted
      region of the current code cell.  Note that the two ends of the
