@@ -276,10 +276,10 @@ Send a number x which minimizes the equation
  draw a line with that many '#' characters.")))
 
 (defun asm-blox-puzzles--hello-world ()
-  "Generate a problem involving writing Hello World to the srceen."
+  "Generate a problem involving writing Hello World to the screen."
   (asm-blox--problem-spec-create
    :name "Editor Basics"
-   :difficulty 'tutorial
+   :difficulty 'easy
    :sources (list )
    :sinks
    (list (asm-blox--cell-sink-create :row 1
