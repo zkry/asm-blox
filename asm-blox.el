@@ -3671,10 +3671,13 @@ The following commands are available:
           (let ((saved-file-ids (asm-blox--saved-puzzle-ct-ids name)))
             (dolist (i saved-file-ids)
               (insert
-               (propertize (format "[%d]" i)
-                           'asm-blox-puzzle-selection-id name
-                           'asm-blox-puzzle-selection-filename
-                           (asm-blox--make-puzzle-idx-file-name name i)))
+               (button-buttonize
+                (propertize (format "[%d]" i)
+                            'asm-blox-puzzle-selection-id name
+                            'asm-blox-puzzle-selection-filename
+                            (asm-blox--make-puzzle-idx-file-name name i))
+                (lambda (_)
+                  (asm-blox-select-puzzle))))
               (insert (propertize " " 'asm-blox-puzzle-selection-id name)))))
         (insert "\n")))))
 
