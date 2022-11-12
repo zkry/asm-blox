@@ -439,9 +439,36 @@ following code:
   6. If true (ie 1) is on the top of the stack, jump to the loop.
 
    `block', `loop', `br' and `br_if' can be combined to create a wide
-variety of constructs.
+variety of constructs.  For example, consider the following which
+mimics an if-else branch:
 
-   Commands:
+     ;; IF UP > 10
+     ;; THEN
+     ;;   SEND 10 LEFT
+     ;; ELSE
+     ;;   SEND 20 RIGHT
+     ;; END
+
+     (block     ; block 1
+      (block    ; block 0
+       (gt (up)
+           (const 10))
+       (br_if 0) ; ELSE clause:
+       (send right
+             (const 20))
+       (br 1))
+       ; THEN clause:
+      (send left
+            (const 10)))
+
+   Here two nested blocks are defined.  The comparison `gt' is
+performed.  If the result is TRUE, the `(br_if 0)' activates and goes
+to the *end* of block 0, running the `(send left (const 10))' clause.
+If the result is FALSE, the `br_if' command is not ran, and the `(send
+right (const 20))' is ran.  Note that we need to have the `(br 1)'
+command so that the control flow doesn't go down to the THEN clause.
+
+   Summary of commands:
 
    * `block': Setup a block. Any `br' command pointing to this block
      will jump past the end of the block.
@@ -505,8 +532,9 @@ example of a stack.
    * `:input-port': any value sent here will be added to the top of the
      stack.
 
-   * `:input-ports': multiple input port specifications.  Can not be
-     used with `input-port'.
+   * `:input-ports': multiple input port specifications in an
+     s-expression.  Can not be used with `input-port'. ex.
+     `:input-ports (up left)'
 
    * `:output-port': if another cell reads from here, it will be popped
      off the stack.
@@ -762,14 +790,14 @@ Node: Comparison Operations9925
 Node: Other Operations11165
 Node: Port Operations11356
 Node: Blocks and Loops12098
-Node: Module Blocks14133
-Node: Stack Cells14743
-Node: Heap Cells16016
-Node: Controller Cells and Editor Problems17669
-Node: Legacy YAML-defined Modules19614
-Node: Editing Commands20677
-Node: Undo and Redo21878
-Node: Advanced editing22241
-Node: Customizations23324
+Node: Module Blocks14976
+Node: Stack Cells15586
+Node: Heap Cells16912
+Node: Controller Cells and Editor Problems18565
+Node: Legacy YAML-defined Modules20510
+Node: Editing Commands21573
+Node: Undo and Redo22774
+Node: Advanced editing23137
+Node: Customizations24220
 
 End Tag Table
