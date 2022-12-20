@@ -939,7 +939,7 @@ Find the pattern 0, 0, 0:
                                                   :name "I"))
      :sinks
      (list (asm-blox--cell-sink-create :row 3
-                                       :col 2
+                                       :col 1
                                        :expected-data output-n
                                        :name "N")
            (asm-blox--cell-sink-create :row 3
