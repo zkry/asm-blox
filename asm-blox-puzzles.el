@@ -246,7 +246,7 @@ from 0 to the read number. (ex. 3->6, 4->10, 5->15)")))
                                       :editor-text nil
                                       :editor-point nil
                                       :expected-text nil))
-     :description "Read the 10 numbers from N (n1, n2, ..., n40).
+     :description "Read the 10 numbers from N (n1, n2, ..., n10).
 Send a number x which minimizes the equation
 (cl-loop for n in N
          sum (abs (- n x)))")))
